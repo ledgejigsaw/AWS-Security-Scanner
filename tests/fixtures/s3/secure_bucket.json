@@ -1,0 +1,8 @@
+{
+    "bucket_name": "company-secure-data",
+    "region": "eu-west-2",
+    "public": false,
+    "encryption": true,
+    "versioning": true,
+    "logging": true
+}
