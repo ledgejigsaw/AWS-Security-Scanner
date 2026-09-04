@@ -1,16 +1,17 @@
 from aws_security_scanner.models.finding import Finding, Severity
+from aws_security_scanner.models.resource import Resource
 
 
-def check_public_bucket(bucket: dict) -> list[Finding]:
+def check_public_bucket(resource: Resource) -> list[Finding]:
     findings = []
 
-    if bucket.get("public") is True:
+    if resource.attributes.get("public") is True:
         findings.append(
             Finding(
                 check_id="S3-001",
                 severity=Severity.CRITICAL,
                 service="S3",
-                resource=bucket["bucket_name"],
+                resource=resource.resource_id,
                 title="S3 bucket is publicly accessible",
                 description=(
                     "The S3 bucket is configured for public access. "
@@ -21,7 +22,7 @@ def check_public_bucket(bucket: dict) -> list[Finding]:
                     "Enable S3 Block Public Access and remove any "
                     "unnecessary public bucket policies or ACLs."
                 ),
-                region=bucket.get("region"),
+                region=resource.region,
                 evidence="public=true",
             )
         )
