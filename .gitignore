@@ -1,28 +1,21 @@
-# Virtual environment
-.venv/
-
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
+
+# Virtual environments
+.venv/
 
 # Packaging
 *.egg-info/
 build/
 dist/
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
 # macOS
 .DS_Store
 
-# IDEs
-.vscode/
-.idea/
+# Testing
+.pytest_cache/
 
 # Generated reports
-# Uncomment if reports should remain local only
-# reports/*.json
-# reports/*.html
+reports/*.json
+reports/*.html
