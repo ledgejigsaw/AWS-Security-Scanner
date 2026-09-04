@@ -1,28 +1,22 @@
-import json
+from pathlib import Path
 
 from aws_security_scanner.models.finding import Severity
-from aws_security_scanner.models.resource import Resource
+from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.rules.s3_rules import check_public_bucket
 
 
-def load_fixture(filename: str) -> dict:
-    with open(f"tests/fixtures/s3/{filename}") as file:
-        return json.load(file)
-
-
-def fixture_to_resource(bucket: dict) -> Resource:
-    return Resource(
-        resource_type="aws_s3_bucket",
-        resource_id=bucket["bucket_name"],
-        attributes=bucket,
-        source="fixture",
-        region=bucket.get("region"),
-    )
+FIXTURE_DIRECTORY = Path("tests/fixtures/s3")
 
 
 def test_public_bucket_is_critical():
-    bucket = load_fixture("insecure_bucket.json")
-    resource = fixture_to_resource(bucket)
+    provider = FixtureProvider(FIXTURE_DIRECTORY)
+    resources = provider.discover()
+
+    resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "company-sensitive-data"
+    )
 
     findings = check_public_bucket(resource)
 
@@ -32,8 +26,14 @@ def test_public_bucket_is_critical():
 
 
 def test_private_bucket_has_no_findings():
-    bucket = load_fixture("secure_bucket.json")
-    resource = fixture_to_resource(bucket)
+    provider = FixtureProvider(FIXTURE_DIRECTORY)
+    resources = provider.discover()
+
+    resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "company-secure-data"
+    )
 
     findings = check_public_bucket(resource)
 
