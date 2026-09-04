@@ -29,6 +29,7 @@ def check_public_bucket(resource: Resource) -> list[Finding]:
 
     return findings
 
+
 def check_encryption(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -52,6 +53,35 @@ def check_encryption(resource: Resource) -> list[Finding]:
                 ),
                 region=resource.region,
                 evidence="encryption=false",
+            )
+        )
+
+    return findings
+
+
+def check_versioning(resource: Resource) -> list[Finding]:
+    findings = []
+
+    if resource.attributes.get("versioning") is False:
+        findings.append(
+            Finding(
+                check_id="S3-003",
+                severity=Severity.MEDIUM,
+                service="S3",
+                resource=resource.resource_id,
+                title="S3 bucket versioning is disabled",
+                description=(
+                    "S3 bucket versioning is disabled. Without versioning, "
+                    "previous versions of objects cannot be retained, "
+                    "reducing protection against accidental deletion or "
+                    "overwriting of data."
+                ),
+                remediation=(
+                    "Enable S3 bucket versioning to retain previous object "
+                    "versions and improve data recovery capabilities."
+                ),
+                region=resource.region,
+                evidence="versioning=false",
             )
         )
 

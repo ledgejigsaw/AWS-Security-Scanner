@@ -5,6 +5,7 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.rules.s3_rules import (
     check_encryption,
     check_public_bucket,
+    check_versioning
 )
 
 
@@ -69,5 +70,35 @@ def test_encrypted_bucket_has_no_encryption_finding():
     )
 
     findings = check_encryption(resource)
+
+    assert findings == []
+
+def test_versioning_disabled_generates_medium_finding():
+    provider = FixtureProvider(FIXTURE_DIRECTORY)
+    resources = provider.discover()
+
+    resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "company-sensitive-data"
+    )
+
+    findings = check_versioning(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-003"
+    assert findings[0].severity == Severity.MEDIUM
+
+def test_versioning_enabled_has_no_versioning_finding():
+    provider = FixtureProvider(FIXTURE_DIRECTORY)
+    resources = provider.discover()
+
+    resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "company-secure-data"
+    )
+
+    findings = check_versioning(resource)
 
     assert findings == []
