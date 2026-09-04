@@ -28,3 +28,31 @@ def check_public_bucket(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+def check_encryption(resource: Resource) -> list[Finding]:
+    findings = []
+
+    if resource.attributes.get("encryption") is False:
+        findings.append(
+            Finding(
+                check_id="S3-002",
+                severity=Severity.HIGH,
+                service="S3",
+                resource=resource.resource_id,
+                title="S3 bucket encryption is disabled",
+                description=(
+                    "The S3 bucket does not have server-side encryption "
+                    "enabled. Data stored in the bucket may therefore be "
+                    "stored without encryption at rest."
+                ),
+                remediation=(
+                    "Enable server-side encryption for the S3 bucket. "
+                    "Use SSE-S3 or SSE-KMS according to the organisation's "
+                    "security requirements."
+                ),
+                region=resource.region,
+                evidence="encryption=false",
+            )
+        )
+
+    return findings
