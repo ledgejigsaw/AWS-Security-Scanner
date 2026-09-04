@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: aws-security-scanner
-Version: 0.1.0
-Summary: Read-only AWS cloud security posture assessment tool
-Requires-Python: >=3.11
-Requires-Dist: boto3
-Requires-Dist: rich
-Provides-Extra: dev
-Requires-Dist: pytest; extra == "dev"

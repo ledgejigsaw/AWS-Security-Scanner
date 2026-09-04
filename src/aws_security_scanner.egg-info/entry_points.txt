@@ -1,2 +1,0 @@
-[console_scripts]
-aws-security-scan = aws_security_scanner.cli:main
