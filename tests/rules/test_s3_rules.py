@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.rules.s3_rules import (
@@ -132,5 +133,50 @@ def test_logging_enabled_has_no_logging_finding():
     )
 
     findings = check_logging(resource)
+
+    assert findings == []
+
+def test_block_public_access_disabled_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "region": "eu-west-2",
+            "public": True,
+            "encryption": False,
+            "versioning": False,
+            "logging": False,
+            "block_public_access": False,
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_block_public_access(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-004"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_block_public_access_enabled_has_no_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-secure-data",
+        attributes={
+            "bucket_name": "company-secure-data",
+            "region": "eu-west-2",
+            "public": False,
+            "encryption": True,
+            "versioning": True,
+            "logging": True,
+            "block_public_access": True,
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_block_public_access(resource)
 
     assert findings == []
