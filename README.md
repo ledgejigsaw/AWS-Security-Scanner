@@ -1,6 +1,6 @@
 # AWS Security Scanner
 
-A Python-based AWS Cloud Security Posture Management (CSPM) tool designed to identify common AWS security misconfigurations.
+A Python-based **AWS Cloud Security Posture Management (CSPM)** tool designed to identify common AWS security misconfigurations.
 
 The project is being developed as a security engineering portfolio project, with an emphasis on:
 
@@ -15,7 +15,7 @@ The project is being developed as a security engineering portfolio project, with
 * Extensible provider architecture
 * Evidence-based security findings
 
-The long-term objective is to provide a read-only security assessment capability for AWS environments, Terraform infrastructure-as-code, and controlled test fixtures.
+The long-term objective is to provide a **read-only security assessment capability** for AWS environments, Terraform infrastructure-as-code, and controlled test fixtures.
 
 ---
 
@@ -39,25 +39,29 @@ The architecture is designed so that the same security rules can eventually anal
 * S3 public-access detection
 * S3 encryption detection
 * S3 versioning detection
-* Automated tests for insecure and secure S3 configurations
+* S3 Block Public Access detection
+* S3 server access logging detection
+* Automated tests for known-good and known-bad S3 configurations
 
 ### Current Test Status
 
 ```text
-5 passed
+8 passed
 ```
 
 ---
 
-## Current Security Checks
+# Current Security Checks
 
 | Check ID | Service | Security Check                  | Severity | Status      |
 | -------- | ------- | ------------------------------- | -------- | ----------- |
 | S3-001   | S3      | Publicly accessible bucket      | CRITICAL | Implemented |
 | S3-002   | S3      | Server-side encryption disabled | HIGH     | Implemented |
 | S3-003   | S3      | Bucket versioning disabled      | MEDIUM   | Implemented |
+| S3-004   | S3      | Block Public Access disabled    | HIGH     | Implemented |
+| S3-005   | S3      | Server access logging disabled  | MEDIUM   | Implemented |
 
-Additional security checks will be added incrementally as the security engine develops.
+Additional security controls will be added incrementally as the security engine develops.
 
 ---
 
@@ -99,6 +103,10 @@ Configuration is obtained from a data source, converted into a normalised `Resou
 ```
 
 The separation between configuration sources and security rules is a core architectural principle of the project.
+
+Security rules should not depend directly on AWS SDK responses, Terraform syntax, or fixture-specific structures.
+
+Instead, providers are responsible for converting source-specific configuration into the common `Resource` model.
 
 ---
 
@@ -205,7 +213,7 @@ Some provider and reporting components are currently placeholders for functional
 * `pip`
 * Python virtual environment
 
-The current fixture-based implementation does **not** require an AWS account.
+The current fixture-based implementation does **not** require an AWS account or AWS credentials.
 
 ---
 
@@ -254,20 +262,24 @@ pytest
 Current result:
 
 ```text
-5 passed
+8 passed
 ```
 
-The test suite currently validates both insecure and secure S3 configurations.
+The test suite validates both known-bad and known-good S3 configurations.
 
-The tests verify that:
+The current tests verify that:
 
-1. A publicly accessible S3 bucket generates a `CRITICAL` finding.
+1. A publicly accessible S3 bucket generates an `S3-001` `CRITICAL` finding.
 2. A private S3 bucket does not generate an `S3-001` finding.
-3. An unencrypted S3 bucket generates a `HIGH` finding.
+3. An unencrypted S3 bucket generates an `S3-002` `HIGH` finding.
 4. An encrypted S3 bucket does not generate an `S3-002` finding.
-5. A bucket with versioning disabled generates a `MEDIUM` finding.
+5. A bucket with versioning disabled generates an `S3-003` `MEDIUM` finding.
+6. A bucket with versioning enabled does not generate an `S3-003` finding.
+7. A bucket with S3 Block Public Access disabled generates an `S3-004` `HIGH` finding.
+8. A bucket with server access logging disabled generates an `S3-005` `MEDIUM` finding.
+9. A bucket with server access logging enabled does not generate an `S3-005` finding.
 
-The secure versioning test will be added as part of the completion of S3-003.
+> Note: The project is being developed incrementally, so the exact number of tests will increase as additional security controls are implemented.
 
 ---
 
@@ -288,7 +300,8 @@ Example:
     "public": true,
     "encryption": false,
     "versioning": false,
-    "logging": false
+    "logging": false,
+    "block_public_access": false
 }
 ```
 
@@ -308,6 +321,8 @@ The finding also contains:
 * Remediation guidance
 * AWS region
 * Evidence supporting the finding
+
+Publicly accessible object storage can represent a significant data-exposure risk, particularly where buckets contain sensitive, confidential, or regulated information.
 
 ---
 
@@ -363,6 +378,64 @@ Versioning can provide additional protection against accidental deletion or over
 
 ---
 
+## S3-004 — Block Public Access Disabled
+
+**Severity:** `HIGH`
+
+Detects S3 buckets where Block Public Access is disabled.
+
+Example:
+
+```json
+"block_public_access": false
+```
+
+The scanner generates a finding containing:
+
+```text
+Check ID: S3-004
+Severity: HIGH
+Service: S3
+Resource: company-sensitive-data
+Issue: S3 Block Public Access is disabled
+```
+
+The finding identifies the configuration value responsible for the detection and recommends enabling S3 Block Public Access.
+
+The current fixture implementation represents Block Public Access using a simplified boolean value.
+
+The future AWS provider will model the underlying S3 Block Public Access configuration more accurately, including the individual AWS controls.
+
+---
+
+## S3-005 — Server Access Logging Disabled
+
+**Severity:** `MEDIUM`
+
+Detects S3 buckets where server access logging is disabled.
+
+Example:
+
+```json
+"logging": false
+```
+
+The scanner generates a finding containing:
+
+```text
+Check ID: S3-005
+Severity: MEDIUM
+Service: S3
+Resource: company-sensitive-data
+Issue: S3 bucket access logging is disabled
+```
+
+Without access logging, requests made against the bucket may not be recorded, reducing visibility into access activity and making security investigations more difficult.
+
+The remediation recommends enabling S3 server access logging and configuring an appropriate destination for the access logs.
+
+---
+
 # Security Finding Model
 
 Security findings use a consistent data model.
@@ -405,6 +478,8 @@ Security checks are implemented independently from the mechanism used to obtain 
 Security rules can be unit tested without requiring AWS credentials or live infrastructure.
 
 Known-good and known-bad configurations are represented as controlled fixtures.
+
+This provides deterministic test conditions and reduces the risk of introducing regressions into existing security controls.
 
 ## Separation of Concerns
 
@@ -536,9 +611,14 @@ This creates the potential for the scanner to operate as a security gate within 
 * [x] S3-001 — Public bucket detection
 * [x] S3-002 — Encryption disabled
 * [x] S3-003 — Versioning disabled
-* [ ] S3-004 — S3 Block Public Access configuration
-* [ ] S3-005 — Server access logging
+* [x] S3-004 — S3 Block Public Access configuration
+* [x] S3-005 — Server access logging
 * [ ] Additional S3 security checks
+* [ ] S3 bucket policy analysis
+* [ ] S3 ACL analysis
+* [ ] S3 public-access policy evaluation
+* [ ] S3 lifecycle configuration analysis
+* [ ] S3 object-lock assessment
 
 ---
 
@@ -673,6 +753,21 @@ Reporting
 ```
 
 This approach allows each security control to be independently developed, tested and validated before moving to the next layer.
+
+The development process follows the general:
+
+```text
+RED → GREEN → REFACTOR
+```
+
+cycle:
+
+1. Write a test representing the required security behaviour.
+2. Confirm the test fails for the expected reason.
+3. Implement the minimum functionality required.
+4. Confirm the test passes.
+5. Refactor where appropriate without changing behaviour.
+6. Commit the completed security control.
 
 ---
 
