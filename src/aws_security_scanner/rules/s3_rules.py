@@ -1,7 +1,8 @@
 from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.models.resource import Resource
+from aws_security_scanner.rules.decorators import rule_for
 
-
+@rule_for("aws_s3_bucket")
 def check_public_bucket(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -30,6 +31,7 @@ def check_public_bucket(resource: Resource) -> list[Finding]:
     return findings
 
 
+@rule_for("aws_s3_bucket")
 def check_encryption(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -59,6 +61,7 @@ def check_encryption(resource: Resource) -> list[Finding]:
     return findings
 
 
+@rule_for("aws_s3_bucket")
 def check_versioning(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -86,6 +89,7 @@ def check_versioning(resource: Resource) -> list[Finding]:
         )
     return findings
 
+@rule_for("aws_s3_bucket")
 def check_block_public_access(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -113,6 +117,8 @@ def check_block_public_access(resource: Resource) -> list[Finding]:
 
     return findings
 
+
+@rule_for("aws_s3_bucket")
 def check_logging(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -141,6 +147,8 @@ def check_logging(resource: Resource) -> list[Finding]:
 
     return findings
 
+
+@rule_for("aws_s3_bucket")
 def check_bucket_policy(resource: Resource) -> list[Finding]:
     findings = []
 
@@ -184,3 +192,4 @@ def check_bucket_policy(resource: Resource) -> list[Finding]:
             )
 
     return findings
+

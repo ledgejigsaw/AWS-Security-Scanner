@@ -25,4 +25,4 @@ class RuleEngine:
 
                 findings.extend(rule(resource))
 
-        return findings
+        return findings 
