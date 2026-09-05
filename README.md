@@ -36,32 +36,42 @@ The architecture is designed so that the same security rules can eventually anal
 * Fixture-based testing architecture
 * Separation between configuration sources and security rules
 * Fixture provider
+* Resource-aware rule engine
+* Rule registry
+* Resource-type rule decorator
 * S3 public-access detection
 * S3 encryption detection
 * S3 versioning detection
 * S3 Block Public Access detection
 * S3 server access logging detection
+* S3 bucket policy wildcard-principal detection
 * Automated tests for known-good and known-bad S3 configurations
+* Rule engine unit tests
+* Rule engine integration tests
+* Rule decorator tests
 
 ### Current Test Status
 
 ```text
-8 passed
+21 passed
 ```
+
+All current automated tests pass.
 
 ---
 
 # Current Security Checks
 
-| Check ID | Service | Security Check                  | Severity | Status      |
-| -------- | ------- | ------------------------------- | -------- | ----------- |
-| S3-001   | S3      | Publicly accessible bucket      | CRITICAL | Implemented |
-| S3-002   | S3      | Server-side encryption disabled | HIGH     | Implemented |
-| S3-003   | S3      | Bucket versioning disabled      | MEDIUM   | Implemented |
-| S3-004   | S3      | Block Public Access disabled    | HIGH     | Implemented |
-| S3-005   | S3      | Server access logging disabled  | MEDIUM   | Implemented |
+| Check ID | Service | Security Check                          | Severity | Status      |
+| -------- | ------- | --------------------------------------- | -------- | ----------- |
+| S3-001   | S3      | Publicly accessible bucket              | CRITICAL | Implemented |
+| S3-002   | S3      | Server-side encryption disabled         | HIGH     | Implemented |
+| S3-003   | S3      | Bucket versioning disabled              | MEDIUM   | Implemented |
+| S3-004   | S3      | Block Public Access disabled            | HIGH     | Implemented |
+| S3-005   | S3      | Server access logging disabled          | MEDIUM   | Implemented |
+| S3-006   | S3      | Bucket policy allows wildcard principal | HIGH     | Implemented |
 
-Additional security controls will be added incrementally as the security engine develops.
+Additional security controls will be added as new AWS services and resource types are introduced.
 
 ---
 
@@ -69,7 +79,7 @@ Additional security controls will be added incrementally as the security engine 
 
 The scanner is built around a separation-of-concerns architecture.
 
-Configuration is obtained from a data source, converted into a normalised `Resource` representation, evaluated by independent security rules, and converted into standardised security findings.
+Configuration is obtained from a data source, converted into a normalised `Resource` representation, evaluated by resource-specific security rules, and converted into standardised security findings.
 
 ```text
                          DATA SOURCES
@@ -88,7 +98,18 @@ Configuration is obtained from a data source, converted into a normalised `Resou
                               |
                               v
                     +-------------------+
-                    |   Security Rules  |
+                    |    Rule Engine    |
+                    +---------+---------+
+                              |
+                              v
+                    +-------------------+
+                    |  Resource-Type    |
+                    |     Filtering     |
+                    +---------+---------+
+                              |
+                              v
+                    +-------------------+
+                    |  Security Rules   |
                     +---------+---------+
                               |
                               v
@@ -110,6 +131,46 @@ Instead, providers are responsible for converting source-specific configuration 
 
 ---
 
+# Rule Architecture
+
+Security rules are designed to declare the AWS resource type they apply to.
+
+Rules use the `@rule_for()` decorator:
+
+```python
+@rule_for("aws_s3_bucket")
+def check_public_bucket(resource: Resource) -> list[Finding]:
+    ...
+```
+
+The decorator associates a rule with a normalised resource type.
+
+The rule engine then executes only rules applicable to the resource being evaluated.
+
+Conceptually:
+
+```text
+Resource
+    |
+    | resource_type = "aws_s3_bucket"
+    v
+Rule Engine
+    |
+    +---- S3 rules       --> Execute
+    |
+    +---- IAM rules      --> Skip
+    |
+    +---- EC2 rules      --> Skip
+    |
+    +---- VPC rules      --> Skip
+```
+
+This allows the scanner to support multiple AWS resource types without every rule being executed against every resource.
+
+The architecture is intended to scale as additional services are introduced.
+
+---
+
 # Normalised Resource Model
 
 A common `Resource` model sits between configuration providers and security rules.
@@ -124,6 +185,9 @@ Configuration Source
         |
         v
      Resource
+        |
+        v
+   Rule Engine
         |
         v
   Security Rule
@@ -145,12 +209,35 @@ For example:
 ```text
 Local Fixture ─────┐
                    |
-Terraform ─────────┼──> Resource ──> S3 Rules
+Terraform ─────────┼──> Resource ──> Rule Engine ──> S3 Rules
                    |
 AWS API ───────────┘
 ```
 
 This reduces coupling between data acquisition and security analysis while allowing the same security controls to operate across multiple configuration sources.
+
+---
+
+# Rule Registry
+
+Security rules are maintained through a central rule registry.
+
+The registry provides the rule engine with the security controls that are currently available:
+
+```text
+Rule Registry
+      |
+      +---- S3-001
+      +---- S3-002
+      +---- S3-003
+      +---- S3-004
+      +---- S3-005
+      +---- S3-006
+```
+
+This provides a single mechanism for assembling the active security rule set.
+
+As additional services are introduced, the registry can be extended with IAM, EC2, VPC and other security rules without redesigning the rule engine.
 
 ---
 
@@ -167,6 +254,7 @@ AWS-Security-Scanner/
 │       │
 │       ├── __init__.py
 │       ├── cli.py
+│       ├── engine.py
 │       │
 │       ├── models/
 │       │   ├── __init__.py
@@ -183,6 +271,8 @@ AWS-Security-Scanner/
 │       │
 │       └── rules/
 │           ├── __init__.py
+│           ├── decorators.py
+│           ├── registry.py
 │           └── s3_rules.py
 │
 ├── tests/
@@ -191,16 +281,22 @@ AWS-Security-Scanner/
 │   │       ├── insecure_bucket.json
 │   │       └── secure_bucket.json
 │   │
-│   └── rules/
-│       ├── __init__.py
-│       └── test_s3_rules.py
+│   ├── rules/
+│   │   ├── __init__.py
+│   │   ├── test_decorators.py
+│   │   ├── test_registry.py
+│   │   └── test_s3_rules.py
+│   │
+│   ├── __init__.py
+│   ├── test_engine.py
+│   └── test_engine_integration.py
 │
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
 
-Some provider and reporting components are currently placeholders for functionality planned for later development.
+Some provider, CLI and reporting components are currently placeholders for functionality planned for later development.
 
 ---
 
@@ -251,7 +347,7 @@ pip install -e ".[dev]"
 
 # Testing
 
-The project uses `pytest` for automated security-rule testing.
+The project uses `pytest` for automated security-rule and architecture testing.
 
 Run the test suite with:
 
@@ -262,10 +358,10 @@ pytest
 Current result:
 
 ```text
-8 passed
+21 passed
 ```
 
-The test suite validates both known-bad and known-good S3 configurations.
+The test suite validates both known-bad and known-good S3 configurations, as well as the rule engine, rule registry and rule metadata architecture.
 
 The current tests verify that:
 
@@ -276,14 +372,30 @@ The current tests verify that:
 5. A bucket with versioning disabled generates an `S3-003` `MEDIUM` finding.
 6. A bucket with versioning enabled does not generate an `S3-003` finding.
 7. A bucket with S3 Block Public Access disabled generates an `S3-004` `HIGH` finding.
-8. A bucket with server access logging disabled generates an `S3-005` `MEDIUM` finding.
-9. A bucket with server access logging enabled does not generate an `S3-005` finding.
-
-> Note: The project is being developed incrementally, so the exact number of tests will increase as additional security controls are implemented.
+8. A bucket with S3 Block Public Access enabled does not generate an `S3-004` finding.
+9. A bucket with server access logging disabled generates an `S3-005` `MEDIUM` finding.
+10. A bucket with server access logging enabled does not generate an `S3-005` finding.
+11. A bucket policy containing a wildcard principal generates an `S3-006` `HIGH` finding.
+12. A bucket policy restricted to a specific principal does not generate an `S3-006` finding.
+13. A bucket policy using a single statement object is correctly evaluated.
+14. The rule engine executes applicable rules.
+15. The rule engine executes multiple applicable rules.
+16. The rule engine ignores rules for unrelated resource types.
+17. The rule registry contains the expected S3 rules.
+18. Registered rules are callable.
+19. The `@rule_for()` decorator assigns the expected resource type.
+20. Decorated rules remain callable.
+21. Registered S3 rules are correctly executed through the rule engine.
 
 ---
 
 # Current S3 Security Checks
+
+The S3 security module is currently complete for the initial scope of the project.
+
+It contains six implemented security controls covering public exposure, encryption, resilience, logging and bucket-policy access.
+
+---
 
 ## S3-001 — Publicly Accessible Bucket
 
@@ -322,7 +434,7 @@ The finding also contains:
 * AWS region
 * Evidence supporting the finding
 
-Publicly accessible object storage can represent a significant data-exposure risk, particularly where buckets contain sensitive, confidential, or regulated information.
+Publicly accessible object storage can represent a significant data-exposure risk, particularly where buckets contain sensitive, confidential or regulated information.
 
 ---
 
@@ -348,7 +460,7 @@ Resource: company-sensitive-data
 Issue: S3 bucket encryption is disabled
 ```
 
-The rule currently recommends enabling server-side encryption using either SSE-S3 or SSE-KMS according to the organisation's security requirements.
+The rule recommends enabling server-side encryption using either SSE-S3 or SSE-KMS according to the organisation's security requirements.
 
 ---
 
@@ -436,6 +548,59 @@ The remediation recommends enabling S3 server access logging and configuring an 
 
 ---
 
+## S3-006 — Wildcard Bucket Policy Principal
+
+**Severity:** `HIGH`
+
+Detects S3 bucket policies containing an `Allow` statement with a wildcard principal.
+
+Example:
+
+```json
+{
+    "Effect": "Allow",
+    "Principal": "*"
+}
+```
+
+The scanner generates a finding containing:
+
+```text
+Check ID: S3-006
+Severity: HIGH
+Service: S3
+Resource: company-sensitive-data
+Issue: S3 bucket policy allows access from any principal
+```
+
+The rule recommends restricting the bucket policy principal to the specific AWS accounts, roles or services that require access.
+
+Wildcard principals should only be used where access is explicitly required, understood and appropriately controlled.
+
+The rule supports both:
+
+```json
+"Statement": {
+    "Effect": "Allow",
+    "Principal": "*"
+}
+```
+
+and:
+
+```json
+"Statement": [
+    {
+        "Effect": "Allow",
+        "Principal": "*"
+    }
+]
+```
+
+This ensures that both single-statement and multi-statement bucket policies can be evaluated.
+
+---
+
 # Security Finding Model
 
 Security findings use a consistent data model.
@@ -487,6 +652,8 @@ The provider is responsible for obtaining and normalising configuration.
 
 The security rule is responsible for determining whether that configuration violates a security requirement.
 
+The rule engine is responsible for determining which rules apply to each resource.
+
 Reporting is responsible for presenting the resulting findings.
 
 This prevents cloud-provider API logic from becoming tightly coupled to security-analysis logic.
@@ -510,6 +677,8 @@ This reduces the need to develop and test security functionality directly agains
 ## Extensibility
 
 Additional security rules and configuration providers can be introduced without redesigning the entire scanner.
+
+The `@rule_for()` decorator provides a consistent mechanism for associating security rules with resource types.
 
 ---
 
@@ -543,6 +712,12 @@ Security logic should be covered by automated tests using known-good and known-b
 
 Security rules should remain independent from AWS API implementation details.
 
+### Resource-Aware Analysis
+
+Rules should only execute against resource types for which they are designed.
+
+This prevents unrelated security controls from being evaluated against incompatible resources and provides a scalable foundation for multi-service analysis.
+
 ---
 
 # Infrastructure as Code
@@ -559,6 +734,9 @@ Terraform Provider
      |
      v
 Resource Model
+     |
+     v
+Rule Engine
      |
      v
 Security Rules
@@ -602,7 +780,11 @@ This creates the potential for the scanner to operate as a security gate within 
 * [x] Fixture-based testing
 * [x] Fixture provider
 * [x] Modular security rules
+* [x] Resource-aware rule engine
+* [x] Rule registry
+* [x] `@rule_for()` resource-type decorator
 * [x] Automated tests
+* [x] Engine integration testing
 
 ---
 
@@ -613,29 +795,16 @@ This creates the potential for the scanner to operate as a security gate within 
 * [x] S3-003 — Versioning disabled
 * [x] S3-004 — S3 Block Public Access configuration
 * [x] S3-005 — Server access logging
-* [ ] Additional S3 security checks
-* [ ] S3 bucket policy analysis
-* [ ] S3 ACL analysis
-* [ ] S3 public-access policy evaluation
-* [ ] S3 lifecycle configuration analysis
-* [ ] S3 object-lock assessment
+* [x] S3-006 — Wildcard bucket-policy principal
+
+**S3 initial security scope complete.**
 
 ---
 
-## Phase 3 — Infrastructure as Code
+## Phase 3 — IAM Security
 
-* [ ] Terraform/HCL parsing
-* [ ] Terraform resource discovery
-* [ ] Terraform → Resource normalisation
-* [ ] Terraform security scanning
-* [ ] Terraform security fixtures
-* [ ] Terraform-specific automated tests
-* [ ] Detection of security misconfigurations before deployment
-
----
-
-## Phase 4 — IAM Security
-
+* [ ] IAM resource model
+* [ ] IAM fixture architecture
 * [ ] Overly permissive IAM policies
 * [ ] Wildcard permissions
 * [ ] Excessive administrative permissions
@@ -644,22 +813,27 @@ This creates the potential for the scanner to operate as a security gate within 
 * [ ] IAM privilege-escalation paths
 * [ ] MFA assessment
 * [ ] Access-key assessment
+* [ ] IAM automated tests
+* [ ] IAM engine integration
 
 ---
 
-## Phase 5 — Compute Security
+## Phase 4 — Compute Security
 
+* [ ] EC2 resource model
 * [ ] EC2 public exposure
 * [ ] IMDSv2 enforcement
 * [ ] Public security groups
 * [ ] Unencrypted EBS volumes
 * [ ] Public AMIs
 * [ ] Public snapshots
+* [ ] EC2 automated tests
 
 ---
 
-## Phase 6 — Network Security
+## Phase 5 — Network Security
 
+* [ ] VPC resource model
 * [ ] VPC configuration
 * [ ] Internet gateways
 * [ ] Route tables
@@ -668,6 +842,20 @@ This creates the potential for the scanner to operate as a security gate within 
 * [ ] Public subnets
 * [ ] Unnecessary internet exposure
 * [ ] Network segmentation checks
+* [ ] Network security fixtures and tests
+
+---
+
+## Phase 6 — Infrastructure as Code
+
+* [ ] Terraform/HCL parsing
+* [ ] Terraform resource discovery
+* [ ] Terraform → Resource normalisation
+* [ ] Terraform security scanning
+* [ ] Terraform security fixtures
+* [ ] Terraform-specific automated tests
+* [ ] Detection of security misconfigurations before deployment
+* [ ] Terraform CI/CD integration
 
 ---
 
@@ -675,6 +863,7 @@ This creates the potential for the scanner to operate as a security gate within 
 
 * [ ] AWS/Boto3 provider
 * [ ] AWS CLI/profile support
+* [ ] AWS resource discovery
 * [ ] Multi-region scanning
 * [ ] Read-only scanner role
 * [ ] Multi-account support
@@ -769,6 +958,8 @@ cycle:
 5. Refactor where appropriate without changing behaviour.
 6. Commit the completed security control.
 
+Architectural changes are also validated through automated unit and integration tests.
+
 ---
 
 # Planned Security Framework Mapping
@@ -810,6 +1001,8 @@ The project is also intended to demonstrate practical understanding of:
 * Security automation
 * DevSecOps
 * Automated security testing
+* Test-driven development
+* Cloud security architecture
 
 ---
 
