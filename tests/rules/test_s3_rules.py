@@ -3,6 +3,7 @@ from pathlib import Path
 from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.rules.s3_rules import (
+    check_block_public_access,
     check_encryption,
     check_public_bucket,
     check_versioning
@@ -102,3 +103,19 @@ def test_versioning_enabled_has_no_versioning_finding():
     findings = check_versioning(resource)
 
     assert findings == []
+
+def test_block_public_access_disabled_generates_high_finding():
+    provider = FixtureProvider(FIXTURE_DIRECTORY)
+    resources = provider.discover()
+
+    resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "company-sensitive-data"
+    )
+
+    findings = check_block_public_access(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-004"
+    assert findings[0].severity == Severity.HIGH

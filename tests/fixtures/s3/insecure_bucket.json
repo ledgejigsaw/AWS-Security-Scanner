@@ -4,5 +4,6 @@
     "public": true,
     "encryption": false,
     "versioning": false,
-    "logging": false
+    "logging": false,
+    "block_public_access": false
 }

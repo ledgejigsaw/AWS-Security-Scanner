@@ -84,5 +84,31 @@ def check_versioning(resource: Resource) -> list[Finding]:
                 evidence="versioning=false",
             )
         )
+    return findings
+
+def check_block_public_access(resource: Resource) -> list[Finding]:
+    findings = []
+
+    if resource.attributes.get("block_public_access") is False:
+        findings.append(
+            Finding(
+                check_id="S3-004",
+                severity=Severity.HIGH,
+                service="S3",
+                resource=resource.resource_id,
+                title="S3 Block Public Access is disabled",
+                description=(
+                    "S3 Block Public Access is disabled for the bucket. "
+                    "This increases the risk of unintended public access "
+                    "through bucket policies or access control lists."
+                ),
+                remediation=(
+                    "Enable S3 Block Public Access and ensure that "
+                    "unnecessary public bucket policies or ACLs are removed."
+                ),
+                region=resource.region,
+                evidence="block_public_access=false",
+            )
+        )
 
     return findings
