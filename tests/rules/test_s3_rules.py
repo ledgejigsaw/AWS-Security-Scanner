@@ -5,6 +5,8 @@ from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.rules.s3_rules import (
     check_block_public_access,
+    check_bucket_policy,
+    check_public_bucket,
     check_encryption,
     check_public_bucket,
     check_versioning,
@@ -180,3 +182,89 @@ def test_block_public_access_enabled_has_no_finding():
     findings = check_block_public_access(resource)
 
     assert findings == []
+
+def test_public_bucket_policy_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "region": "eu-west-2",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-sensitive-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-006"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_restricted_bucket_policy_has_no_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-secure-data",
+        attributes={
+            "bucket_name": "company-secure-data",
+            "region": "eu-west-2",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": "arn:aws:iam::123456789012:root"
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-secure-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert findings == []
+
+def test_single_bucket_policy_statement_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "region": "eu-west-2",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": "arn:aws:s3:::company-sensitive-data/*",
+                },
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-006"
+    assert findings[0].severity == Severity.HIGH

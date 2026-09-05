@@ -140,3 +140,47 @@ def check_logging(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+def check_bucket_policy(resource: Resource) -> list[Finding]:
+    findings = []
+
+    policy = resource.attributes.get("bucket_policy")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if (
+            statement.get("Effect") == "Allow"
+            and statement.get("Principal") == "*"
+        ):
+            findings.append(
+                Finding(
+                    check_id="S3-006",
+                    severity=Severity.HIGH,
+                    service="S3",
+                    resource=resource.resource_id,
+                    title="S3 bucket policy allows access from any principal",
+                    description=(
+                        "The S3 bucket policy contains an Allow statement "
+                        "with a wildcard principal. This can permit access "
+                        "from any AWS principal and may expose bucket "
+                        "objects to unauthorised users."
+                    ),
+                    remediation=(
+                        "Restrict the bucket policy Principal to the "
+                        "specific AWS accounts, roles, or services that "
+                        "require access. Remove wildcard principals unless "
+                        "public access is explicitly required and justified."
+                    ),
+                    region=resource.region,
+                    evidence="Effect=Allow, Principal=*",
+                )
+            )
+
+    return findings
