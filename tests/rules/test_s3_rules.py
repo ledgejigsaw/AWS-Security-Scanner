@@ -6,7 +6,8 @@ from aws_security_scanner.rules.s3_rules import (
     check_block_public_access,
     check_encryption,
     check_public_bucket,
-    check_versioning
+    check_versioning,
+    check_logging
 )
 
 
@@ -104,7 +105,7 @@ def test_versioning_enabled_has_no_versioning_finding():
 
     assert findings == []
 
-def test_block_public_access_disabled_generates_high_finding():
+def test_logging_disabled_generates_medium_finding():
     provider = FixtureProvider(FIXTURE_DIRECTORY)
     resources = provider.discover()
 
@@ -114,8 +115,22 @@ def test_block_public_access_disabled_generates_high_finding():
         if resource.resource_id == "company-sensitive-data"
     )
 
-    findings = check_block_public_access(resource)
+    findings = check_logging(resource)
 
     assert len(findings) == 1
-    assert findings[0].check_id == "S3-004"
-    assert findings[0].severity == Severity.HIGH
+    assert findings[0].check_id == "S3-005"
+    assert findings[0].severity == Severity.MEDIUM
+
+def test_logging_enabled_has_no_logging_finding():
+    provider = FixtureProvider(FIXTURE_DIRECTORY)
+    resources = provider.discover()
+
+    resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "company-secure-data"
+    )
+
+    findings = check_logging(resource)
+
+    assert findings == []

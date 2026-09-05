@@ -112,3 +112,31 @@ def check_block_public_access(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+def check_logging(resource: Resource) -> list[Finding]:
+    findings = []
+
+    if resource.attributes.get("logging") is False:
+        findings.append(
+            Finding(
+                check_id="S3-005",
+                severity=Severity.MEDIUM,
+                service="S3",
+                resource=resource.resource_id,
+                title="S3 bucket access logging is disabled",
+                description=(
+                    "S3 server access logging is disabled. Without access "
+                    "logging, requests made against the bucket may not be "
+                    "recorded, reducing visibility into access activity "
+                    "and making security investigations more difficult."
+                ),
+                remediation=(
+                    "Enable S3 server access logging and configure an "
+                    "appropriate target bucket for the access logs."
+                ),
+                region=resource.region,
+                evidence="logging=false",
+            )
+        )
+
+    return findings
