@@ -1,0 +1,15 @@
+{
+    "resource_type": "aws_iam_role",
+    "role_name": "PublicAssumableRole",
+    "region": "eu-west-2",
+    "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "sts:AssumeRole"
+            }
+        ]
+    }
+}

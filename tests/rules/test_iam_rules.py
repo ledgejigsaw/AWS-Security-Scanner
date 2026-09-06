@@ -4,6 +4,7 @@ from aws_security_scanner.rules.iam_rules import (
     check_overly_permissive_policy,
     check_wildcard_permissions,
     check_excessive_administrative_permissions,
+    check_insecure_trust_policy,
 )
 
 
@@ -301,5 +302,105 @@ def test_deny_high_risk_permission_does_not_trigger_admin_check():
     )
 
     findings = check_excessive_administrative_permissions(resource)
+
+    assert findings == []
+
+def test_wildcard_trust_policy_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_role",
+        resource_id="PublicAssumableRole",
+        attributes={
+            "assume_role_policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_insecure_trust_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-004"
+    assert findings[0].severity == Severity.HIGH
+
+def test_wildcard_aws_principal_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_role",
+        resource_id="WildcardAWSPrincipalRole",
+        attributes={
+            "assume_role_policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": "*"
+                        },
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_insecure_trust_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-004"
+    assert findings[0].severity == Severity.HIGH
+
+def test_restricted_service_trust_policy_does_not_trigger():
+    resource = Resource(
+        resource_type="aws_iam_role",
+        resource_id="EC2ApplicationRole",
+        attributes={
+            "assume_role_policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_insecure_trust_policy(resource)
+
+    assert findings == []
+    
+def test_deny_wildcard_trust_policy_does_not_trigger():
+    resource = Resource(
+        resource_type="aws_iam_role",
+        resource_id="DeniedWildcardRole",
+        attributes={
+            "assume_role_policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_insecure_trust_policy(resource)
 
     assert findings == []

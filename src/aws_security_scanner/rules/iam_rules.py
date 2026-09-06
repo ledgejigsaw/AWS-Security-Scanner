@@ -214,3 +214,73 @@ def check_excessive_administrative_permissions(
             )
 
     return findings
+
+@rule_for("aws_iam_role")
+def check_insecure_trust_policy(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect IAM roles with overly permissive trust policies."""
+
+    findings = []
+
+    policy = resource.attributes.get(
+        "assume_role_policy_document"
+    )
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        if statement.get("Action") != "sts:AssumeRole":
+            continue
+
+        principal = statement.get("Principal")
+
+        principal_is_wildcard = (
+            principal == "*"
+            or (
+                isinstance(principal, dict)
+                and (
+                    principal.get("AWS") == "*"
+                    or principal.get("Federated") == "*"
+                )
+            )
+        )
+
+        if not principal_is_wildcard:
+            continue
+
+        findings.append(
+            Finding(
+                check_id="IAM-004",
+                severity=Severity.HIGH,
+                service="IAM",
+                resource=resource.resource_id,
+                title="IAM role has an overly permissive trust policy",
+                description=(
+                    "The IAM role trust policy allows sts:AssumeRole "
+                    "from a wildcard principal. This can allow "
+                    "unintended AWS identities to assume the role."
+                ),
+                remediation=(
+                    "Restrict the trust policy Principal to the "
+                    "specific AWS accounts, roles, services, or "
+                    "federated identities that require access."
+                ),
+                region=resource.region,
+                evidence=(
+                    "Effect=Allow, Action=sts:AssumeRole, "
+                    f"Principal={principal}"
+                ),
+            )
+        )
+
+    return findings

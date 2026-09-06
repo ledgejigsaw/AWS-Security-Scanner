@@ -1,0 +1,17 @@
+{
+    "resource_type": "aws_iam_role",
+    "role_name": "EC2ApplicationRole",
+    "region": "eu-west-2",
+    "assume_role_policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            }
+        ]
+    }
+}

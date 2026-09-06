@@ -77,3 +77,23 @@ def test_rule_engine_runs_registered_iam_003_rule():
     assert iam_findings[0].severity.value == "HIGH"
     assert iam_findings[0].service == "IAM"
     assert iam_findings[0].resource == "HighRiskAdminPolicy"
+
+def test_rule_engine_runs_registered_iam_004_rule():
+    fixture_directory = Path("tests/fixtures/iam")
+
+    provider = FixtureProvider(fixture_directory)
+    resources = provider.discover()
+
+    engine = RuleEngine(get_all_rules())
+    findings = engine.scan(resources)
+
+    iam_findings = [
+        finding
+        for finding in findings
+        if finding.check_id == "IAM-004"
+    ]
+
+    assert len(iam_findings) == 1
+    assert iam_findings[0].severity.value == "HIGH"
+    assert iam_findings[0].service == "IAM"
+    assert iam_findings[0].resource == "PublicAssumableRole"

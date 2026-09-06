@@ -11,6 +11,7 @@ from aws_security_scanner.rules.iam_rules import (
     check_overly_permissive_policy,
     check_wildcard_permissions,
     check_excessive_administrative_permissions,
+    check_insecure_trust_policy,
 )
 
 def get_all_rules():
@@ -26,4 +27,5 @@ def get_all_rules():
         check_overly_permissive_policy,
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
+        check_insecure_trust_policy,
     ]
