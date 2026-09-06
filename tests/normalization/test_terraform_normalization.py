@@ -85,7 +85,7 @@ def test_terraform_s3_logging_is_aggregated():
         if resource.resource_id == "company_data"
     )
 
-    logging = company_data.attributes["logging"]
+    logging = company_data.attributes["logging_configuration"]
 
     assert logging["target_bucket"] == ""
 
@@ -103,3 +103,26 @@ def test_terraform_s3_aggregation_returns_only_base_buckets():
         resource.resource_type == "aws_s3_bucket"
         for resource in aggregated
     )
+
+def test_terraform_s3_bucket_policy_is_aggregated():
+    fixture = Path("tests/fixtures/terraform/realistic_s3.json")
+
+    provider = TerraformProvider(fixture)
+    resources = provider.discover()
+
+    resources = aggregate_s3_resources(resources)
+
+    company_data = next(
+        resource
+        for resource in resources
+        if resource.resource_type == "aws_s3_bucket"
+        and resource.resource_id == "company_data"
+    )
+
+    policy = company_data.attributes["bucket_policy"]
+
+    assert policy["Version"] == "2012-10-17"
+
+    assert policy["Statement"][0]["Effect"] == "Allow"
+
+    assert policy["Statement"][0]["Principal"] == "*"

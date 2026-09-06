@@ -67,6 +67,38 @@
                 "bucket": "${aws_s3_bucket.company_secure_data.id}",
                 "target_bucket": "company-access-logs"
             }
+        },
+                "aws_s3_bucket_policy": {
+            "company_data": {
+                "bucket": "${aws_s3_bucket.company_data.id}",
+                "policy": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": "*",
+                            "Action": "s3:GetObject",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            },
+            "company_secure_data": {
+                "bucket": "${aws_s3_bucket.company_secure_data.id}",
+                "policy": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::123456789012:role/ApplicationRole"
+                            },
+                            "Action": "s3:GetObject",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
         }
     }
 }
