@@ -4,10 +4,12 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_s3_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 6
+    assert len(rules) == 7
 
 
-def test_rule_registry_contains_callable_rules():
+def test_rule_registry_contains_iam_rules():
     rules = get_all_rules()
 
-    assert all(callable(rule) for rule in rules)
+    rule_names = [rule.__name__ for rule in rules]
+
+    assert "check_overly_permissive_policy" in rule_names

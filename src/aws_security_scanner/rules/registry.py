@@ -7,6 +7,9 @@ from aws_security_scanner.rules.s3_rules import (
     check_bucket_policy,
 )
 
+from aws_security_scanner.rules.iam_rules import (
+    check_overly_permissive_policy,
+)
 
 def get_all_rules():
     """Return all registered security rules."""
@@ -18,4 +21,5 @@ def get_all_rules():
         check_block_public_access,
         check_logging,
         check_bucket_policy,
+        check_overly_permissive_policy,
     ]

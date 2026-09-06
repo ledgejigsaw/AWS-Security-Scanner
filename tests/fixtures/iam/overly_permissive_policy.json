@@ -1,4 +1,5 @@
 {
+    "resource_type": "aws_iam_policy",
     "policy_name": "AdministratorLikePolicy",
     "policy_type": "customer_managed",
     "policy_document": {
