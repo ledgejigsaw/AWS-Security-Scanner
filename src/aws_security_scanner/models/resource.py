@@ -9,3 +9,4 @@ class Resource:
     attributes: dict[str, Any]
     source: str
     region: str | None = None
+    relationships: dict[str, str] | None = None

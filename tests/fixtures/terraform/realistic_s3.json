@@ -1,0 +1,28 @@
+{
+    "resource": {
+        "aws_s3_bucket": {
+            "company_data": {
+                "bucket": "company-sensitive-data",
+                "region": "eu-west-2"
+            },
+            "company_secure_data": {
+                "bucket": "company-secure-data",
+                "region": "eu-west-2"
+            }
+        },
+        "aws_s3_bucket_versioning": {
+            "company_data": {
+                "bucket": "${aws_s3_bucket.company_data.id}",
+                "versioning_configuration": {
+                    "status": "Disabled"
+                }
+            },
+            "company_secure_data": {
+                "bucket": "${aws_s3_bucket.company_secure_data.id}",
+                "versioning_configuration": {
+                    "status": "Enabled"
+                }
+            }
+        }
+    }
+}
