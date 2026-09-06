@@ -23,6 +23,24 @@
                     "status": "Enabled"
                 }
             }
+        },
+        "aws_s3_bucket_server_side_encryption_configuration": {
+            "company_data": {
+            "bucket": "${aws_s3_bucket.company_data.id}",
+            "rule": {
+                "apply_server_side_encryption_by_default": {
+                "sse_algorithm": "AES256"
+            }
         }
+    },
+    "company_secure_data": {
+        "bucket": "${aws_s3_bucket.company_secure_data.id}",
+        "rule": {
+            "apply_server_side_encryption_by_default": {
+                "sse_algorithm": "AES256"
+            }
+        }
+    }
+}
     }
 }
