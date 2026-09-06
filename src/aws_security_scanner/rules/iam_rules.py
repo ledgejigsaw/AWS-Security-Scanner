@@ -137,3 +137,80 @@ def check_wildcard_permissions(
             )
 
     return findings
+
+@rule_for("aws_iam_policy")
+def check_excessive_administrative_permissions(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect high-risk IAM administrative permissions."""
+
+    findings = []
+
+    policy = resource.attributes.get("policy_document")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    high_risk_actions = {
+        "iam:CreateUser",
+        "iam:CreateRole",
+        "iam:AttachRolePolicy",
+        "iam:AttachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:PutRolePolicy",
+        "iam:PassRole",
+        "iam:CreateAccessKey",
+        "iam:UpdateAssumeRolePolicy",
+    }
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        action = statement.get("Action")
+
+        if isinstance(action, str):
+            actions = [action]
+        elif isinstance(action, list):
+            actions = action
+        else:
+            continue
+
+        matched_actions = high_risk_actions.intersection(actions)
+
+        for matched_action in matched_actions:
+            findings.append(
+                Finding(
+                    check_id="IAM-003",
+                    severity=Severity.HIGH,
+                    service="IAM",
+                    resource=resource.resource_id,
+                    title="IAM policy grants high-risk administrative permission",
+                    description=(
+                        f"The IAM policy grants the high-risk administrative "
+                        f"permission '{matched_action}'. Such permissions "
+                        "can allow an identity to modify IAM configuration, "
+                        "create credentials, alter trust relationships, "
+                        "or delegate permissions."
+                    ),
+                    remediation=(
+                        "Apply the principle of least privilege. Remove "
+                        "high-risk administrative permissions unless they "
+                        "are explicitly required. Where required, restrict "
+                        "the permission to specific resources and controlled "
+                        "workflows."
+                    ),
+                    region=resource.region,
+                    evidence=(
+                        f"Effect=Allow, Action={matched_action}, "
+                        f"Resource={statement.get('Resource')}"
+                    ),
+                )
+            )
+
+    return findings

@@ -3,6 +3,7 @@ from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.rules.iam_rules import (
     check_overly_permissive_policy,
     check_wildcard_permissions,
+    check_excessive_administrative_permissions,
 )
 
 
@@ -198,5 +199,107 @@ def test_restricted_policy_does_not_trigger_wildcard_check():
     )
 
     findings = check_wildcard_permissions(resource)
+
+    assert findings == []
+
+def test_high_risk_administrative_permission_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="IAMAdminPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "iam:CreateUser",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_excessive_administrative_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-003"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_high_risk_administrative_action_in_action_list_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="IAMAdminActionList",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                            "iam:PassRole",
+                        ],
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_excessive_administrative_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-003"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_restricted_iam_permission_does_not_trigger_admin_check():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="RestrictedPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_excessive_administrative_permissions(resource)
+
+    assert findings == []
+
+
+def test_deny_high_risk_permission_does_not_trigger_admin_check():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="DeniedAdminPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Action": "iam:CreateRole",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_excessive_administrative_permissions(resource)
 
     assert findings == []

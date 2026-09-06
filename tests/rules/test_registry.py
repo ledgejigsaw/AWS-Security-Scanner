@@ -1,10 +1,10 @@
 from aws_security_scanner.rules.registry import get_all_rules
 
 
-def test_rule_registry_contains_s3_rules():
+def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 7
+    assert len(rules) == 9
 
 
 def test_rule_registry_contains_iam_rules():
