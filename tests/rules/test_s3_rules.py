@@ -6,11 +6,11 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.rules.s3_rules import (
     check_block_public_access,
     check_bucket_policy,
+    check_wildcard_bucket_policy,
     check_public_bucket,
     check_encryption,
-    check_public_bucket,
     check_versioning,
-    check_logging
+    check_logging,
 )
 
 
@@ -206,7 +206,7 @@ def test_public_bucket_policy_generates_high_finding():
         region="eu-west-2",
     )
 
-    findings = check_bucket_policy(resource)
+    findings = check_wildcard_bucket_policy(resource)
 
     assert len(findings) == 1
     assert findings[0].check_id == "S3-006"
@@ -263,7 +263,7 @@ def test_single_bucket_policy_statement_generates_high_finding():
         region="eu-west-2",
     )
 
-    findings = check_bucket_policy(resource)
+    findings = check_wildcard_bucket_policy(resource)
 
     assert len(findings) == 1
     assert findings[0].check_id == "S3-006"
@@ -322,7 +322,7 @@ def test_bucket_policy_with_wildcard_federated_principal_generates_high_finding(
         region="eu-west-2",
     )
 
-    findings = check_bucket_policy(resource)
+    findings = check_wildcard_bucket_policy(resource)
 
     assert len(findings) == 1
     assert findings[0].check_id == "S3-006"
@@ -352,7 +352,7 @@ def test_bucket_policy_with_wildcard_service_principal_generates_high_finding():
         region="eu-west-2",
     )
 
-    findings = check_bucket_policy(resource)
+    findings = check_wildcard_bucket_policy(resource)
 
     assert len(findings) == 1
     assert findings[0].check_id == "S3-006"
@@ -406,6 +406,6 @@ def test_bucket_policy_with_specific_service_principal_has_no_finding():
         region="eu-west-2",
     )
 
-    findings = check_bucket_policy(resource)
+    findings = check_wildcard_bucket_policy(resource)
 
     assert findings == []
