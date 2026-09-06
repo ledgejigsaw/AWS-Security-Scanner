@@ -58,3 +58,55 @@ def test_terraform_provider_preserves_terraform_resource_types():
         "aws_s3_bucket",
         "aws_s3_bucket_versioning",
     }
+
+def test_terraform_provider_resolves_resource_relationships():
+    fixture = Path("tests/fixtures/terraform/realistic_s3.json")
+
+    provider = TerraformProvider(fixture)
+
+    resources = provider.discover()
+
+    versioning = next(
+        resource
+        for resource in resources
+        if resource.resource_type == "aws_s3_bucket_versioning"
+        and resource.resource_id == "company_data"
+    )
+
+    assert versioning.relationships == {
+        "bucket": "aws_s3_bucket.company_data"
+    }
+
+def test_terraform_provider_leaves_unrelated_resources_without_relationships():
+    fixture = Path("tests/fixtures/terraform/realistic_s3.json")
+
+    provider = TerraformProvider(fixture)
+
+    resources = provider.discover()
+
+    bucket = next(
+        resource
+        for resource in resources
+        if resource.resource_type == "aws_s3_bucket"
+        and resource.resource_id == "company_data"
+    )
+
+    assert bucket.relationships is None
+
+def test_terraform_provider_resolves_nested_relationships():
+    fixture = Path("tests/fixtures/terraform/realistic_s3.json")
+
+    provider = TerraformProvider(fixture)
+
+    resources = provider.discover()
+
+    versioning = next(
+        resource
+        for resource in resources
+        if resource.resource_type == "aws_s3_bucket_versioning"
+        and resource.resource_id == "company_data"
+    )
+
+    assert versioning.relationships == {
+        "bucket": "aws_s3_bucket.company_data"
+    }
