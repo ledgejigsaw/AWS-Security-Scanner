@@ -28,9 +28,22 @@ class FixtureProvider:
         """Convert fixture data into the normalised Resource model."""
 
         return Resource(
-            resource_type="aws_s3_bucket",
-            resource_id=data["bucket_name"],
+            resource_type=data["resource_type"],
+            resource_id=self._get_resource_id(data),
             attributes=data,
             source="fixture",
             region=data.get("region"),
+        )
+
+    def _get_resource_id(self, data: dict) -> str:
+        """Return the identifier for a supported resource."""
+
+        if data["resource_type"] == "aws_s3_bucket":
+            return data["bucket_name"]
+
+        if data["resource_type"] == "aws_iam_policy":
+            return data["policy_name"]
+
+        raise ValueError(
+            f"Unsupported fixture resource type: {data['resource_type']}"
         )

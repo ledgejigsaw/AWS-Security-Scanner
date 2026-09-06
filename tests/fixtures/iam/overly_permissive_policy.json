@@ -1,0 +1,14 @@
+{
+    "policy_name": "AdministratorLikePolicy",
+    "policy_type": "customer_managed",
+    "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": "*",
+                "Resource": "*"
+            }
+        ]
+    }
+}

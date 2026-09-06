@@ -1,5 +1,5 @@
 {
-    "bucket_name": "company-secure-data",
+    "resource_type": "aws_s3_bucket","bucket_name": "company-secure-data",
     "region": "eu-west-2",
     "public": false,
     "encryption": true,
