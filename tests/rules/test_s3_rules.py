@@ -268,3 +268,144 @@ def test_single_bucket_policy_statement_generates_high_finding():
     assert len(findings) == 1
     assert findings[0].check_id == "S3-006"
     assert findings[0].severity == Severity.HIGH
+
+def test_bucket_policy_with_wildcard_aws_principal_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": "*"
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-sensitive-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-006"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_bucket_policy_with_wildcard_federated_principal_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "*"
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-sensitive-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-006"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_bucket_policy_with_wildcard_service_principal_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "*"
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-sensitive-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-006"
+    assert findings[0].severity == Severity.HIGH
+
+def test_bucket_policy_with_deny_wildcard_principal_has_no_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-secure-data",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-secure-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert findings == []
+
+def test_bucket_policy_with_specific_service_principal_has_no_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-secure-data",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "logging.s3.amazonaws.com"
+                        },
+                        "Action": "s3:PutObject",
+                        "Resource": "arn:aws:s3:::company-secure-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_bucket_policy(resource)
+
+    assert findings == []

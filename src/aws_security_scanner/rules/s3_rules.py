@@ -147,7 +147,6 @@ def check_logging(resource: Resource) -> list[Finding]:
 
     return findings
 
-
 @rule_for("aws_s3_bucket")
 def check_bucket_policy(resource: Resource) -> list[Finding]:
     findings = []
@@ -163,10 +162,24 @@ def check_bucket_policy(resource: Resource) -> list[Finding]:
         statements = [statements]
 
     for statement in statements:
-        if (
-            statement.get("Effect") == "Allow"
-            and statement.get("Principal") == "*"
-        ):
+        if statement.get("Effect") != "Allow":
+            continue
+
+        principal = statement.get("Principal")
+
+        wildcard_principal = (
+            principal == "*"
+            or (
+                isinstance(principal, dict)
+                and (
+                    principal.get("AWS") == "*"
+                    or principal.get("Federated") == "*"
+                    or principal.get("Service") == "*"
+                )
+            )
+        )
+
+        if wildcard_principal:
             findings.append(
                 Finding(
                     check_id="S3-006",
@@ -187,9 +200,10 @@ def check_bucket_policy(resource: Resource) -> list[Finding]:
                         "public access is explicitly required and justified."
                     ),
                     region=resource.region,
-                    evidence="Effect=Allow, Principal=*",
+                    evidence="Effect=Allow, wildcard Principal",
                 )
             )
 
     return findings
+
 
