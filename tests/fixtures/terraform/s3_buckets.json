@@ -1,0 +1,24 @@
+{
+    "resource": {
+        "aws_s3_bucket": {
+            "insecure_bucket": {
+                "bucket": "company-sensitive-data",
+                "region": "eu-west-2",
+                "public": true,
+                "encryption": false,
+                "versioning": false,
+                "logging": false,
+                "block_public_access": false
+            },
+            "secure_bucket": {
+                "bucket": "company-secure-data",
+                "region": "eu-west-2",
+                "public": false,
+                "encryption": true,
+                "versioning": true,
+                "logging": true,
+                "block_public_access": true
+            }
+        }
+    }
+}
