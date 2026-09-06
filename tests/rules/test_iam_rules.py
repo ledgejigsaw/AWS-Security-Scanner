@@ -1,6 +1,9 @@
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.models.finding import Severity
-from aws_security_scanner.rules.iam_rules import check_overly_permissive_policy
+from aws_security_scanner.rules.iam_rules import (
+    check_overly_permissive_policy,
+    check_wildcard_permissions,
+)
 
 
 def test_overly_permissive_policy_is_critical():
@@ -98,3 +101,102 @@ def test_single_statement_dict_is_supported():
 
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-001"
+
+def test_wildcard_action_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="S3WildcardActionPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:*",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_wildcard_resource_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="WildcardResourcePolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:GetObject",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_unrestricted_policy_does_not_duplicate_iam_001():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="AdministratorLikePolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "*",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert findings == []
+
+
+def test_restricted_policy_does_not_trigger_wildcard_check():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="RestrictedS3Policy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-secure-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert findings == []

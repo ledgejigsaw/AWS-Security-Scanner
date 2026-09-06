@@ -53,3 +53,87 @@ def check_overly_permissive_policy(
             )
 
     return findings
+
+@rule_for("aws_iam_policy")
+def check_wildcard_permissions(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect IAM policies containing excessively broad wildcard permissions."""
+
+    findings = []
+
+    policy = resource.attributes.get("policy_document")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        action = statement.get("Action")
+        resource_scope = statement.get("Resource")
+
+        action_is_wildcard = (
+            action == "*"
+            or (
+                isinstance(action, str)
+                and action.endswith(":*")
+            )
+            or (
+                isinstance(action, list)
+                and any(
+                    item == "*"
+                    or (
+                        isinstance(item, str)
+                        and item.endswith(":*")
+                    )
+                    for item in action
+                )
+            )
+        )
+
+        resource_is_wildcard = resource_scope == "*"
+
+        # IAM-001 already handles unrestricted Action + Resource.
+        if action_is_wildcard and resource_is_wildcard:
+            continue
+
+        if action_is_wildcard or resource_is_wildcard:
+            findings.append(
+                Finding(
+                    check_id="IAM-002",
+                    severity=Severity.HIGH,
+                    service="IAM",
+                    resource=resource.resource_id,
+                    title=(
+                        "IAM policy contains excessively broad "
+                        "wildcard permissions"
+                    ),
+                    description=(
+                        "The IAM policy contains an Allow statement "
+                        "using a wildcard Action or Resource. This "
+                        "provides broader permissions than may be "
+                        "required and can increase the impact of a "
+                        "compromised identity."
+                    ),
+                    remediation=(
+                        "Apply the principle of least privilege. "
+                        "Replace wildcard Actions and Resources with "
+                        "the specific permissions and resources required "
+                        "by the workload or user."
+                    ),
+                    region=resource.region,
+                    evidence=(
+                        f"Effect=Allow, Action={action}, "
+                        f"Resource={resource_scope}"
+                    ),
+                )
+            )
+
+    return findings
