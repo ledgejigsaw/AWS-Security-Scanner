@@ -404,3 +404,215 @@ def test_deny_wildcard_trust_policy_does_not_trigger():
     findings = check_insecure_trust_policy(resource)
 
     assert findings == []
+
+def test_service_action_prefix_wildcard_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="S3ReadPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:Get*",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_action_prefix_wildcard_in_list_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="MixedPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:Put*",
+                        ],
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_specific_action_has_no_wildcard_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="SpecificS3Policy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert findings == []
+
+
+def test_deny_action_prefix_wildcard_has_no_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="DenyPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Action": "s3:Get*",
+                        "Resource": "*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert findings == []
+
+def test_service_action_prefix_wildcard_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="S3ReadPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:Get*",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_action_prefix_wildcard_in_list_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="MixedPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:Put*",
+                        ],
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_specific_action_has_no_wildcard_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="SpecificS3Policy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert findings == []
+
+
+def test_deny_action_prefix_wildcard_has_no_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="DenyPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Action": "s3:Get*",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert findings == []

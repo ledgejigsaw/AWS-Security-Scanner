@@ -83,16 +83,13 @@ def check_wildcard_permissions(
             action == "*"
             or (
                 isinstance(action, str)
-                and action.endswith(":*")
+                and "*" in action
             )
             or (
                 isinstance(action, list)
                 and any(
-                    item == "*"
-                    or (
-                        isinstance(item, str)
-                        and item.endswith(":*")
-                    )
+                    isinstance(item, str)
+                    and "*" in item
                     for item in action
                 )
             )
