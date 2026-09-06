@@ -24,7 +24,7 @@ The long-term objective is to provide a **read-only security assessment capabili
 
 **Current version: 0.1.0**
 
-The project is currently being developed primarily using local security fixtures and Terraform JSON configuration.
+The project is currently being developed primarily using local security fixtures and Terraform JSON configuration, with structured JSON reporting and a command-line interface now implemented.
 
 This allows the security detection engine and its supporting architecture to be developed and tested without requiring an active AWS account or live cloud infrastructure.
 
@@ -33,7 +33,7 @@ The architecture is designed so that the same security rules can eventually anal
 ### Current test status
 
 ```text
-51 passed
+83 passed
 ```
 
 All current automated tests pass.
@@ -56,6 +56,10 @@ The project currently contains:
 * Integration testing
 * S3 security controls
 * IAM security controls
+* Rule metadata architecture
+* Standardised security findings
+* JSON reporting
+* Command-line scanning interface
 
 The current architecture separates **configuration acquisition**, **resource normalisation**, **security analysis** and **reporting**.
 
@@ -297,14 +301,23 @@ Security rules declare the AWS resource type they apply to.
 Rules use the `@rule_for()` decorator:
 
 ```python
-@rule_for("aws_s3_bucket")
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-001",
+    service="S3",
+    severity=Severity.CRITICAL,
+    category="Access Control",
+    title="S3 bucket is publicly accessible",
+    description="...",
+    remediation="...",
+)
 def check_public_bucket(resource: Resource) -> list[Finding]:
     ...
 ```
 
-The decorator associates a rule with a normalised resource type.
+The decorator associates a rule with a normalised resource type and structured security metadata.
 
-The rule engine then executes only rules applicable to the resource being evaluated.
+The rule engine then executes only rules applicable to the resource being evaluated. The metadata is also used to construct consistent `Finding` objects across the rule set.
 
 Conceptually:
 
@@ -374,7 +387,8 @@ AWS-Security-Scanner/
 │       ├── models/
 │       │   ├── __init__.py
 │       │   ├── finding.py
-│       │   └── resource.py
+│       │   ├── resource.py
+│       │   └── rule.py
 │       │
 │       ├── providers/
 │       │   ├── __init__.py
@@ -388,6 +402,11 @@ AWS-Security-Scanner/
 │       │
 │       ├── reporting/
 │       │   └── __init__.py
+│       │
+│       ├── reporting/
+│       │   ├── __init__.py
+│       │   ├── json_reporter.py
+│       │   └── summary.py
 │       │
 │       └── rules/
 │           ├── __init__.py
@@ -416,13 +435,20 @@ AWS-Security-Scanner/
 │   │       └── realistic_s3.json
 │   │
 │   ├── models/
-│   │   └── test_resource.py
+│   │   ├── test_finding.py
+│   │   ├── test_resource.py
+│   │   └── test_rule.py
 │   │
 │   ├── normalization/
 │   │   └── test_terraform_normalization.py
 │   │
 │   ├── providers/
 │   │   └── test_terraform.py
+│   │
+│   ├── reporting/
+│   │   ├── __init__.py
+│   │   ├── test_json_reporter.py
+│   │   └── test_summary.py
 │   │
 │   ├── rules/
 │   │   ├── __init__.py
@@ -490,7 +516,7 @@ pip install -e ".[dev]"
 
 # Testing
 
-The project uses `pytest` for automated security-rule, normalisation, provider and architecture testing.
+The project uses `pytest` for automated security-rule, normalisation, provider, reporting and architecture testing.
 
 Run the complete test suite with:
 
@@ -501,7 +527,7 @@ pytest -v
 Current result:
 
 ```text
-51 passed
+83 passed
 ```
 
 The test suite covers:
@@ -713,6 +739,36 @@ do not trigger the finding.
 
 ---
 
+# Command-Line Interface
+
+The scanner provides a command-line interface for running assessments against supported configuration sources.
+
+For example, a Terraform JSON scan can be executed with:
+
+```bash
+python -m aws_security_scanner.cli \
+    --source terraform \
+    --file tests/fixtures/terraform/realistic_s3.json \
+    --format json
+```
+
+The CLI currently supports:
+
+* Fixture-based scanning
+* Terraform JSON scanning
+* JSON report generation
+* Configurable report output paths
+
+Example output:
+
+```text
+Security scan complete. 5 findings written to reports/scan.json
+```
+
+The CLI is intentionally read-only and currently operates against local fixtures and Terraform JSON rather than live AWS environments.
+
+---
+
 # Security Finding Model
 
 Security findings use a consistent data model.
@@ -731,9 +787,11 @@ Region
 Evidence
 ```
 
-This provides a standard interface for security checks and future reporting functionality.
+This provides a standard interface for security checks and reporting.
 
-The findings model is designed so results can eventually be consumed by:
+Rules declare their metadata through the `@rule_for()` decorator, and findings are created through `Finding.from_rule()`. This keeps identifiers, severity, service, titles, descriptions and remediation guidance consistent across the rule set.
+
+The findings model is designed so results can be consumed by:
 
 * Terminal reporting
 * JSON reports
@@ -741,6 +799,35 @@ The findings model is designed so results can eventually be consumed by:
 * CI/CD pipelines
 * Security dashboards
 * Risk-scoring systems
+
+---
+
+# JSON Reporting
+
+The scanner currently supports structured JSON output.
+
+A generated report contains:
+
+```text
+summary
+├── total_findings
+└── by_severity
+
+findings
+├── check_id
+├── severity
+├── service
+├── resource
+├── title
+├── description
+├── remediation
+├── region
+└── evidence
+```
+
+Reports can be written to a configurable output path using the CLI.
+
+The reporting layer is deliberately separated from the rule engine so additional output formats can be introduced without changing security-analysis logic.
 
 ---
 
@@ -914,8 +1001,12 @@ This creates the potential for the scanner to operate as a security gate within 
 * [x] Resource-aware rule engine
 * [x] Rule registry
 * [x] `@rule_for()` resource-type decorator
+* [x] Rule metadata model
+* [x] Standardised finding construction
 * [x] Automated tests
 * [x] Engine integration testing
+* [x] JSON reporting
+* [x] Command-line interface
 
 ---
 
@@ -1015,7 +1106,7 @@ This creates the potential for the scanner to operate as a security gate within 
 ## Phase 8 — Reporting
 
 * [ ] Rich terminal reporting
-* [ ] JSON output
+* [x] JSON output
 * [ ] HTML reports
 * [ ] Severity filtering
 * [ ] Risk scoring
