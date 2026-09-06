@@ -39,7 +39,7 @@ def test_terraform_provider_discovers_realistic_s3_resources():
 
     resources = provider.discover()
 
-    assert len(resources) == 6
+    assert len(resources) == 10
 
 
 def test_terraform_provider_preserves_terraform_resource_types():
@@ -58,6 +58,8 @@ def test_terraform_provider_preserves_terraform_resource_types():
         "aws_s3_bucket",
         "aws_s3_bucket_versioning",
         "aws_s3_bucket_server_side_encryption_configuration",
+        "aws_s3_bucket_public_access_block",
+        "aws_s3_bucket_logging",    
     }
 
 def test_terraform_provider_resolves_resource_relationships():
@@ -109,5 +111,43 @@ def test_terraform_provider_resolves_nested_relationships():
     )
 
     assert versioning.relationships == {
+        "bucket": "aws_s3_bucket.company_data"
+    }
+
+def test_terraform_provider_resolves_public_access_block_relationship():
+    fixture = Path("tests/fixtures/terraform/realistic_s3.json")
+
+    provider = TerraformProvider(fixture)
+
+    resources = provider.discover()
+
+    public_access_block = next(
+        resource
+        for resource in resources
+        if resource.resource_type
+        == "aws_s3_bucket_public_access_block"
+        and resource.resource_id == "company_data"
+    )
+
+    assert public_access_block.relationships == {
+        "bucket": "aws_s3_bucket.company_data"
+    }
+
+
+def test_terraform_provider_resolves_logging_relationship():
+    fixture = Path("tests/fixtures/terraform/realistic_s3.json")
+
+    provider = TerraformProvider(fixture)
+
+    resources = provider.discover()
+
+    logging = next(
+        resource
+        for resource in resources
+        if resource.resource_type == "aws_s3_bucket_logging"
+        and resource.resource_id == "company_data"
+    )
+
+    assert logging.relationships == {
         "bucket": "aws_s3_bucket.company_data"
     }
