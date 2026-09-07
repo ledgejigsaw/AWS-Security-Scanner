@@ -80,3 +80,42 @@ rules: invalid
 
     with pytest.raises(TypeError):
         SecurityPolicy.from_yaml(policy_file)
+
+def test_rule_enabled_must_be_boolean():
+    with pytest.raises(TypeError):
+        SecurityPolicy(
+            {
+                "S3-001": {
+                    "enabled": "yes",
+                }
+            }
+        )
+
+
+def test_yaml_policy_enabled_must_be_boolean(tmp_path):
+    policy_file = tmp_path / "policy.yaml"
+
+    policy_file.write_text(
+        """
+rules:
+  S3-001:
+    enabled: yes
+"""
+    )
+
+    with pytest.raises(TypeError):
+        SecurityPolicy.from_yaml(policy_file)
+
+
+def test_yaml_policy_root_must_be_mapping(tmp_path):
+    policy_file = tmp_path / "policy.yaml"
+
+    policy_file.write_text(
+        """
+- invalid
+- policy
+"""
+    )
+
+    with pytest.raises(TypeError):
+        SecurityPolicy.from_yaml(policy_file) 
