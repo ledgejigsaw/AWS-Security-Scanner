@@ -10,7 +10,8 @@ description = "Read-only AWS cloud security posture assessment tool"
 requires-python = ">=3.11"
 dependencies = [
     "boto3",
-    "rich"
+    "rich",
+    "PyYAML"
 ]
 
 
