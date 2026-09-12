@@ -19,6 +19,16 @@ class RuleEngine:
         self.rules = rules
         self.policy = policy or SecurityPolicy()
 
+    def _get_check_id(self, rule: Rule) -> str | None:
+        """Return the check ID associated with a rule."""
+
+        metadata = getattr(rule, "metadata", None)
+
+        if metadata is None:
+            return None
+
+        return metadata.check_id
+
     def scan(self, resources: list[Resource]) -> list[Finding]:
         """Run enabled security rules against resources."""
 
@@ -29,10 +39,11 @@ class RuleEngine:
                 if rule.resource_type != resource.resource_type:
                     continue
 
-                check_id = rule.metadata.check_id
+                check_id = self._get_check_id(rule)
 
-                if not self.policy.is_enabled(check_id):
-                    continue
+                if check_id is not None:
+                    if not self.policy.is_enabled(check_id):
+                        continue
 
                 findings.extend(rule(resource))
 
