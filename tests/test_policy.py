@@ -119,3 +119,21 @@ def test_yaml_policy_root_must_be_mapping(tmp_path):
 
     with pytest.raises(TypeError):
         SecurityPolicy.from_yaml(policy_file) 
+
+def test_rule_uses_default_severity():
+    policy = SecurityPolicy()
+
+    assert policy.get_severity("S3-006", "HIGH") == "HIGH"
+
+
+def test_rule_can_override_severity():
+    policy = SecurityPolicy(
+        {
+            "S3-006": {
+                "enabled": True,
+                "severity": "CRITICAL",
+            }
+        }
+    )
+
+    assert policy.get_severity("S3-006", "HIGH") == "CRITICAL"

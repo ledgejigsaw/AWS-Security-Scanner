@@ -1,0 +1,30 @@
+rules:
+  S3-001:
+    enabled: true
+
+  S3-002:
+    enabled: true
+
+  S3-003:
+    enabled: true
+
+  S3-004:
+    enabled: true
+
+  S3-005:
+    enabled: true
+
+  S3-006:
+    enabled: true
+
+  IAM-001:
+    enabled: true
+
+  IAM-002:
+    enabled: true
+
+  IAM-003:
+    enabled: true
+
+  IAM-004:
+    enabled: true

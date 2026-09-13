@@ -4,6 +4,7 @@ import re
 
 import yaml
 
+
 class YAML12SafeLoader(yaml.SafeLoader):
     """Safe YAML loader using YAML 1.2 boolean semantics."""
 
@@ -22,6 +23,7 @@ YAML12SafeLoader.add_implicit_resolver(
     re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
     list("tTfF"),
 )
+
 
 class SecurityPolicy:
     """Configuration controlling which security rules are enabled."""
@@ -59,6 +61,16 @@ class SecurityPolicy:
             return True
 
         return configuration.get("enabled", True)
+
+    def get_severity(self, check_id: str, default: str) -> str:
+        """Return the configured severity or the rule's default severity."""
+
+        configuration = self.rules.get(check_id)
+
+        if configuration is None:
+            return default
+
+        return configuration.get("severity", default)
 
     @classmethod
     def from_yaml(cls, policy_path: str | Path) -> "SecurityPolicy":

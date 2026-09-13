@@ -7,6 +7,8 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.rules.registry import get_all_rules
+from aws_security_scanner.policy import SecurityPolicy
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path for the generated report.",
     )
 
+    parser.add_argument(
+    "--policy",
+    type=Path,
+    help="Path to a YAML security policy file.",
+)
+
     return parser
 
 
@@ -69,15 +77,20 @@ def discover_resources(
 def run_scan(
     source: str,
     source_path: Path,
+    policy_path: Path | None = None,
 ) -> list:
-    """Discover resources and execute registered security rules."""
+    resources = discover_resources(source, source_path)
 
-    resources = discover_resources(
-        source,
-        source_path,
+    policy = (
+        SecurityPolicy.from_yaml(policy_path)
+        if policy_path
+        else SecurityPolicy()
     )
 
-    engine = RuleEngine(get_all_rules())
+    engine = RuleEngine(
+        get_all_rules(),
+        policy=policy,
+    )
 
     return engine.scan(resources)
 
@@ -91,6 +104,7 @@ def main() -> None:
     findings = run_scan(
         args.source,
         args.file,
+        args.policy,
     )
 
     if args.format == "json":

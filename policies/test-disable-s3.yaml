@@ -1,0 +1,3 @@
+rules:
+  S3-001:
+    enabled: false
