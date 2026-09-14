@@ -409,3 +409,17 @@ def test_bucket_policy_with_specific_service_principal_has_no_finding():
     findings = check_wildcard_bucket_policy(resource)
 
     assert findings == []
+
+def test_bucket_without_policy_has_no_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_bucket_policy(resource)
+
+    assert findings == []
