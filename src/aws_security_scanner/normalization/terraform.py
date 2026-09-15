@@ -16,6 +16,7 @@ def aggregate_s3_resources(
 
     for resource in resources:
         if resource.resource_type == "aws_s3_bucket":
+            resource.attributes.setdefault("encryption", False)
             aggregated.append(resource)
             continue
 
@@ -114,3 +115,24 @@ def aggregate_s3_resources(
                     bucket.attributes["bucket_policy"] = policy
 
     return aggregated
+
+def test_s3_configuration_for_missing_bucket_is_ignored():
+    resources = [
+        Resource(
+            resource_type="aws_s3_bucket_versioning",
+            resource_id="orphaned_versioning",
+            attributes={
+                "versioning_configuration": {
+                    "status": "Enabled",
+                },
+            },
+            source="terraform",
+            relationships={
+                "bucket": "aws_s3_bucket.missing_bucket",
+            },
+        ),
+    ]
+
+    result = aggregate_s3_resources(resources)
+
+    assert result == []

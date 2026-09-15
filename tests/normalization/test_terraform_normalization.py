@@ -179,3 +179,25 @@ def test_s3_configuration_for_missing_bucket_is_ignored():
     result = aggregate_s3_resources(resources)
 
     assert result == []
+
+def test_s3_bucket_without_encryption_defaults_to_false():
+    resources = [
+        Resource(
+            resource_type="aws_s3_bucket",
+            resource_id="company-data",
+            attributes={
+                "bucket": "company-data",
+            },
+            source="terraform",
+        ),
+    ]
+
+    result = aggregate_s3_resources(resources)
+
+    bucket = next(
+        resource
+        for resource in result
+        if resource.resource_id == "company-data"
+    )
+
+    assert bucket.attributes["encryption"] is False
