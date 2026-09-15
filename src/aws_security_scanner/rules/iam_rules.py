@@ -384,4 +384,4 @@ def check_insecure_trust_policy(
 
             break
 
-    return findings
+    return findings 
