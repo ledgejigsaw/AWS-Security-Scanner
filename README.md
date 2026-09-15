@@ -1,373 +1,124 @@
 # AWS Security Scanner
 
-A Python-based AWS cloud security posture assessment tool designed to identify common security misconfigurations across AWS resources.
+A Python-based cloud security posture assessment tool designed to identify common security weaknesses across AWS resources and Infrastructure as Code.
 
-The project is being developed as a portfolio project alongside my Cybersecurity degree, with a focus on **cloud security, secure-by-design development, least privilege, infrastructure security and automated security testing**.
+The project is being developed as a practical cybersecurity and cloud security portfolio project, with an emphasis on:
 
-> **Current status:** Active development
-> **Current test suite:** 150 passing tests
-> **Current release:** v0.1.0
-> **Live AWS scanning:** Planned
-> **Terraform/IaC scanning:** Supported
+* Security-by-design
+* Least privilege
+* Read-only cloud discovery
+* Infrastructure as Code security
+* Provider-independent security rules
+* Evidence-based findings
+* Automated testing
+* Modular architecture
+* Extensibility
+
+The long-term goal is to build a security scanner capable of analysing AWS environments, Terraform configurations and other supported sources using the same security rule engine.
+
+> **Current status:** The scanner currently supports local fixtures, Terraform JSON analysis and a read-only AWS S3 provider foundation. Live AWS scanning is still under development.
+
+> **Current test suite:** 164 passing tests
 
 ---
 
 ## Project Overview
 
-The AWS Security Scanner is designed to analyse AWS security configuration and identify potentially insecure configurations.
-
-The long-term goal is to build a modular security assessment platform capable of analysing:
-
-* AWS resources
-* Terraform infrastructure
-* Local security fixtures
-* IAM policies
-* S3 configuration
-* Network security
-* Identity and access controls
-* Infrastructure-as-Code security
-* Cloud security posture
-
-The scanner uses a **normalised internal resource model**, allowing security rules to operate independently of the original configuration source.
-
-This means the same security rule can eventually analyse a resource from:
+The scanner separates **resource discovery**, **normalisation**, **security analysis** and **reporting**.
 
 ```text
-Terraform
-   │
-   ├── Fixture
-   │
-   └── AWS API
-          │
-          ▼
-   Normalised Resource
-          │
-          ▼
-      Rule Engine
-          │
-          ▼
-       Findings
-          │
-          ▼
-       Reports
+                       DATA SOURCES
+                            │
+             ┌──────────────┼──────────────┐
+             │              │              │
+          Fixtures       Terraform         AWS
+             │              │              │
+             └──────────────┼──────────────┘
+                            │
+                            ▼
+                   NORMALISED RESOURCE
+                         MODEL
+                            │
+                            ▼
+                       RULE ENGINE
+                            │
+                            ▼
+                         FINDINGS
+                            │
+                            ▼
+                        REPORTING
 ```
+
+This architecture means that security rules do not need to understand where a resource came from.
+
+For example, an S3 encryption rule can analyse:
+
+* A local security fixture
+* A Terraform configuration
+* An AWS resource discovered through boto3
+
+using the same internal `Resource` representation.
 
 ---
 
 # Current Capabilities
 
-The scanner currently supports:
+## Resource Discovery
 
-* Normalised AWS resource representation
-* Local JSON security fixtures
-* Terraform JSON analysis
-* Terraform resource relationship resolution
-* Terraform S3 resource aggregation
-* Modular security rules
-* Central rule registry
-* Decorator-based rule registration
-* Structured security findings
-* Severity classification
-* Evidence attached to findings
-* JSON reporting
-* CLI execution
-* Automated testing
-* IAM policy analysis
-* IAM role trust policy analysis
-* S3 security analysis
+The project currently supports three resource sources.
 
-The project currently contains **14 security rules** and **150 automated tests**.
+### Local fixtures
 
----
+Local JSON fixtures are used for deterministic security testing without requiring an AWS account.
 
-# Security Rules
+```text
+tests/fixtures/
+├── s3/
+└── iam/
+```
 
-## Amazon S3
+Fixtures are converted into the common `Resource` model before being passed to the rule engine.
 
-| Rule   | Severity | Description                                  |
-| ------ | -------- | -------------------------------------------- |
-| S3-001 | CRITICAL | Public S3 bucket                             |
-| S3-002 | HIGH     | Server-side encryption disabled              |
-| S3-003 | MEDIUM   | Versioning disabled                          |
-| S3-004 | HIGH     | S3 Block Public Access disabled              |
-| S3-005 | MEDIUM   | Server access logging disabled               |
-| S3-006 | HIGH     | Bucket policy contains wildcard principal    |
-| S3-007 | HIGH     | Bucket policy does not enforce TLS           |
-| S3-008 | HIGH     | Bucket policy allows unrestricted S3 actions |
-| S3-009 | HIGH     | Bucket policy contains wildcard resource     |
-| S3-010 | CRITICAL | Bucket policy allows public write access     |
+### Terraform
 
-### S3-001 — Public Bucket
+Terraform JSON output can be analysed without requiring a live AWS environment.
 
-Detects S3 buckets configured for public access.
+The Terraform provider currently supports:
 
-**Severity:** CRITICAL
-
----
-
-### S3-002 — Encryption Disabled
-
-Detects S3 buckets without server-side encryption configuration.
-
-**Severity:** HIGH
-
----
-
-### S3-003 — Versioning Disabled
-
-Detects S3 buckets where versioning is not enabled.
-
-**Severity:** MEDIUM
-
----
-
-### S3-004 — Block Public Access Disabled
-
-Detects S3 buckets where one or more Block Public Access controls are disabled.
-
-**Severity:** HIGH
-
----
-
-### S3-005 — Server Access Logging Disabled
-
-Detects S3 buckets without server access logging configured.
-
-**Severity:** MEDIUM
-
----
-
-### S3-006 — Wildcard Bucket Principal
-
-Detects bucket policies containing an `Allow` statement with a wildcard principal.
+* Resource discovery
+* Resource normalisation
+* Terraform resource relationships
+* S3 resource aggregation
+* Security configuration analysis
 
 Example:
 
-```json
-{
-  "Effect": "Allow",
-  "Principal": "*"
-}
+```bash
+terraform show -json > terraform.json
 ```
 
-**Severity:** HIGH
+The resulting JSON can then be scanned by the project.
 
----
+### AWS
 
-### S3-007 — TLS Not Enforced
+A read-only AWS provider is currently under development using `boto3`.
 
-Detects bucket policies that do not explicitly deny requests where:
+The current implementation supports S3 discovery and retrieves:
 
-```text
-aws:SecureTransport = false
-```
+* Bucket information
+* Default server-side encryption
+* Bucket versioning
+* S3 Block Public Access configuration
+* Server access logging
+* Bucket policies
 
-**Severity:** HIGH
-
----
-
-### S3-008 — Excessive S3 Actions
-
-Detects bucket policies granting:
-
-```text
-s3:*
-```
-
-**Severity:** HIGH
-
----
-
-### S3-009 — Wildcard Bucket Resource
-
-Detects bucket policies granting access to:
-
-```text
-Resource = "*"
-```
-
-**Severity:** HIGH
-
----
-
-### S3-010 — Public Write Access
-
-Detects anonymous write permissions such as:
-
-```text
-s3:PutObject
-s3:DeleteObject
-s3:PutObjectAcl
-```
-
-when combined with a wildcard principal.
-
-**Severity:** CRITICAL
-
----
-
-# IAM Security Rules
-
-| Rule    | Severity | Description                          |
-| ------- | -------- | ------------------------------------ |
-| IAM-001 | CRITICAL | Unrestricted IAM permissions         |
-| IAM-002 | HIGH     | Excessive wildcard IAM permissions   |
-| IAM-003 | HIGH     | High-risk administrative permissions |
-| IAM-004 | HIGH     | Wildcard IAM role trust principal    |
-
----
-
-## IAM-001 — Unrestricted Permissions
-
-Detects IAM policies granting:
-
-```text
-Action = "*"
-Resource = "*"
-```
-
-within an `Allow` statement.
-
-**Severity:** CRITICAL
-
-This represents unrestricted permissions and can significantly increase the impact of a compromised identity.
-
----
-
-## IAM-002 — Excessive Wildcard Permissions
-
-Detects excessively broad IAM permissions involving:
-
-* `Action = "*"`
-* Wildcard action patterns
-* Wildcard resources
-* Wildcard resources contained within lists
-* `NotAction`
-
-For example:
-
-```json
-{
-  "Effect": "Allow",
-  "NotAction": "iam:DeleteUser",
-  "Resource": "arn:aws:s3:::company-data/*"
-}
-```
-
-The scanner treats broad `NotAction` permissions as a security finding because `NotAction` can grant a very large effective permission set.
-
-**Severity:** HIGH
-
-IAM-001 and IAM-002 are deliberately separated so that completely unrestricted:
-
-```text
-Action="*"
-Resource="*"
-```
-
-permissions are reported as **CRITICAL**, while other excessively broad permissions are reported as **HIGH**.
-
----
-
-## IAM-003 — High-Risk Administrative Permissions
-
-Detects selected high-risk IAM permissions including:
-
-```text
-iam:CreateUser
-iam:CreateRole
-iam:AttachRolePolicy
-iam:AttachUserPolicy
-iam:PutUserPolicy
-iam:PutRolePolicy
-iam:PassRole
-iam:CreateAccessKey
-iam:UpdateAssumeRolePolicy
-```
-
-**Severity:** HIGH
-
-These permissions can potentially allow an identity to create credentials, modify IAM configuration, alter trust relationships or delegate permissions.
-
----
-
-## IAM-004 — Insecure Role Trust Policy
-
-Detects IAM role trust policies containing wildcard principals.
-
-Examples include:
-
-```json
-"Principal": "*"
-```
-
-or:
-
-```json
-"Principal": {
-  "AWS": "*"
-}
-```
-
-and:
-
-```json
-"Principal": {
-  "Federated": "*"
-}
-```
-
-Supported trust actions include:
-
-```text
-sts:AssumeRole
-sts:AssumeRoleWithSAML
-sts:AssumeRoleWithWebIdentity
-```
-
-**Severity:** HIGH
-
-Restricted AWS service principals are not treated as wildcard principals.
-
----
-
-# Architecture
-
-The project separates configuration sources from security analysis.
-
-```text
-                    DATA SOURCES
-                         │
-             ┌───────────┼───────────┐
-             │           │           │
-          Fixtures    Terraform      AWS
-             │           │           │
-             └───────────┼───────────┘
-                         │
-                         ▼
-                NORMALISED RESOURCE
-                         │
-                         ▼
-                    RULE ENGINE
-                         │
-                         ▼
-                      FINDINGS
-                         │
-                         ▼
-                     REPORTING
-```
-
-This architecture is intentional.
-
-Security rules should not need to understand whether a resource originated from Terraform, a fixture or the AWS API.
-
-Instead, providers convert their source data into the common `Resource` model.
+AWS API calls are currently tested using mocked boto3 clients, allowing development without storing AWS credentials or requiring a live AWS account.
 
 ---
 
 # Normalised Resource Model
 
-Resources are represented internally using a common model:
+All providers convert discovered resources into a common `Resource` model.
 
 ```python
 @dataclass
@@ -380,95 +131,253 @@ class Resource:
     relationships: dict[str, str] | None = None
 ```
 
-This provides a consistent interface for the rule engine.
+This provides a consistent interface between:
+
+```text
+Provider
+   ↓
+Resource
+   ↓
+Rule
+   ↓
+Finding
+```
+
+The approach also keeps security rules independent from individual provider implementations.
+
+---
+
+# Security Rules
+
+The project currently contains **14 security rules**.
+
+## Amazon S3
+
+| ID     | Severity | Description                                  |
+| ------ | -------- | -------------------------------------------- |
+| S3-001 | Critical | Public S3 bucket                             |
+| S3-002 | High     | Server-side encryption disabled              |
+| S3-003 | Medium   | Bucket versioning disabled                   |
+| S3-004 | High     | S3 Block Public Access disabled              |
+| S3-005 | Medium   | Server access logging disabled               |
+| S3-006 | High     | Wildcard bucket policy principal             |
+| S3-007 | High     | Bucket policy does not enforce TLS           |
+| S3-008 | High     | Bucket policy allows unrestricted S3 actions |
+| S3-009 | High     | Bucket policy uses wildcard resource         |
+| S3-010 | Critical | Bucket policy allows public write access     |
+
+## AWS IAM
+
+| ID      | Severity | Description                                                |
+| ------- | -------- | ---------------------------------------------------------- |
+| IAM-001 | Critical | IAM policy grants unrestricted permissions                 |
+| IAM-002 | High     | IAM policy contains excessively broad wildcard permissions |
+| IAM-003 | High     | IAM policy grants high-risk administrative permissions     |
+| IAM-004 | High     | IAM role trust policy allows wildcard principal            |
+
+The rule engine is designed to allow additional rules to be added without changing the provider architecture.
+
+---
+
+# S3 Security Analysis
+
+The S3 analysis currently covers several common security controls.
+
+### Public access
+
+Detects buckets configured in a way that can expose data publicly.
+
+### Encryption
+
+Checks whether default server-side encryption is configured.
+
+### Versioning
+
+Identifies buckets without versioning enabled.
+
+### Block Public Access
+
+Checks all four S3 Block Public Access settings:
+
+```text
+BlockPublicAcls
+BlockPublicPolicy
+IgnorePublicAcls
+RestrictPublicBuckets
+```
+
+The scanner considers Block Public Access enabled only when all four controls are enabled.
+
+### Server access logging
+
+Identifies buckets without S3 server access logging.
+
+### Bucket policies
+
+The scanner analyses bucket policies for:
+
+* Wildcard principals
+* Missing TLS enforcement
+* `s3:*`
+* Wildcard resources
+* Public write permissions
+
+---
+
+# IAM Security Analysis
+
+IAM analysis currently focuses on excessive permissions and trust relationships.
+
+The scanner detects:
+
+* `Action: "*"`
+* Wildcard actions such as `s3:*`
+* Wildcard resources
+* `NotAction`
+* High-risk IAM administrative permissions
+* Wildcard IAM role trust principals
+
+The scanner specifically separates unrestricted permissions from broader wildcard permissions.
 
 For example:
 
-```text
-Terraform resource
-        │
-        ▼
-TerraformProvider
-        │
-        ▼
-Resource
-        │
-        ▼
-S3 Security Rules
+```json
+{
+    "Effect": "Allow",
+    "Action": "*",
+    "Resource": "*"
+}
 ```
 
-The same S3 rules can eventually operate against:
+is treated as an unrestricted permission set and generates the critical **IAM-001** finding.
 
-```text
-Terraform → Resource
-Fixture   → Resource
-AWS API   → Resource
+Broader wildcard permissions that do not meet the IAM-001 condition are analysed by **IAM-002**.
+
+---
+
+# `NotAction` Analysis
+
+IAM `NotAction` permissions are also analysed.
+
+For example:
+
+```json
+{
+    "Effect": "Allow",
+    "NotAction": "iam:DeleteUser",
+    "Resource": "arn:aws:s3:::example-bucket/*"
+}
 ```
 
-without requiring separate implementations of every security check.
+The scanner treats broad `NotAction` permissions as a security finding because they can result in a very large effective permission set.
+
+---
+
+# Architecture
+
+The project is structured around clear separation of responsibilities.
+
+```text
+src/aws_security_scanner/
+│
+├── cli.py
+├── engine.py
+├── policy.py
+│
+├── models/
+│   ├── finding.py
+│   ├── resource.py
+│   └── rule.py
+│
+├── providers/
+│   ├── aws.py
+│   ├── fixture.py
+│   └── terraform.py
+│
+├── normalization/
+│   └── terraform.py
+│
+├── reporting/
+│   ├── summary.py
+│   └── json_reporter.py
+│
+└── rules/
+    ├── decorators.py
+    ├── registry.py
+    ├── s3_rules.py
+    └── iam_rules.py
+```
 
 ---
 
 # Providers
 
-## Fixture Provider
+Providers are responsible for discovering resources and converting them into the common resource model.
 
-The fixture provider allows security rules to be developed and tested without requiring an active AWS account.
+## FixtureProvider
 
-Example fixture:
+Used for deterministic local testing.
 
-```json
-{
-  "resource_type": "aws_s3_bucket",
-  "bucket_name": "company-sensitive-data",
-  "region": "eu-west-2",
-  "public": false,
-  "encryption": true,
-  "versioning": true
-}
+```text
+JSON fixture
+     ↓
+FixtureProvider
+     ↓
+Resource
 ```
 
-Fixtures provide deterministic test data and make the project easier to develop offline.
+## TerraformProvider
+
+Used to analyse Terraform JSON output.
+
+```text
+Terraform JSON
+      ↓
+TerraformProvider
+      ↓
+Resource
+      ↓
+Relationship resolution
+      ↓
+S3 aggregation
+```
+
+## AWSProvider
+
+Used for read-only AWS discovery.
+
+```text
+AWS API
+   ↓
+boto3
+   ↓
+AWSProvider
+   ↓
+Resource
+```
+
+The AWS provider currently focuses on S3.
 
 ---
 
-## Terraform Provider
+# Terraform Resource Relationships
 
-Terraform JSON configuration can be analysed and converted into the internal resource model.
-
-The provider also resolves relationships between Terraform resources.
+Terraform often represents related configuration as separate resources.
 
 For example:
 
 ```text
 aws_s3_bucket
-       │
-       ├── aws_s3_bucket_versioning
-       │
-       ├── aws_s3_bucket_server_side_encryption_configuration
-       │
-       ├── aws_s3_bucket_public_access_block
-       │
-       ├── aws_s3_bucket_logging
-       │
-       └── aws_s3_bucket_policy
+aws_s3_bucket_versioning
+aws_s3_bucket_server_side_encryption_configuration
+aws_s3_bucket_public_access_block
+aws_s3_bucket_logging
+aws_s3_bucket_policy
 ```
 
-These related resources can then be aggregated into the base S3 bucket resource before security rules are executed.
+The scanner resolves Terraform references and aggregates the related configuration back onto the base S3 bucket resource.
 
----
-
-# Terraform Relationship Resolution
-
-Terraform resources commonly reference other resources using expressions such as:
-
-```text
-${aws_s3_bucket.company_data.id}
-```
-
-The provider resolves these references and records relationships in the normalised resource model.
-
-This allows the scanner to understand relationships between resources instead of analysing every Terraform resource in isolation.
+This allows the security rules to analyse the bucket as a single logical resource.
 
 ---
 
@@ -476,7 +385,7 @@ This allows the scanner to understand relationships between resources instead of
 
 Security rules are registered using decorators.
 
-Example:
+Conceptually:
 
 ```python
 @rule_for(
@@ -484,56 +393,66 @@ Example:
     check_id="S3-002",
     service="S3",
     severity=Severity.HIGH,
-    category="Data Protection",
-    title="S3 bucket encryption disabled",
-    description="...",
-    remediation="...",
+    ...
 )
 def check_encryption(resource: Resource) -> list[Finding]:
     ...
 ```
 
-The decorator registers the rule with the central rule registry.
+The rule engine can then determine which rules apply to a resource based on its resource type.
 
-The engine can then discover and execute applicable rules based on the resource type.
+This provides a central rule registry without requiring the CLI or providers to know about individual security checks.
 
 ---
 
 # Findings
 
-Security findings contain structured information including:
+Security findings are represented using a common `Finding` model.
+
+A finding contains information such as:
 
 * Check ID
-* Resource
-* Region
 * Severity
 * Service
-* Category
-* Title
+* Resource
+* Region
+* Evidence
 * Description
 * Remediation
-* Evidence
 
-Example:
+This allows the same finding structure to be used regardless of whether the resource originated from:
 
-```json
-{
-  "check_id": "S3-002",
-  "severity": "HIGH",
-  "service": "S3",
-  "resource": "company-sensitive-data",
-  "region": "eu-west-2",
-  "evidence": "encryption=False"
-}
+* Fixtures
+* Terraform
+* AWS
+
+---
+
+# Evidence-Based Findings
+
+The scanner attempts to provide evidence alongside each finding.
+
+For example:
+
+```text
+Check: S3-006
+Resource: company-data
+Evidence: Principal=*
 ```
 
-Evidence is included so that findings can be traced back to the configuration that triggered the security rule.
+This makes findings easier to investigate and gives the scanner more value than simply reporting:
+
+```text
+S3 bucket is insecure
+```
+
+The intention is for every finding to provide enough context for a security engineer to understand why the control was triggered.
 
 ---
 
 # Reporting
 
-The scanner currently supports JSON reporting.
+The project currently supports JSON reporting.
 
 Example:
 
@@ -544,36 +463,28 @@ python -m aws_security_scanner.cli \
     --format json
 ```
 
-The generated report is written to:
+Reports are written to:
 
 ```text
 reports/scan.json
 ```
 
-The report contains:
+The report contains summary information such as:
 
-* Total findings
-* Findings by severity
-* Individual findings
-* Evidence
-* Resource information
-
----
-
-# CLI
-
-The scanner can be executed through the Python module interface.
-
-Example:
-
-```bash
-python -m aws_security_scanner.cli \
-    --source terraform \
-    --file tests/fixtures/terraform/realistic_s3.json \
-    --format json
+```json
+{
+    "summary": {
+        "total_findings": 4,
+        "by_severity": {
+            "CRITICAL": 1,
+            "HIGH": 2,
+            "MEDIUM": 1
+        }
+    }
+}
 ```
 
-The project is designed so that additional input sources and output formats can be added without significantly changing the rule engine.
+Individual findings also contain their associated evidence.
 
 ---
 
@@ -583,9 +494,26 @@ Testing is a major part of the project.
 
 The current test suite contains:
 
-```text
-150 passing tests
-```
+> **164 passing tests**
+
+The tests cover:
+
+* Resource models
+* Finding models
+* Rule models
+* Rule decorators
+* Rule registration
+* S3 security rules
+* IAM security rules
+* IAM `NotAction`
+* Terraform normalisation
+* Terraform relationships
+* Terraform providers
+* Fixture providers
+* AWS provider
+* Reporting
+* CLI behaviour
+* Integration paths
 
 Run the complete test suite with:
 
@@ -593,378 +521,99 @@ Run the complete test suite with:
 pytest -q
 ```
 
-Expected result:
-
-```text
-150 passed
-```
-
-IAM-specific tests can be run with:
+Run only the AWS provider tests with:
 
 ```bash
-pytest -q tests/rules/test_iam_rules.py
+pytest -q tests/providers/test_aws.py
 ```
 
-Expected result:
+The current AWS provider suite contains tests covering:
 
 ```text
-39 passed
-```
-
-The tests cover:
-
-* Resource models
-* Finding models
-* Rule metadata
-* Rule registration
-* Rule execution
-* S3 security rules
-* IAM security rules
-* IAM wildcard permissions
-* IAM `NotAction`
-* IAM role trust policies
-* Terraform normalisation
-* Terraform relationships
-* Terraform S3 aggregation
-* Providers
-* Reporting
-* CLI behaviour
-* Integration workflows
-
----
-
-# Test-Driven Development
-
-Security rules are developed with tests alongside the implementation.
-
-The development workflow generally follows:
-
-```text
-Define security requirement
-          │
-          ▼
-Write failing test
-          │
-          ▼
-Implement security rule
-          │
-          ▼
-Run focused tests
-          │
-          ▼
-Run full regression suite
-          │
-          ▼
-Commit change
-```
-
-This helps ensure that new security controls do not silently break existing functionality.
-
----
-
-# Project Structure
-
-```text
-AWS-Security-Scanner/
-│
-├── policies/
-│
-├── reports/
-│
-├── src/
-│   └── aws_security_scanner/
-│       │
-│       ├── __init__.py
-│       ├── cli.py
-│       ├── engine.py
-│       ├── policy.py
-│       │
-│       ├── models/
-│       │   ├── __init__.py
-│       │   ├── finding.py
-│       │   ├── resource.py
-│       │   └── rule.py
-│       │
-│       ├── providers/
-│       │   ├── __init__.py
-│       │   ├── aws.py
-│       │   ├── fixture.py
-│       │   └── terraform.py
-│       │
-│       ├── normalization/
-│       │   ├── __init__.py
-│       │   └── terraform.py
-│       │
-│       ├── reporting/
-│       │   ├── __init__.py
-│       │   ├── summary.py
-│       │   └── json_reporter.py
-│       │
-│       └── rules/
-│           ├── __init__.py
-│           ├── decorators.py
-│           ├── registry.py
-│           ├── s3_rules.py
-│           └── iam_rules.py
-│
-├── tests/
-│   ├── fixtures/
-│   │   ├── s3/
-│   │   ├── iam/
-│   │   └── terraform/
-│   │
-│   ├── models/
-│   ├── normalization/
-│   ├── providers/
-│   ├── reporting/
-│   ├── rules/
-│   ├── test_cli.py
-│   ├── test_engine.py
-│   ├── test_engine_integration.py
-│   ├── test_policy.py
-│   └── test_terraform_integration.py
-│
-├── .gitignore
-├── pyproject.toml
-└── README.md
+S3 bucket discovery
+S3 encryption
+S3 encryption disabled
+S3 versioning
+S3 versioning disabled
+S3 Block Public Access
+S3 Block Public Access disabled
+S3 server access logging
+S3 server access logging disabled
+S3 bucket policies
+S3 buckets without policies
 ```
 
 ---
 
-# Technology Stack
+# Development Without AWS Credentials
 
-The project currently uses:
+The project is intentionally being developed without requiring a live AWS environment.
 
-* **Python 3.11+**
-* **boto3**
-* **Rich**
-* **PyYAML**
-* **pytest**
-* **Terraform JSON**
-* **Git / GitHub**
+AWS API calls are mocked during testing.
 
-The local development environment currently uses Python 3.13.
+For example:
 
----
+```python
+s3_client = Mock()
 
-# Security Design Principles
-
-The project is being developed around several core principles.
-
-## Least Privilege
-
-Security rules identify excessive permissions and encourage permissions to be restricted to the minimum required.
-
-## Security by Design
-
-Security is considered during architecture and implementation rather than being added after functionality has been built.
-
-## Deterministic Analysis
-
-Fixtures and Terraform analysis provide repeatable input for reliable testing.
-
-## Evidence-Based Findings
-
-Every finding should provide enough evidence to understand why the rule was triggered.
-
-## Separation of Concerns
-
-Providers handle data collection and normalisation.
-
-Rules handle security analysis.
-
-Reporting handles output.
-
-This separation allows the project to evolve without tightly coupling components.
-
-## Extensibility
-
-New AWS services and security controls should be addable without rewriting the existing rule engine.
-
----
-
-# Current Limitations
-
-The project is still under active development.
-
-Current limitations include:
-
-* Live AWS discovery is not yet implemented
-* Direct Terraform HCL parsing is not yet implemented
-* AWS authentication and credential handling are not yet integrated into the scanner
-* AWS coverage is currently focused primarily on S3 and IAM
-* Reporting is currently focused on JSON
-* The scanner does not yet provide a complete AWS security posture assessment
-* Some security rules use intentionally simplified detection logic while the rule framework is being developed
-
-These limitations are intentional development milestones rather than final design decisions.
-
----
-
-# Roadmap
-
-## Phase 1 — Core Scanner
-
-* [x] Normalised resource model
-* [x] Fixture provider
-* [x] Terraform JSON provider
-* [x] Terraform relationship resolution
-* [x] S3 resource aggregation
-* [x] Rule registry
-* [x] Rule decorators
-* [x] Structured findings
-* [x] JSON reporting
-* [x] CLI
-* [x] Automated test suite
-
-## Phase 2 — S3 Security
-
-* [x] Public bucket detection
-* [x] Encryption detection
-* [x] Versioning detection
-* [x] Block Public Access detection
-* [x] Logging detection
-* [x] Wildcard principal detection
-* [x] TLS enforcement detection
-* [x] Excessive S3 actions
-* [x] Wildcard bucket resources
-* [x] Public write access
-
-## Phase 3 — IAM Security
-
-* [x] Unrestricted IAM permissions
-* [x] Wildcard Action detection
-* [x] Wildcard Resource detection
-* [x] Wildcard Action patterns
-* [x] `NotAction` analysis
-* [x] High-risk administrative permissions
-* [x] IAM role trust policy analysis
-* [x] Wildcard AWS principals
-* [x] Wildcard federated principals
-
-## Phase 4 — AWS Integration
-
-* [ ] Implement live AWS provider
-* [ ] AWS credential/profile handling
-* [ ] Read-only AWS discovery
-* [ ] AWS account metadata
-* [ ] Region discovery
-* [ ] S3 API discovery
-* [ ] IAM API discovery
-* [ ] Least-privilege scanner IAM policy
-
-## Phase 5 — Additional AWS Services
-
-Planned services include:
-
-* [ ] EC2
-* [ ] VPC
-* [ ] Security Groups
-* [ ] EBS
-* [ ] RDS
-* [ ] CloudTrail
-* [ ] KMS
-* [ ] Lambda
-* [ ] Secrets Manager
-* [ ] CloudWatch
-* [ ] SNS
-* [ ] SQS
-
-## Phase 6 — Infrastructure as Code
-
-* [x] Terraform JSON analysis
-* [x] Terraform resource relationships
-* [x] Terraform S3 aggregation
-* [ ] Direct HCL parsing
-* [ ] Terraform module analysis
-* [ ] Terraform variable analysis
-* [ ] Terraform security recommendations
-* [ ] IaC security reporting
-
-## Phase 7 — Reporting
-
-* [x] JSON reporting
-* [x] Severity summaries
-* [x] Finding evidence
-* [ ] HTML reports
-* [ ] Executive security summary
-* [ ] Compliance mapping
-* [ ] SARIF output
-* [ ] CI/CD security reporting
-
-## Phase 8 — CI/CD
-
-* [ ] GitHub Actions
-* [ ] Automated test execution
-* [ ] Coverage reporting
-* [ ] Static analysis
-* [ ] Dependency scanning
-* [ ] Security regression testing
-* [ ] Automated release process
-
----
-
-# Future Architecture
-
-The long-term architecture is intended to support multiple configuration sources and security analysis workflows.
-
-```text
-                         ┌───────────────┐
-                         │   AWS APIs    │
-                         └───────┬───────┘
-                                 │
-                         ┌───────▼───────┐
-                         │ AWS Provider  │
-                         └───────┬───────┘
-                                 │
-┌──────────────┐          ┌──────▼───────┐
-│  Terraform   │─────────►│              │
-└──────────────┘          │  Normalised  │
-                          │   Resource   │
-┌──────────────┐          │    Model     │
-│   Fixtures   │─────────►│              │
-└──────────────┘          └──────┬───────┘
-                                 │
-                          ┌──────▼───────┐
-                          │ Rule Engine  │
-                          └──────┬───────┘
-                                 │
-                          ┌──────▼───────┐
-                          │  Findings    │
-                          └──────┬───────┘
-                                 │
-                    ┌────────────┼────────────┐
-                    │            │            │
-                JSON          HTML          SARIF
+s3_client.list_buckets.return_value = {
+    "Buckets": [
+        {"Name": "example-bucket"}
+    ]
+}
 ```
 
-The objective is to make the scanner capable of analysing both **deployed cloud environments** and **infrastructure before deployment**.
+This provides several advantages:
+
+* No AWS credentials stored in the repository
+* No accidental production changes
+* No AWS infrastructure costs
+* Deterministic tests
+* Repeatable development
+* Easier CI/CD integration
+
+The AWS provider is designed to remain **read-only**.
 
 ---
 
-# Why I Am Building This
+# Security Principles
 
-This project is being developed as a practical cybersecurity and cloud-security portfolio project.
+The project follows several security principles.
 
-Rather than simply building a collection of individual security checks, the project is being used to explore:
+## Least privilege
 
-* Cloud security architecture
-* AWS security controls
-* IAM security
-* Infrastructure as Code security
-* Python application architecture
-* Security automation
-* Test-driven development
-* Security findings and evidence
-* CI/CD security
-* Least-privilege design
-* Cloud security engineering
+The scanner identifies overly broad permissions and encourages specific permissions and resources.
 
-The longer-term objective is to evolve the project from a local security scanner into a more complete **cloud security posture assessment platform**.
+## Read-only discovery
+
+The AWS provider is intended to inspect configuration rather than modify AWS resources.
+
+## No hard-coded credentials
+
+AWS credentials should never be stored in source code, fixtures or configuration committed to Git.
+
+## Provider-independent rules
+
+Security logic should not depend on whether data came from AWS, Terraform or fixtures.
+
+## Evidence-based analysis
+
+Findings should contain evidence supporting the security decision.
+
+## Deterministic testing
+
+Security checks should be reproducible and independently testable.
 
 ---
 
-# Development Environment
+# Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/ledgejigsaw/AWS-Security-Scanner.git
+cd AWS-Security-Scanner
+```
 
 Create a virtual environment:
 
@@ -992,48 +641,217 @@ pytest -q
 
 ---
 
-# Example Workflow
+# Requirements
 
-A typical development workflow looks like:
+* Python 3.11+
+* boto3
+* PyYAML
+* Rich
+* pytest for development/testing
 
-```bash
-git pull origin main
+The project is currently being developed on Python 3.13.
 
-source .venv/bin/activate
+---
 
-pytest -q
+# Example Project Structure
 
-# Make changes
-
-pytest -q
-
-git status
-
-git add .
-
-git commit -m "description of change"
-
-git push origin main
+```text
+AWS-Security-Scanner/
+│
+├── policies/
+│
+├── reports/
+│
+├── src/
+│   └── aws_security_scanner/
+│       ├── cli.py
+│       ├── engine.py
+│       ├── policy.py
+│       │
+│       ├── models/
+│       ├── providers/
+│       ├── normalization/
+│       ├── reporting/
+│       └── rules/
+│
+├── tests/
+│   ├── fixtures/
+│   ├── models/
+│   ├── normalization/
+│   ├── providers/
+│   ├── reporting/
+│   └── rules/
+│
+├── .gitignore
+├── pyproject.toml
+└── README.md
 ```
+
+---
+
+# Roadmap
+
+The project is still under active development.
+
+## Completed
+
+* [x] Initial Python project structure
+* [x] Normalised `Resource` model
+* [x] Finding model
+* [x] Rule model
+* [x] Rule decorator system
+* [x] Central rule registry
+* [x] Fixture provider
+* [x] Terraform JSON provider
+* [x] Terraform resource relationship resolution
+* [x] Terraform S3 resource aggregation
+* [x] S3-001 through S3-010
+* [x] IAM-001 through IAM-004
+* [x] IAM wildcard permission analysis
+* [x] IAM `NotAction` analysis
+* [x] JSON reporting
+* [x] CLI integration
+* [x] Automated test suite
+* [x] Read-only AWS provider foundation
+* [x] AWS S3 bucket discovery
+* [x] AWS S3 encryption discovery
+* [x] AWS S3 versioning discovery
+* [x] AWS S3 Block Public Access discovery
+* [x] AWS S3 logging discovery
+* [x] AWS S3 bucket policy discovery
+* [x] Mocked AWS provider tests
+
+## In Progress
+
+* [ ] AWS provider → rule engine integration
+* [ ] AWS S3 security integration testing
+* [ ] AWS IAM provider
+* [ ] AWS IAM policy discovery
+* [ ] AWS IAM role/trust policy discovery
+* [ ] Expanded AWS resource discovery
+* [ ] Live AWS scanning
+* [ ] Improved reporting
+
+## Planned
+
+* [ ] EC2 security checks
+* [ ] VPC/network security checks
+* [ ] Security Group analysis
+* [ ] CloudTrail analysis
+* [ ] KMS analysis
+* [ ] RDS security checks
+* [ ] Lambda security checks
+* [ ] Secrets Manager checks
+* [ ] Additional IAM analysis
+* [ ] Additional Terraform resource types
+* [ ] Direct Terraform HCL parsing
+* [ ] HTML reporting
+* [ ] CI/CD security scanning
+* [ ] GitHub Actions integration
+* [ ] Configuration/policy packs
+* [ ] Severity filtering
+* [ ] Scan baselines
+* [ ] Finding suppression
+* [ ] SARIF output
+* [ ] Architecture visualisation
+
+---
+
+# Future Architecture
+
+The longer-term objective is to evolve the scanner into a broader cloud security analysis platform.
+
+```text
+                    ┌─────────────────────┐
+                    │      CLI / API      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │    Source Manager   │
+                    └──────────┬──────────┘
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+     Terraform              AWS API             Fixtures
+          │                    │                    │
+          └────────────────────┼────────────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Normalised Resource │
+                    │       Model         │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │     Rule Engine     │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │      Findings       │
+                    └──────────┬──────────┘
+                               │
+                 ┌─────────────┼─────────────┐
+                 │             │             │
+                 ▼             ▼             ▼
+               JSON          HTML          SARIF
+```
+
+---
+
+# Why I'm Building This
+
+This project is being developed as a practical exploration of cloud security engineering rather than simply as a collection of security scripts.
+
+The aim is to demonstrate understanding of:
+
+* Python development
+* AWS security
+* IAM
+* S3 security
+* Infrastructure as Code
+* Terraform
+* Cloud security architecture
+* Security automation
+* API integration
+* Software testing
+* Secure software design
+* CI/CD security
+* Security reporting
+
+The architecture is intentionally being developed incrementally, with tests driving the implementation of individual security capabilities.
+
 ---
 
 # Project Status
 
-The project is currently in **active development**.
+**Current version:** `0.1.0`
 
-The core architecture is established, with:
+**Security rules:** 14
 
-* A normalised resource model
-* Multiple data providers
-* A modular rule engine
-* S3 security controls
-* IAM security controls
-* Terraform analysis
-* Structured findings
-* JSON reporting
-* CLI support
-* 150 automated tests
+**Automated tests:** 164 passing
 
-The next major architectural milestone is **live AWS integration**, allowing the same security rules currently used against fixtures and Terraform to analyse read-only AWS configuration.
+**Data sources:**
 
-The project will continue to evolve towards a broader cloud security posture assessment platform.
+* Local fixtures
+* Terraform JSON
+* AWS S3 API foundation
+
+**AWS access:** Read-only provider under development
+
+**Live AWS scanning:** Not yet implemented
+
+**Status:** Active development
+
+---
+
+# Repository
+
+GitHub:
+
+https://github.com/ledgejigsaw/AWS-Security-Scanner
+
+Feedback, suggestions and contributions are welcome.
