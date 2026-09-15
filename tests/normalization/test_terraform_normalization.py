@@ -126,3 +126,56 @@ def test_terraform_s3_bucket_policy_is_aggregated():
     assert policy["Statement"][0]["Effect"] == "Allow"
 
     assert policy["Statement"][0]["Principal"] == "*"
+
+def test_s3_configuration_without_bucket_relationship_is_ignored():
+    resources = [
+        Resource(
+            resource_type="aws_s3_bucket",
+            resource_id="company-data",
+            attributes={
+                "bucket": "company-data",
+            },
+            source="terraform",
+        ),
+        Resource(
+            resource_type="aws_s3_bucket_versioning",
+            resource_id="orphaned_versioning",
+            attributes={
+                "versioning_configuration": {
+                    "status": "Enabled",
+                },
+            },
+            source="terraform",
+        ),
+    ]
+
+    result = aggregate_s3_resources(resources)
+
+    bucket = next(
+        resource
+        for resource in result
+        if resource.resource_id == "company-data"
+    )
+
+    assert "versioning_configuration" not in bucket.attributes 
+
+def test_s3_configuration_for_missing_bucket_is_ignored():
+    resources = [
+        Resource(
+            resource_type="aws_s3_bucket_versioning",
+            resource_id="orphaned_versioning",
+            attributes={
+                "versioning_configuration": {
+                    "status": "Enabled",
+                },
+            },
+            source="terraform",
+            relationships={
+                "bucket": "aws_s3_bucket.missing_bucket",
+            },
+        ),
+    ]
+
+    result = aggregate_s3_resources(resources)
+
+    assert result == []
