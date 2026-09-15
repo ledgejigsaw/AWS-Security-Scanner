@@ -154,7 +154,7 @@ def test_overly_permissive_policy_detects_wildcards_in_lists():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-001"
     assert findings[0].severity == Severity.CRITICAL
-    
+
 # ---------------------------------------------------------------------------
 # IAM-002 — Wildcard IAM Permissions
 # ---------------------------------------------------------------------------
@@ -877,3 +877,34 @@ def test_insecure_trust_policy_ignores_non_assume_role_action():
     findings = check_insecure_trust_policy(resource)
 
     assert findings == []
+
+def test_wildcard_permissions_detect_wildcard_resource_in_list():
+
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="ListWildcardResourcePolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                        ],
+                        "Resource": [
+                            "arn:aws:s3:::company-data/*",
+                            "*",
+                        ],
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
