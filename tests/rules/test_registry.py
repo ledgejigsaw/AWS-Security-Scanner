@@ -4,7 +4,7 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 10
+    assert len(rules) == 11
 
 
 def test_rule_registry_contains_iam_rules():
@@ -15,3 +15,10 @@ def test_rule_registry_contains_iam_rules():
     assert "check_wildcard_permissions" in rule_names
     assert "check_excessive_administrative_permissions" in rule_names
     assert "check_insecure_trust_policy" in rule_names
+
+def test_rule_registry_contains_s3_tls_rule():
+    rules = get_all_rules()
+
+    rule_names = [rule.__name__ for rule in rules]
+
+    assert "check_tls_enforcement" in rule_names

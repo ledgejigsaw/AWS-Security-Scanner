@@ -4,13 +4,34 @@ from aws_security_scanner.providers.terraform import TerraformProvider
 
 
 def test_terraform_provider_discovers_resources():
+
     fixture = Path("tests/fixtures/terraform/s3_buckets.json")
 
     provider = TerraformProvider(fixture)
 
     resources = provider.discover()
 
-    assert len(resources) == 2
+    assert len(resources) == 3
+
+    resource_types = {
+        resource.resource_type
+        for resource in resources
+    }
+
+    assert resource_types == {
+        "aws_s3_bucket",
+        "aws_s3_bucket_policy",
+    }
+
+    policy_resource = next(
+        resource
+        for resource in resources
+        if resource.resource_id == "secure_bucket_policy"
+    )
+
+    assert policy_resource.relationships == {
+        "bucket": "aws_s3_bucket.secure_bucket"
+    }
 
 
 def test_terraform_provider_normalises_resource():

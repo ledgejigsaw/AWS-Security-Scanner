@@ -11,6 +11,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_encryption,
     check_versioning,
     check_logging,
+    check_tls_enforcement,
 )
 
 
@@ -421,5 +422,72 @@ def test_bucket_without_policy_has_no_finding():
     )
 
     findings = check_wildcard_bucket_policy(resource)
+
+    assert findings == []
+
+def test_bucket_policy_without_tls_enforcement_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": "arn:aws:iam::123456789012:root"
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": (
+                            "arn:aws:s3:::company-sensitive-data/*"
+                        ),
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_tls_enforcement(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-007"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_bucket_policy_with_tls_enforcement_has_no_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-secure-data",
+        attributes={
+            "bucket_name": "company-secure-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "s3:*",
+                        "Resource": [
+                            "arn:aws:s3:::company-secure-data",
+                            "arn:aws:s3:::company-secure-data/*",
+                        ],
+                        "Condition": {
+                            "Bool": {
+                                "aws:SecureTransport": "false"
+                            }
+                        },
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_tls_enforcement(resource)
 
     assert findings == []

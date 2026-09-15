@@ -230,3 +230,67 @@ def check_wildcard_bucket_policy(resource: Resource) -> list[Finding]:
     return findings
 
 check_bucket_policy = check_wildcard_bucket_policy
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-007",
+    service="S3",
+    severity=Severity.HIGH,
+    category="Data Protection",
+    title="S3 bucket policy does not enforce TLS",
+    description=(
+        "The S3 bucket policy does not explicitly deny "
+        "requests made without TLS. Data could therefore "
+        "be transmitted without transport encryption."
+    ),
+    remediation=(
+        "Add an explicit Deny statement to the bucket policy "
+        "that blocks requests when aws:SecureTransport is false."
+    ),
+)
+def check_tls_enforcement(resource: Resource) -> list[Finding]:
+    findings = []
+
+    policy = resource.attributes.get("bucket_policy")
+
+    if not policy:
+        findings.append(
+            Finding.from_rule(
+                check_tls_enforcement,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence="TLS enforcement not configured",
+            )
+        )
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    tls_enforced = False
+
+    for statement in statements:
+        if statement.get("Effect") != "Deny":
+            continue
+
+        condition = statement.get("Condition", {})
+
+        bool_condition = condition.get("Bool", {})
+
+        if bool_condition.get("aws:SecureTransport") == "false":
+            tls_enforced = True
+            break
+
+    if not tls_enforced:
+        findings.append(
+            Finding.from_rule(
+                check_tls_enforcement,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence="aws:SecureTransport=false deny not found",
+            )
+        )
+
+    return findings

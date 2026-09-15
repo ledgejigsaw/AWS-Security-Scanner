@@ -28,7 +28,7 @@ def test_run_scan_without_policy_preserves_default_behaviour():
 
     check_ids = {finding.check_id for finding in findings}
 
-    assert len(findings) == 5
+    assert len(findings) == 7
     assert "S3-001" in check_ids
 
 
@@ -51,7 +51,7 @@ rules:
 
     check_ids = {finding.check_id for finding in findings}
 
-    assert len(findings) == 4
+    assert len(findings) == 6
     assert "S3-001" not in check_ids
 
 def test_run_scan_can_override_rule_severity(tmp_path):

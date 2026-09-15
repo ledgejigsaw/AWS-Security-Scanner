@@ -6,12 +6,14 @@ from aws_security_scanner.normalization.terraform import (
 )
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.rules.registry import get_all_rules
+from aws_security_scanner.normalization.terraform import aggregate_s3_resources
 
 def test_rule_engine_scans_terraform_resources():
     fixture = Path("tests/fixtures/terraform/s3_buckets.json")
 
     provider = TerraformProvider(fixture)
     resources = provider.discover()
+    resources = aggregate_s3_resources(resources)
 
     engine = RuleEngine(get_all_rules())
     findings = engine.scan(resources)
@@ -22,7 +24,7 @@ def test_rule_engine_scans_terraform_resources():
         if finding.resource == "insecure_bucket"
     ]
 
-    assert len(terraform_findings) == 5
+    assert len(terraform_findings) == 6
 
     check_ids = {
         finding.check_id
@@ -35,6 +37,7 @@ def test_rule_engine_scans_terraform_resources():
         "S3-003",
         "S3-004",
         "S3-005",
+        "S3-007",
     }
 
     secure_findings = [

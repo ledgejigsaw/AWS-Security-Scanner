@@ -5,6 +5,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_block_public_access,
     check_logging,
     check_wildcard_bucket_policy,
+    check_tls_enforcement,
 )
 
 from aws_security_scanner.rules.iam_rules import (
@@ -24,6 +25,7 @@ def get_all_rules():
         check_block_public_access,
         check_logging,
         check_wildcard_bucket_policy,
+        check_tls_enforcement,
         check_overly_permissive_policy,
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
