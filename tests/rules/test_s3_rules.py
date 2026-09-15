@@ -491,3 +491,54 @@ def test_bucket_policy_with_tls_enforcement_has_no_finding():
     findings = check_tls_enforcement(resource)
 
     assert findings == []
+
+def test_bucket_without_policy_generates_tls_finding():
+
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_tls_enforcement(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-007"
+    assert findings[0].severity == Severity.HIGH
+
+def test_bucket_policy_with_single_tls_statement_dict_has_no_finding():
+
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-secure-data",
+        attributes={
+            "bucket_name": "company-secure-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": {
+                    "Effect": "Deny",
+                    "Principal": "*",
+                    "Action": "s3:*",
+                    "Resource": [
+                        "arn:aws:s3:::company-secure-data",
+                        "arn:aws:s3:::company-secure-data/*",
+                    ],
+                    "Condition": {
+                        "Bool": {
+                            "aws:SecureTransport": "false"
+                        }
+                    },
+                },
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_tls_enforcement(resource)
+
+    assert findings == []
