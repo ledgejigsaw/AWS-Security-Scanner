@@ -53,3 +53,47 @@ rules:
 
     assert len(findings) == 4
     assert "S3-001" not in check_ids
+
+def test_run_scan_can_override_rule_severity(tmp_path):
+    terraform_file = tmp_path / "terraform.json"
+
+    terraform_file.write_text(
+        """
+{
+    "resource": {
+        "aws_s3_bucket": {
+            "company_data": {
+                "bucket": "company-sensitive-data",
+                "region": "eu-west-2"
+            }
+        }
+    }
+}
+"""
+    )
+
+    policy_file = tmp_path / "policy.yaml"
+
+    policy_file.write_text(
+        """
+rules:
+  S3-002:
+    enabled: true
+    severity: CRITICAL
+"""
+    )
+
+    findings = run_scan(
+        "terraform",
+        terraform_file,
+        policy_file,
+    )
+
+    encryption_findings = [
+        finding
+        for finding in findings
+        if finding.check_id == "S3-002"
+    ]
+
+    assert len(encryption_findings) == 1
+    assert encryption_findings[0].severity.value == "CRITICAL"

@@ -1,6 +1,7 @@
 from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.registry import get_all_rules
+from aws_security_scanner.policy import SecurityPolicy
 
 
 def test_rule_engine_runs_registered_s3_rules():
@@ -97,3 +98,81 @@ def test_rule_engine_runs_registered_iam_004_rule():
     assert iam_findings[0].severity.value == "HIGH"
     assert iam_findings[0].service == "IAM"
     assert iam_findings[0].resource == "PublicAssumableRole"
+
+def test_rule_engine_can_disable_rule_with_policy():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "public": True,
+            "encryption": False,
+            "versioning": False,
+            "logging": False,
+            "block_public_access": False,
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    policy = SecurityPolicy(
+        {
+            "S3-001": {
+                "enabled": False,
+            }
+        }
+    )
+
+    engine = RuleEngine(
+        get_all_rules(),
+        policy=policy,
+    )
+
+    findings = engine.scan([resource])
+
+    check_ids = {finding.check_id for finding in findings}
+
+    assert "S3-001" not in check_ids
+    assert "S3-002" in check_ids
+
+
+def test_rule_engine_can_override_rule_severity_with_policy():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "public": True,
+            "encryption": False,
+            "versioning": False,
+            "logging": False,
+            "block_public_access": False,
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    policy = SecurityPolicy(
+        {
+            "S3-002": {
+                "enabled": True,
+                "severity": "CRITICAL",
+            }
+        }
+    )
+
+    engine = RuleEngine(
+        get_all_rules(),
+        policy=policy,
+    )
+
+    findings = engine.scan([resource])
+
+    encryption_findings = [
+        finding
+        for finding in findings
+        if finding.check_id == "S3-002"
+    ]
+
+    assert len(encryption_findings) == 1
+    assert encryption_findings[0].severity.value == "CRITICAL"
