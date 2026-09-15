@@ -9,6 +9,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_wildcard_bucket_policy,
     check_tls_enforcement,
     check_excessive_s3_actions,
+    check_wildcard_bucket_resource,
 )
 
 
@@ -692,3 +693,132 @@ def test_bucket_policy_with_single_statement_dict_for_s3_008_generates_high_find
     assert len(findings) == 1
     assert findings[0].check_id == "S3-008"
     assert findings[0].severity == Severity.HIGH
+
+def test_bucket_policy_with_wildcard_resource_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": (
+                                "arn:aws:iam::123456789012:"
+                                "role/application"
+                            )
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": "*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_bucket_resource(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-009"
+    assert findings[0].severity == Severity.HIGH
+
+def test_bucket_policy_with_specific_resources_generates_no_s3_009_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": (
+                                "arn:aws:iam::123456789012:"
+                                "role/application"
+                            )
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": [
+                            "arn:aws:s3:::company-sensitive-data",
+                            "arn:aws:s3:::company-sensitive-data/*",
+                        ],
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_bucket_resource(resource)
+
+    assert findings == []
+
+def test_bucket_policy_with_multiple_resources_including_wildcard_generates_high_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": (
+                                "arn:aws:iam::123456789012:"
+                                "role/application"
+                            )
+                        },
+                        "Action": "s3:GetObject",
+                        "Resource": [
+                            "arn:aws:s3:::company-sensitive-data/*",
+                            "*",
+                        ],
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_bucket_resource(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-009"
+    assert findings[0].severity == Severity.HIGH
+
+def test_bucket_policy_deny_with_wildcard_resource_generates_no_s3_009_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "s3:*",
+                        "Resource": "*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_bucket_resource(resource)
+
+    assert findings == []

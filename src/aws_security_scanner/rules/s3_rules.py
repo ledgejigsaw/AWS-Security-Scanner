@@ -347,3 +347,57 @@ def check_excessive_s3_actions(resource: Resource) -> list[Finding]:
             break
 
     return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-009",
+    service="S3",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="S3 bucket policy allows access to all resources",
+    description=(
+        "The S3 bucket policy contains an Allow statement "
+        "with a wildcard resource. This can grant access "
+        "beyond the intended S3 bucket resources."
+    ),
+    remediation=(
+        "Restrict the bucket policy Resource to the specific "
+        "S3 bucket or object ARNs required by the statement. "
+        "Avoid using Resource='*' unless explicitly required "
+        "and justified."
+    ),
+)
+def check_wildcard_bucket_resource(resource: Resource) -> list[Finding]:
+    findings = []
+
+    policy = resource.attributes.get("bucket_policy")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        resources = statement.get("Resource", [])
+
+        if isinstance(resources, str):
+            resources = [resources]
+
+        if "*" in resources:
+            findings.append(
+                Finding.from_rule(
+                    check_wildcard_bucket_resource,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=f"Resource={resources}",
+                )
+            )
+            break
+
+    return findings
