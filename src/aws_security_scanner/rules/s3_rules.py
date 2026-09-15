@@ -294,3 +294,56 @@ def check_tls_enforcement(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-008",
+    service="S3",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="S3 bucket policy allows unrestricted S3 actions",
+    description=(
+        "The S3 bucket policy contains an Allow statement "
+        "granting the s3:* action. This provides unrestricted "
+        "S3 permissions to the specified principal."
+    ),
+    remediation=(
+        "Replace s3:* with only the specific S3 actions "
+        "required by the principal. Follow the principle "
+        "of least privilege."
+    ),
+)
+def check_excessive_s3_actions(resource: Resource) -> list[Finding]:
+    findings = []
+
+    policy = resource.attributes.get("bucket_policy")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        actions = statement.get("Action", [])
+
+        if isinstance(actions, str):
+            actions = [actions]
+
+        if "s3:*" in actions:
+            findings.append(
+                Finding.from_rule(
+                    check_excessive_s3_actions,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=f"Action={actions}",
+                )
+            )
+            break
+
+    return findings
