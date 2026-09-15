@@ -669,11 +669,3 @@ CLI scanning
 ```
 
 Future development will focus on expanding IAM policy analysis, additional AWS services, live AWS discovery and CI/CD integration.
-
----
-
-## Repository
-
-The project is available on GitHub:
-
-https://github.com/ledgejigsaw/AWS-Security-Scanner
