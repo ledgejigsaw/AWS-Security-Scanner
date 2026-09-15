@@ -3,6 +3,11 @@ from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.decorators import rule_for
 
 
+# ---------------------------------------------------------------------------
+# IAM-001 — Unrestricted IAM Permissions
+# ---------------------------------------------------------------------------
+
+
 @rule_for(
     "aws_iam_policy",
     check_id="IAM-001",
@@ -42,21 +47,48 @@ def check_overly_permissive_policy(
         statements = [statements]
 
     for statement in statements:
-        if (
-            statement.get("Effect") == "Allow"
-            and statement.get("Action") == "*"
-            and statement.get("Resource") == "*"
-        ):
+        if statement.get("Effect") != "Allow":
+            continue
+
+        action = statement.get("Action")
+        resource_scope = statement.get("Resource")
+
+        action_is_wildcard = (
+            action == "*"
+            or (
+                isinstance(action, list)
+                and "*" in action
+            )
+        )
+
+        resource_is_wildcard = (
+            resource_scope == "*"
+            or (
+                isinstance(resource_scope, list)
+                and "*" in resource_scope
+            )
+        )
+
+        if action_is_wildcard and resource_is_wildcard:
             findings.append(
                 Finding.from_rule(
                     check_overly_permissive_policy,
                     resource=resource.resource_id,
                     region=resource.region,
-                    evidence="Effect=Allow, Action=*, Resource=*",
+                    evidence=(
+                        "Effect=Allow, "
+                        f"Action={action}, "
+                        f"Resource={resource_scope}"
+                    ),
                 )
             )
 
     return findings
+
+
+# ---------------------------------------------------------------------------
+# IAM-002 — Wildcard IAM Permissions
+# ---------------------------------------------------------------------------
 
 
 @rule_for(
@@ -120,7 +152,13 @@ def check_wildcard_permissions(
             )
         )
 
-        resource_is_wildcard = resource_scope == "*"
+        resource_is_wildcard = (
+            resource_scope == "*"
+            or (
+                isinstance(resource_scope, list)
+                and "*" in resource_scope
+            )
+        )
 
         # IAM-001 already handles unrestricted Action + Resource.
         if action_is_wildcard and resource_is_wildcard:
@@ -140,6 +178,11 @@ def check_wildcard_permissions(
             )
 
     return findings
+
+
+# ---------------------------------------------------------------------------
+# IAM-003 — High-Risk Administrative Permissions
+# ---------------------------------------------------------------------------
 
 
 @rule_for(
@@ -223,6 +266,11 @@ def check_excessive_administrative_permissions(
     return findings
 
 
+# ---------------------------------------------------------------------------
+# IAM-004 — Insecure IAM Role Trust Policy
+# ---------------------------------------------------------------------------
+
+
 @rule_for(
     "aws_iam_role",
     check_id="IAM-004",
@@ -264,35 +312,47 @@ def check_insecure_trust_policy(
         if statement.get("Effect") != "Allow":
             continue
 
-        if statement.get("Action") != "sts:AssumeRole":
+        action = statement.get("Action")
+
+        if isinstance(action, str):
+            actions = [action]
+        elif isinstance(action, list):
+            actions = action
+        else:
+            continue
+
+        if not any(
+            item in {
+                "sts:AssumeRole",
+                "sts:AssumeRoleWithSAML",
+                "sts:AssumeRoleWithWebIdentity",
+            }
+            for item in actions
+        ):
             continue
 
         principal = statement.get("Principal")
 
-        principal_is_wildcard = (
+        wildcard_principal = (
             principal == "*"
             or (
                 isinstance(principal, dict)
-                and (
-                    principal.get("AWS") == "*"
-                    or principal.get("Federated") == "*"
+                and any(
+                    value == "*"
+                    for key, value in principal.items()
+                    if key in {"AWS", "Federated"}
                 )
             )
         )
 
-        if not principal_is_wildcard:
-            continue
-
-        findings.append(
-            Finding.from_rule(
-                check_insecure_trust_policy,
-                resource=resource.resource_id,
-                region=resource.region,
-                evidence=(
-                    "Effect=Allow, Action=sts:AssumeRole, "
-                    f"Principal={principal}"
-                ),
+        if wildcard_principal:
+            findings.append(
+                Finding.from_rule(
+                    check_insecure_trust_policy,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=f"Principal={principal}",
+                )
             )
-        )
 
     return findings

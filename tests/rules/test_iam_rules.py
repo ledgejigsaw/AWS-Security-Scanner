@@ -124,7 +124,37 @@ def test_overly_permissive_policy_accepts_single_statement_dict():
     assert findings[0].check_id == "IAM-001"
     assert findings[0].severity == Severity.CRITICAL
 
+def test_overly_permissive_policy_detects_wildcards_in_lists():
 
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="ListWildcardAdminPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "*",
+                            "iam:PassRole",
+                        ],
+                        "Resource": [
+                            "*",
+                        ],
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_overly_permissive_policy(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-001"
+    assert findings[0].severity == Severity.CRITICAL
+    
 # ---------------------------------------------------------------------------
 # IAM-002 — Wildcard IAM Permissions
 # ---------------------------------------------------------------------------
