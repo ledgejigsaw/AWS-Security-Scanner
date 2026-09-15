@@ -7,7 +7,6 @@ from aws_security_scanner.rules.decorators import rule_for
 # IAM-001 — Unrestricted IAM Permissions
 # ---------------------------------------------------------------------------
 
-
 @rule_for(
     "aws_iam_policy",
     check_id="IAM-001",
@@ -47,6 +46,7 @@ def check_overly_permissive_policy(
         statements = [statements]
 
     for statement in statements:
+
         if statement.get("Effect") != "Allow":
             continue
 
@@ -70,6 +70,7 @@ def check_overly_permissive_policy(
         )
 
         if action_is_wildcard and resource_is_wildcard:
+
             findings.append(
                 Finding.from_rule(
                     check_overly_permissive_policy,
@@ -90,7 +91,6 @@ def check_overly_permissive_policy(
 # IAM-002 — Wildcard IAM Permissions
 # ---------------------------------------------------------------------------
 
-
 @rule_for(
     "aws_iam_policy",
     check_id="IAM-002",
@@ -100,22 +100,22 @@ def check_overly_permissive_policy(
     title="IAM policy contains excessively broad wildcard permissions",
     description=(
         "The IAM policy contains an Allow statement "
-        "using a wildcard Action or Resource. This "
-        "provides broader permissions than may be "
+        "using a wildcard Action, NotAction, or Resource. "
+        "This provides broader permissions than may be "
         "required and can increase the impact of a "
         "compromised identity."
     ),
     remediation=(
         "Apply the principle of least privilege. "
-        "Replace wildcard Actions and Resources with "
-        "the specific permissions and resources required "
+        "Replace wildcard Actions, NotActions, and Resources "
+        "with the specific permissions and resources required "
         "by the workload or user."
     ),
 )
 def check_wildcard_permissions(
     resource: Resource,
 ) -> list[Finding]:
-    """Detect IAM policies containing excessively broad wildcard permissions."""
+    """Detect IAM policies containing excessively broad permissions."""
 
     findings = []
 
@@ -130,10 +130,12 @@ def check_wildcard_permissions(
         statements = [statements]
 
     for statement in statements:
+
         if statement.get("Effect") != "Allow":
             continue
 
         action = statement.get("Action")
+        not_action = statement.get("NotAction")
         resource_scope = statement.get("Resource")
 
         action_is_wildcard = (
@@ -152,6 +154,14 @@ def check_wildcard_permissions(
             )
         )
 
+        not_action_is_broad = (
+            isinstance(not_action, str)
+            or (
+                isinstance(not_action, list)
+                and len(not_action) > 0
+            )
+        )
+
         resource_is_wildcard = (
             resource_scope == "*"
             or (
@@ -160,18 +170,26 @@ def check_wildcard_permissions(
             )
         )
 
-        # IAM-001 already handles unrestricted Action + Resource.
+        # IAM-001 already handles unrestricted
+        # Action + Resource permissions.
         if action_is_wildcard and resource_is_wildcard:
             continue
 
-        if action_is_wildcard or resource_is_wildcard:
+        if (
+            action_is_wildcard
+            or not_action_is_broad
+            or resource_is_wildcard
+        ):
+
             findings.append(
                 Finding.from_rule(
                     check_wildcard_permissions,
                     resource=resource.resource_id,
                     region=resource.region,
                     evidence=(
-                        f"Effect=Allow, Action={action}, "
+                        f"Effect=Allow, "
+                        f"Action={action}, "
+                        f"NotAction={not_action}, "
                         f"Resource={resource_scope}"
                     ),
                 )
@@ -183,7 +201,6 @@ def check_wildcard_permissions(
 # ---------------------------------------------------------------------------
 # IAM-003 — High-Risk Administrative Permissions
 # ---------------------------------------------------------------------------
-
 
 @rule_for(
     "aws_iam_policy",
@@ -236,6 +253,7 @@ def check_excessive_administrative_permissions(
     }
 
     for statement in statements:
+
         if statement.get("Effect") != "Allow":
             continue
 
@@ -251,13 +269,15 @@ def check_excessive_administrative_permissions(
         matched_actions = high_risk_actions.intersection(actions)
 
         for matched_action in matched_actions:
+
             findings.append(
                 Finding.from_rule(
                     check_excessive_administrative_permissions,
                     resource=resource.resource_id,
                     region=resource.region,
                     evidence=(
-                        f"Effect=Allow, Action={matched_action}, "
+                        f"Effect=Allow, "
+                        f"Action={matched_action}, "
                         f"Resource={statement.get('Resource')}"
                     ),
                 )
@@ -270,29 +290,31 @@ def check_excessive_administrative_permissions(
 # IAM-004 — Insecure IAM Role Trust Policy
 # ---------------------------------------------------------------------------
 
-
 @rule_for(
     "aws_iam_role",
     check_id="IAM-004",
     service="IAM",
     severity=Severity.HIGH,
     category="Access Control",
-    title="IAM role has an overly permissive trust policy",
+    title="IAM role trust policy allows wildcard principal",
     description=(
-        "The IAM role trust policy allows sts:AssumeRole "
-        "from a wildcard principal. This can allow "
-        "unintended AWS identities to assume the role."
+        "The IAM role trust policy contains an Allow statement "
+        "with a wildcard principal. This can allow unintended "
+        "AWS principals to assume the role."
     ),
     remediation=(
-        "Restrict the trust policy Principal to the "
-        "specific AWS accounts, roles, services, or "
-        "federated identities that require access."
+        "Restrict the role trust policy Principal to the "
+        "specific AWS accounts, roles, or services that "
+        "require access. Avoid wildcard principals unless "
+        "the trust relationship is explicitly required "
+        "and justified."
     ),
 )
+
 def check_insecure_trust_policy(
     resource: Resource,
 ) -> list[Finding]:
-    """Detect IAM roles with overly permissive trust policies."""
+    """Detect IAM role trust policies with wildcard principals."""
 
     findings = []
 
@@ -308,7 +330,14 @@ def check_insecure_trust_policy(
     if isinstance(statements, dict):
         statements = [statements]
 
+    supported_actions = {
+        "sts:AssumeRole",
+        "sts:AssumeRoleWithSAML",
+        "sts:AssumeRoleWithWebIdentity",
+    }
+
     for statement in statements:
+
         if statement.get("Effect") != "Allow":
             continue
 
@@ -322,12 +351,8 @@ def check_insecure_trust_policy(
             continue
 
         if not any(
-            item in {
-                "sts:AssumeRole",
-                "sts:AssumeRoleWithSAML",
-                "sts:AssumeRoleWithWebIdentity",
-            }
-            for item in actions
+            trust_action in supported_actions
+            for trust_action in actions
         ):
             continue
 
@@ -339,8 +364,7 @@ def check_insecure_trust_policy(
                 isinstance(principal, dict)
                 and any(
                     value == "*"
-                    for key, value in principal.items()
-                    if key in {"AWS", "Federated"}
+                    for value in principal.values()
                 )
             )
         )
@@ -351,8 +375,13 @@ def check_insecure_trust_policy(
                     check_insecure_trust_policy,
                     resource=resource.resource_id,
                     region=resource.region,
-                    evidence=f"Principal={principal}",
+                    evidence=(
+                        f"Principal={principal}, "
+                        f"Action={action}"
+                    ),
                 )
             )
+
+            break
 
     return findings

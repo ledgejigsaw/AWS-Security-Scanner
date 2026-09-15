@@ -934,3 +934,55 @@ def test_wildcard_permissions_detect_wildcard_action_with_specific_resource():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-002"
     assert findings[0].severity == Severity.HIGH
+
+def test_wildcard_permissions_detect_broad_not_action():
+
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="BroadNotActionPolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "NotAction": "iam:DeleteUser",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
+
+def test_wildcard_permissions_detect_broad_not_action_with_specific_resource():
+
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="BroadNotActionSpecificResourcePolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "NotAction": "iam:DeleteUser",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
