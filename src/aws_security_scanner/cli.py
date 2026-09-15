@@ -5,6 +5,7 @@ from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
 from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
+from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
@@ -20,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--source",
-        choices=["fixture", "terraform"],
+        choices=["fixture", "terraform", "aws"],
         required=True,
         help="Security resource source.",
     )
@@ -28,8 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--file",
         type=Path,
-        required=True,
         help="Fixture directory or Terraform JSON file.",
+    )
+
+    parser.add_argument(
+        "--region",
+        help="AWS region to scan.",
     )
 
     parser.add_argument(
@@ -57,29 +62,48 @@ def build_parser() -> argparse.ArgumentParser:
 
 def discover_resources(
     source: str,
-    source_path: Path,
+    source_path: Path | None = None,
+    region: str | None = None,
 ):
     """Discover resources from the selected source."""
 
     if source == "fixture":
+        if source_path is None:
+            raise ValueError(
+                "--file is required when using the fixture source."
+            )
+
         provider = FixtureProvider(source_path)
         return provider.discover()
 
     if source == "terraform":
+        if source_path is None:
+            raise ValueError(
+                "--file is required when using the terraform source."
+            )
+
         provider = TerraformProvider(source_path)
         resources = provider.discover()
-
         return aggregate_s3_resources(resources)
+
+    if source == "aws":
+        provider = AWSProvider(region=region)
+        return provider.discover_s3_buckets()
 
     raise ValueError(f"Unsupported source: {source}")
 
 
 def run_scan(
     source: str,
-    source_path: Path,
+    source_path: Path | None = None,
     policy_path: Path | None = None,
+    region: str | None = None,
 ) -> list:
-    resources = discover_resources(source, source_path)
+    resources = discover_resources(
+        source,
+        source_path,
+        region,
+    )
 
     policy = (
         SecurityPolicy.from_yaml(policy_path)
@@ -105,6 +129,7 @@ def main() -> None:
         args.source,
         args.file,
         args.policy,
+        args.region
     )
 
     if args.format == "json":

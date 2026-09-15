@@ -1,7 +1,10 @@
+import json
+
 from pathlib import Path
+from unittest.mock import patch
 
 from aws_security_scanner.cli import build_parser, run_scan
-
+from aws_security_scanner.models.resource import Resource
 
 def test_cli_accepts_policy_argument():
     parser = build_parser()
@@ -97,3 +100,106 @@ rules:
 
     assert len(encryption_findings) == 1
     assert encryption_findings[0].severity.value == "CRITICAL"
+
+def test_run_scan_uses_aws_provider():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-data",
+        attributes={
+            "encryption": False,
+            "versioning": False,
+            "block_public_access": False,
+            "logging": False,
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
+    with patch(
+        "aws_security_scanner.cli.AWSProvider"
+    ) as mock_provider:
+        mock_provider.return_value.discover_s3_buckets.return_value = [
+            resource
+        ]
+
+        findings = run_scan(
+            "aws",
+            region="eu-west-2",
+        )
+
+    mock_provider.assert_called_once_with(
+        region="eu-west-2"
+    )
+
+    check_ids = {
+        finding.check_id
+        for finding in findings
+    }
+
+    assert "S3-002" in check_ids
+    assert "S3-003" in check_ids
+    assert "S3-004" in check_ids
+    assert "S3-005" in check_ids
+
+def test_aws_scan_can_write_json_report(tmp_path):
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-data",
+        attributes={
+            "encryption": False,
+            "versioning": False,
+            "block_public_access": False,
+            "logging": False,
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
+    output_path = tmp_path / "aws-scan.json"
+
+    with patch(
+        "aws_security_scanner.cli.AWSProvider"
+    ) as mock_provider:
+        mock_provider.return_value.discover_s3_buckets.return_value = [
+            resource
+        ]
+
+        findings = run_scan(
+            "aws",
+            region="eu-west-2",
+        )
+
+    from aws_security_scanner.reporting.json_reporter import (
+        write_json_report,
+    )
+
+    write_json_report(findings, output_path)
+
+    assert output_path.exists()
+
+    with output_path.open(encoding="utf-8") as file:
+        report = json.load(file)
+
+    print(
+    [
+        (
+            finding.check_id,
+            finding.severity.value,
+            finding.evidence,
+        )
+        for finding in findings
+    ]
+)
+
+    assert report["summary"]["total_findings"] == 5
+
+    check_ids = {
+        finding["check_id"]
+        for finding in report["findings"]
+    }
+
+    assert "S3-002" in check_ids
+    assert "S3-003" in check_ids
+    assert "S3-004" in check_ids
+    assert "S3-005" in check_ids
+    assert "S3-007" in check_ids
