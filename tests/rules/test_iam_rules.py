@@ -908,3 +908,29 @@ def test_wildcard_permissions_detect_wildcard_resource_in_list():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-002"
     assert findings[0].severity == Severity.HIGH
+
+def test_wildcard_permissions_detect_wildcard_action_with_specific_resource():
+
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="WildcardActionSpecificResourcePolicy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "s3:Get*",
+                        "Resource": "arn:aws:s3:::company-data/*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-002"
+    assert findings[0].severity == Severity.HIGH
