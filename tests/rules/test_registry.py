@@ -4,7 +4,7 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 13
+    assert len(rules) == 14
 
 
 def test_rule_registry_contains_iam_rules():

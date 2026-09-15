@@ -10,6 +10,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_tls_enforcement,
     check_excessive_s3_actions,
     check_wildcard_bucket_resource,
+    check_public_write_access,
 )
 
 
@@ -820,5 +821,197 @@ def test_bucket_policy_deny_with_wildcard_resource_generates_no_s3_009_finding()
     )
 
     findings = check_wildcard_bucket_resource(resource)
+
+    assert findings == []
+
+def test_bucket_policy_with_public_write_access_generates_critical_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:PutObject",
+                        "Resource": (
+                            "arn:aws:s3:::company-sensitive-data/*"
+                        ),
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-010"
+    assert findings[0].severity == Severity.CRITICAL
+
+def test_bucket_policy_with_public_read_access_generates_no_s3_010_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": (
+                            "arn:aws:s3:::company-sensitive-data/*"
+                        ),
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
+
+    assert findings == []
+
+def test_bucket_policy_with_public_delete_access_generates_critical_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:DeleteObject",
+                        "Resource": (
+                            "arn:aws:s3:::company-sensitive-data/*"
+                        ),
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-010"
+    assert findings[0].severity == Severity.CRITICAL
+
+def test_bucket_policy_with_public_wildcard_action_generates_critical_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:*",
+                        "Resource": "*",
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-010"
+    assert findings[0].severity == Severity.CRITICAL
+
+def test_bucket_policy_with_specific_principal_write_access_generates_no_s3_010_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": (
+                                "arn:aws:iam::123456789012:"
+                                "role/application"
+                            )
+                        },
+                        "Action": "s3:PutObject",
+                        "Resource": (
+                            "arn:aws:s3:::company-sensitive-data/*"
+                        ),
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
+
+    assert findings == []
+
+def test_bucket_policy_deny_with_public_write_access_generates_no_s3_010_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "s3:PutObject",
+                        "Resource": (
+                            "arn:aws:s3:::company-sensitive-data/*"
+                        ),
+                    }
+                ],
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
+
+    assert findings == []
+
+def test_bucket_without_policy_generates_no_s3_010_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-sensitive-data",
+        attributes={
+            "bucket_name": "company-sensitive-data",
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_write_access(resource)
 
     assert findings == []

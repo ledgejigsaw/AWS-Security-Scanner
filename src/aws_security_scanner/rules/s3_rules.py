@@ -401,3 +401,82 @@ def check_wildcard_bucket_resource(resource: Resource) -> list[Finding]:
             break
 
     return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-010",
+    service="S3",
+    severity=Severity.CRITICAL,
+    category="Access Control",
+    title="S3 bucket policy allows public write access",
+    description=(
+        "The S3 bucket policy allows anonymous access to "
+        "write operations. This can allow unauthorised users "
+        "to upload, modify, or delete objects."
+    ),
+    remediation=(
+        "Remove public write permissions from the bucket policy. "
+        "Restrict write operations to specific AWS principals "
+        "that require access."
+    ),
+)
+def check_public_write_access(resource: Resource) -> list[Finding]:
+    findings = []
+
+    policy = resource.attributes.get("bucket_policy")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    write_actions = {
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:PutObjectAcl",
+        "s3:PutObjectTagging",
+        "s3:DeleteObjectVersion",
+    }
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        principal = statement.get("Principal")
+
+        wildcard_principal = (
+            principal == "*"
+            or (
+                isinstance(principal, dict)
+                and any(value == "*" for value in principal.values())
+            )
+        )
+
+        if not wildcard_principal:
+            continue
+
+        actions = statement.get("Action", [])
+
+        if isinstance(actions, str):
+            actions = [actions]
+
+        if "s3:*" in actions or any(
+            action in write_actions for action in actions
+        ):
+            findings.append(
+                Finding.from_rule(
+                    check_public_write_access,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"Principal={principal}, "
+                        f"Action={actions}"
+                    ),
+                )
+            )
+            break
+
+    return findings
