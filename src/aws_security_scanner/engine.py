@@ -29,6 +29,21 @@ class RuleEngine:
 
         return metadata.check_id
 
+    def _apply_policy(
+        self,
+        finding: Finding,
+    ) -> Finding:
+        """Apply policy configuration to a finding."""
+
+        severity = self.policy.get_severity(
+            finding.check_id,
+            finding.severity.value,
+        )
+
+        finding.severity = severity
+
+        return finding
+
     def scan(self, resources: list[Resource]) -> list[Finding]:
         """Run enabled security rules against resources."""
 
@@ -45,6 +60,11 @@ class RuleEngine:
                     if not self.policy.is_enabled(check_id):
                         continue
 
-                findings.extend(rule(resource))
+                rule_findings = rule(resource)
+
+                for finding in rule_findings:
+                    findings.append(
+                        self._apply_policy(finding)
+                    )
 
         return findings

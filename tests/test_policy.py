@@ -1,5 +1,6 @@
 import pytest
 
+from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.policy import SecurityPolicy
 
 
@@ -120,10 +121,14 @@ def test_yaml_policy_root_must_be_mapping(tmp_path):
     with pytest.raises(TypeError):
         SecurityPolicy.from_yaml(policy_file) 
 
+
 def test_rule_uses_default_severity():
     policy = SecurityPolicy()
 
-    assert policy.get_severity("S3-006", "HIGH") == "HIGH"
+    assert (
+        policy.get_severity("S3-006", Severity.HIGH)
+        == Severity.HIGH
+    )
 
 
 def test_rule_can_override_severity():
@@ -136,4 +141,28 @@ def test_rule_can_override_severity():
         }
     )
 
-    assert policy.get_severity("S3-006", "HIGH") == "CRITICAL"
+    assert (
+        policy.get_severity("S3-006", Severity.HIGH)
+        == Severity.CRITICAL
+    )
+
+def test_rule_severity_must_be_a_string():
+    with pytest.raises(TypeError):
+        SecurityPolicy(
+            {
+                "S3-006": {
+                    "severity": True,
+                }
+            }
+        )
+
+
+def test_rule_severity_must_be_valid():
+    with pytest.raises(ValueError):
+        SecurityPolicy(
+            {
+                "S3-006": {
+                    "severity": "BANANA",
+                }
+            }
+        )

@@ -1,8 +1,10 @@
 from pathlib import Path
 from typing import Any
-import re
 
+import re
 import yaml
+
+from aws_security_scanner.models.finding import Severity
 
 
 class YAML12SafeLoader(yaml.SafeLoader):
@@ -50,7 +52,38 @@ class SecurityPolicy:
                         f"'enabled' for rule {check_id} must be a boolean"
                     )
 
+            if "severity" in configuration:
+                self._validate_severity(
+                    check_id,
+                    configuration["severity"],
+                )
+
         self.rules = rules
+
+    @staticmethod
+    def _validate_severity(
+        check_id: str,
+        severity: Any,
+    ) -> None:
+        """Validate a configured severity value."""
+
+        if not isinstance(severity, str):
+            raise TypeError(
+                f"'severity' for rule {check_id} must be a string"
+            )
+
+        try:
+            Severity(severity)
+        except ValueError as exc:
+            valid_values = ", ".join(
+                severity.value
+                for severity in Severity
+            )
+
+            raise ValueError(
+                f"'severity' for rule {check_id} must be one of: "
+                f"{valid_values}"
+            ) from exc
 
     def is_enabled(self, check_id: str) -> bool:
         """Return whether a security rule is enabled."""
@@ -62,24 +95,39 @@ class SecurityPolicy:
 
         return configuration.get("enabled", True)
 
-    def get_severity(self, check_id: str, default: str) -> str:
+    def get_severity(
+        self,
+        check_id: str,
+        default: str | Severity,
+    ) -> Severity:
         """Return the configured severity or the rule's default severity."""
 
         configuration = self.rules.get(check_id)
 
         if configuration is None:
-            return default
+            return Severity(default)
 
-        return configuration.get("severity", default)
+        configured_severity = configuration.get(
+            "severity",
+            default,
+        )
+
+        return Severity(configured_severity)
 
     @classmethod
-    def from_yaml(cls, policy_path: str | Path) -> "SecurityPolicy":
+    def from_yaml(
+        cls,
+        policy_path: str | Path,
+    ) -> "SecurityPolicy":
         """Load a security policy from a YAML file."""
 
         policy_path = Path(policy_path)
 
         with policy_path.open("r", encoding="utf-8") as file:
-            data = yaml.load(file, Loader=YAML12SafeLoader)
+            data = yaml.load(
+                file,
+                Loader=YAML12SafeLoader,
+            )
 
         if data is None:
             data = {}
@@ -90,6 +138,8 @@ class SecurityPolicy:
         rules = data.get("rules", {})
 
         if not isinstance(rules, dict):
-            raise TypeError("Policy 'rules' must be a dictionary")
+            raise TypeError(
+                "Policy 'rules' must be a dictionary"
+            )
 
         return cls(rules)

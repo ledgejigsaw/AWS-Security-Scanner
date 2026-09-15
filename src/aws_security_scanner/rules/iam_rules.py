@@ -48,31 +48,16 @@ def check_overly_permissive_policy(
             and statement.get("Resource") == "*"
         ):
             findings.append(
-                Finding(
-                    check_id="IAM-001",
-                    severity=Severity.CRITICAL,
-                    service="IAM",
+                Finding.from_rule(
+                    check_overly_permissive_policy,
                     resource=resource.resource_id,
-                    title="IAM policy grants unrestricted permissions",
-                    description=(
-                        "The IAM policy contains an Allow statement "
-                        "granting all actions against all resources. "
-                        "This provides unrestricted permissions and "
-                        "creates a significant privilege escalation "
-                        "and compromise risk."
-                    ),
-                    remediation=(
-                        "Apply the principle of least privilege. "
-                        "Restrict the allowed actions to only those "
-                        "required and limit Resource to the specific "
-                        "AWS resources that require access."
-                    ),
                     region=resource.region,
                     evidence="Effect=Allow, Action=*, Resource=*",
                 )
             )
 
     return findings
+
 
 @rule_for(
     "aws_iam_policy",
@@ -143,28 +128,9 @@ def check_wildcard_permissions(
 
         if action_is_wildcard or resource_is_wildcard:
             findings.append(
-                Finding(
-                    check_id="IAM-002",
-                    severity=Severity.HIGH,
-                    service="IAM",
+                Finding.from_rule(
+                    check_wildcard_permissions,
                     resource=resource.resource_id,
-                    title=(
-                        "IAM policy contains excessively broad "
-                        "wildcard permissions"
-                    ),
-                    description=(
-                        "The IAM policy contains an Allow statement "
-                        "using a wildcard Action or Resource. This "
-                        "provides broader permissions than may be "
-                        "required and can increase the impact of a "
-                        "compromised identity."
-                    ),
-                    remediation=(
-                        "Apply the principle of least privilege. "
-                        "Replace wildcard Actions and Resources with "
-                        "the specific permissions and resources required "
-                        "by the workload or user."
-                    ),
                     region=resource.region,
                     evidence=(
                         f"Effect=Allow, Action={action}, "
@@ -174,6 +140,7 @@ def check_wildcard_permissions(
             )
 
     return findings
+
 
 @rule_for(
     "aws_iam_policy",
@@ -242,26 +209,9 @@ def check_excessive_administrative_permissions(
 
         for matched_action in matched_actions:
             findings.append(
-                Finding(
-                    check_id="IAM-003",
-                    severity=Severity.HIGH,
-                    service="IAM",
+                Finding.from_rule(
+                    check_excessive_administrative_permissions,
                     resource=resource.resource_id,
-                    title="IAM policy grants high-risk administrative permission",
-                    description=(
-                        f"The IAM policy grants the high-risk administrative "
-                        f"permission '{matched_action}'. Such permissions "
-                        "can allow an identity to modify IAM configuration, "
-                        "create credentials, alter trust relationships, "
-                        "or delegate permissions."
-                    ),
-                    remediation=(
-                        "Apply the principle of least privilege. Remove "
-                        "high-risk administrative permissions unless they "
-                        "are explicitly required. Where required, restrict "
-                        "the permission to specific resources and controlled "
-                        "workflows."
-                    ),
                     region=resource.region,
                     evidence=(
                         f"Effect=Allow, Action={matched_action}, "
@@ -271,6 +221,7 @@ def check_excessive_administrative_permissions(
             )
 
     return findings
+
 
 @rule_for(
     "aws_iam_role",
@@ -333,22 +284,9 @@ def check_insecure_trust_policy(
             continue
 
         findings.append(
-            Finding(
-                check_id="IAM-004",
-                severity=Severity.HIGH,
-                service="IAM",
+            Finding.from_rule(
+                check_insecure_trust_policy,
                 resource=resource.resource_id,
-                title="IAM role has an overly permissive trust policy",
-                description=(
-                    "The IAM role trust policy allows sts:AssumeRole "
-                    "from a wildcard principal. This can allow "
-                    "unintended AWS identities to assume the role."
-                ),
-                remediation=(
-                    "Restrict the trust policy Principal to the "
-                    "specific AWS accounts, roles, services, or "
-                    "federated identities that require access."
-                ),
                 region=resource.region,
                 evidence=(
                     "Effect=Allow, Action=sts:AssumeRole, "

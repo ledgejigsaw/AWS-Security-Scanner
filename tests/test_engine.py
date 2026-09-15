@@ -211,3 +211,51 @@ def test_rule_engine_runs_enabled_rule():
     assert len(findings) == 1
     assert findings[0].check_id == "TEST-001"
 
+def test_rule_engine_applies_policy_severity_override():
+
+    def test_rule(resource: Resource) -> list[Finding]:
+        return [
+            Finding(
+                check_id="TEST-001",
+                severity=Severity.HIGH,
+                service="TEST",
+                resource=resource.resource_id,
+                title="Test finding",
+                description="Test description",
+                remediation="Test remediation",
+            )
+        ]
+
+    test_rule.resource_type = "aws_s3_bucket"
+    test_rule.metadata = type(
+        "Metadata",
+        (),
+        {"check_id": "TEST-001"},
+    )()
+
+    policy = SecurityPolicy(
+        {
+            "TEST-001": {
+                "enabled": True,
+                "severity": "CRITICAL",
+            }
+        }
+    )
+
+    engine = RuleEngine(
+        [test_rule],
+        policy=policy,
+    )
+
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="test-bucket",
+        attributes={},
+        source="test",
+    )
+
+    findings = engine.scan([resource])
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "TEST-001"
+    assert findings[0].severity == "CRITICAL"
