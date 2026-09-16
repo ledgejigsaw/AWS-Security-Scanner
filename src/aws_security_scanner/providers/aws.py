@@ -13,13 +13,17 @@ class AWSProvider:
     def __init__(
         self,
         s3_client: Any | None = None,
+        iam_client: Any | None = None,
         region: str | None = None,
     ):
         self.region = region
-
         self.s3_client = s3_client or boto3.client(
-            "s3",
-            region_name=region,
+        "s3",
+        region_name=region,
+        )
+        self.iam_client = iam_client or boto3.client(
+        "iam",
+        region_name=region,
         )
 
     def discover_s3_buckets(self) -> list[Resource]:
@@ -58,6 +62,41 @@ class AWSProvider:
                     resource_type="aws_s3_bucket",
                     resource_id=bucket_name,
                     attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_iam_policies(self) -> list[Resource]:
+        """Discover IAM managed policies and their default policy documents."""
+
+        response = self.iam_client.list_policies(
+            Scope="Local",
+        )
+
+        resources = []
+
+        for policy in response.get("Policies", []):
+            policy_name = policy["PolicyName"]
+            policy_arn = policy["Arn"]
+            version_id = policy["DefaultVersionId"]
+
+            version_response = self.iam_client.get_policy_version(
+                PolicyArn=policy_arn,
+                VersionId=version_id,
+            )
+
+            policy_document = version_response["PolicyVersion"]["Document"]
+
+            resources.append(
+                Resource(
+                    resource_type="aws_iam_policy",
+                    resource_id=policy_name,
+                    attributes={
+                        "policy_document": policy_document,
+                    },
                     source="aws",
                     region=self.region,
                 )

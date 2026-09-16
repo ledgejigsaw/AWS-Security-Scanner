@@ -456,3 +456,81 @@ def test_aws_provider_discovers_iam_policies():
     assert resources[0].attributes["policy_document"]["Statement"][0][
         "Action"
     ] == "*"
+
+def test_aws_provider_uses_default_iam_policy_version():
+    iam_client = Mock()
+
+    policy_arn = (
+        "arn:aws:iam::123456789012:policy/AdminPolicy"
+    )
+
+    iam_client.list_policies.return_value = {
+        "Policies": [
+            {
+                "PolicyName": "AdminPolicy",
+                "Arn": policy_arn,
+                "DefaultVersionId": "v3",
+            }
+        ]
+    }
+
+    iam_client.get_policy_version.return_value = {
+        "PolicyVersion": {
+            "Document": {
+                "Version": "2012-10-17",
+                "Statement": [],
+            }
+        }
+    }
+
+    provider = AWSProvider(
+        iam_client=iam_client,
+    )
+
+    provider.discover_iam_policies()
+
+    iam_client.get_policy_version.assert_called_once_with(
+        PolicyArn=policy_arn,
+        VersionId="v3",
+    )
+
+def test_aws_provider_discovers_iam_roles():
+    iam_client = Mock()
+
+    iam_client.list_roles.return_value = {
+        "Roles": [
+            {
+                "RoleName": "InsecureRole",
+                "Arn": "arn:aws:iam::123456789012:role/InsecureRole",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "*"
+                            },
+                            "Action": "sts:AssumeRole",
+                        }
+                    ],
+                },
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        iam_client=iam_client,
+    )
+
+    resources = provider.discover_iam_roles()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_iam_role"
+    assert resources[0].resource_id == "InsecureRole"
+    assert resources[0].source == "aws"
+
+    policy = resources[0].attributes[
+        "assume_role_policy_document"
+    ]
+
+    assert policy["Statement"][0]["Principal"]["AWS"] == "*"
