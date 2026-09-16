@@ -414,3 +414,45 @@ def test_aws_provider_resource_works_with_s3_encryption_rule():
     resource = resources[0]
 
     assert resource.attributes["encryption"] is False
+
+def test_aws_provider_discovers_iam_policies():
+    iam_client = Mock()
+
+    iam_client.list_policies.return_value = {
+        "Policies": [
+            {
+                "PolicyName": "AdminPolicy",
+                "Arn": "arn:aws:iam::123456789012:policy/AdminPolicy",
+                "DefaultVersionId": "v1",
+            }
+        ]
+    }
+
+    iam_client.get_policy_version.return_value = {
+        "PolicyVersion": {
+            "Document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "*",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        }
+    }
+
+    provider = AWSProvider(
+        iam_client=iam_client,
+    )
+
+    resources = provider.discover_iam_policies()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_iam_policy"
+    assert resources[0].resource_id == "AdminPolicy"
+    assert resources[0].source == "aws"
+    assert resources[0].attributes["policy_document"]["Statement"][0][
+        "Action"
+    ] == "*"
