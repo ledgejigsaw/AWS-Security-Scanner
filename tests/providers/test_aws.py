@@ -5,6 +5,11 @@ from botocore.exceptions import ClientError
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.providers.aws import AWSProvider
 
+from aws_security_scanner.engine import RuleEngine
+from aws_security_scanner.rules.iam_rules import (
+    check_insecure_trust_policy,
+)
+
 
 def test_aws_provider_discovers_s3_buckets():
     s3_client = Mock()
@@ -534,3 +539,43 @@ def test_aws_provider_discovers_iam_roles():
     ]
 
     assert policy["Statement"][0]["Principal"]["AWS"] == "*"
+
+def test_aws_iam_role_discovery_integrates_with_iam_004():
+    iam_client = Mock()
+
+    iam_client.list_roles.return_value = {
+        "Roles": [
+            {
+                "RoleName": "InsecureRole",
+                "Arn": "arn:aws:iam::123456789012:role/InsecureRole",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "*"
+                            },
+                            "Action": "sts:AssumeRole",
+                        }
+                    ],
+                },
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        iam_client=iam_client,
+    )
+
+    resources = provider.discover_iam_roles()
+
+    engine = RuleEngine(
+        [check_insecure_trust_policy],
+    )
+
+    findings = engine.scan(resources)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-004"
+    assert findings[0].resource == "InsecureRole"

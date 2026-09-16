@@ -17,13 +17,15 @@ class AWSProvider:
         region: str | None = None,
     ):
         self.region = region
+
         self.s3_client = s3_client or boto3.client(
-        "s3",
-        region_name=region,
+            "s3",
+            region_name=region,
         )
+
         self.iam_client = iam_client or boto3.client(
-        "iam",
-        region_name=region,
+            "iam",
+            region_name=region,
         )
 
     def discover_s3_buckets(self) -> list[Resource]:
@@ -41,16 +43,17 @@ class AWSProvider:
             attributes["encryption"] = (
                 self._get_bucket_encryption(bucket_name)
             )
+
             attributes["versioning"] = (
-               self._get_bucket_versioning(bucket_name)
+                self._get_bucket_versioning(bucket_name)
             )
 
             attributes["block_public_access"] = (
-               self._get_block_public_access(bucket_name)
+                self._get_block_public_access(bucket_name)
             )
 
             attributes["logging"] = (
-               self._get_bucket_logging(bucket_name)
+                self._get_bucket_logging(bucket_name)
             )
 
             attributes["bucket_policy"] = (
@@ -88,7 +91,9 @@ class AWSProvider:
                 VersionId=version_id,
             )
 
-            policy_document = version_response["PolicyVersion"]["Document"]
+            policy_document = version_response[
+                "PolicyVersion"
+            ]["Document"]
 
             resources.append(
                 Resource(
@@ -104,7 +109,40 @@ class AWSProvider:
 
         return resources
 
-    def _get_bucket_encryption(self, bucket_name: str) -> bool:
+    def discover_iam_roles(self) -> list[Resource]:
+        """Discover IAM roles and their trust policies."""
+
+        response = self.iam_client.list_roles()
+
+        resources = []
+
+        for role in response.get("Roles", []):
+            role_name = role["RoleName"]
+
+            assume_role_policy = role.get(
+                "AssumeRolePolicyDocument"
+            )
+
+            resources.append(
+                Resource(
+                    resource_type="aws_iam_role",
+                    resource_id=role_name,
+                    attributes={
+                        "assume_role_policy_document": (
+                            assume_role_policy
+                        ),
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def _get_bucket_encryption(
+        self,
+        bucket_name: str,
+    ) -> bool:
         """Return whether default server-side encryption is configured."""
 
         try:
@@ -123,7 +161,10 @@ class AWSProvider:
 
         return bool(rules)
 
-    def _get_bucket_versioning(self, bucket_name: str) -> bool:
+    def _get_bucket_versioning(
+        self,
+        bucket_name: str,
+    ) -> bool:
         """Return whether S3 bucket versioning is enabled."""
 
         response = self.s3_client.get_bucket_versioning(
@@ -132,7 +173,10 @@ class AWSProvider:
 
         return response.get("Status") == "Enabled"
 
-    def _get_block_public_access(self, bucket_name: str) -> bool:
+    def _get_block_public_access(
+        self,
+        bucket_name: str,
+    ) -> bool:
         """Return whether all S3 public access blocks are enabled."""
 
         try:
@@ -157,7 +201,10 @@ class AWSProvider:
             )
         )
 
-    def _get_bucket_logging(self, bucket_name: str) -> bool:
+    def _get_bucket_logging(
+        self,
+        bucket_name: str,
+    ) -> bool:
         """Return whether S3 server access logging is enabled."""
 
         try:
@@ -169,7 +216,10 @@ class AWSProvider:
 
         return bool(response.get("LoggingEnabled"))
 
-    def _get_bucket_policy(self, bucket_name: str) -> dict | None:
+    def _get_bucket_policy(
+        self,
+        bucket_name: str,
+    ) -> dict | None:
         """Return the S3 bucket policy as a dictionary."""
 
         try:
