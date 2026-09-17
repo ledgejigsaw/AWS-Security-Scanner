@@ -197,3 +197,82 @@ def test_aws_scan_can_write_json_report(tmp_path):
     assert "S3-004" in check_ids
     assert "S3-005" in check_ids
     assert "S3-007" in check_ids
+
+def test_run_scan_uses_s3_and_iam_resources():
+    s3_resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="company-data",
+        attributes={
+            "encryption": False,
+            "versioning": False,
+            "block_public_access": True,
+            "logging": True,
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
+    iam_policy = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="admin-policy",
+        attributes={
+            "policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "*",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
+    iam_role = Resource(
+        resource_type="aws_iam_role",
+        resource_id="insecure-role",
+        attributes={
+            "assume_role_policy_document": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
+    with patch(
+        "aws_security_scanner.cli.AWSProvider"
+    ) as mock_provider:
+        mock_provider.return_value.discover_s3_buckets.return_value = [
+            s3_resource
+        ]
+        mock_provider.return_value.discover_iam_policies.return_value = [
+            iam_policy
+        ]
+        mock_provider.return_value.discover_iam_roles.return_value = [
+            iam_role
+        ]
+
+        findings = run_scan(
+            "aws",
+            region="eu-west-2",
+        )
+
+    check_ids = {
+        finding.check_id
+        for finding in findings
+    }
+
+    assert "S3-002" in check_ids
+    assert "IAM-001" in check_ids
+    assert "IAM-004" in check_ids
