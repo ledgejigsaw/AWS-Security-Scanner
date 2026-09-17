@@ -121,6 +121,8 @@ def test_run_scan_uses_aws_provider():
         mock_provider.return_value.discover_s3_buckets.return_value = [
             resource
         ]
+        mock_provider.return_value.discover_iam_policies.return_value = []
+        mock_provider.return_value.discover_iam_roles.return_value = []
 
         findings = run_scan(
             "aws",
@@ -163,6 +165,8 @@ def test_aws_scan_can_write_json_report(tmp_path):
         mock_provider.return_value.discover_s3_buckets.return_value = [
             resource
         ]
+        mock_provider.return_value.discover_iam_policies.return_value = []
+        mock_provider.return_value.discover_iam_roles.return_value = []
 
         findings = run_scan(
             "aws",
@@ -180,16 +184,6 @@ def test_aws_scan_can_write_json_report(tmp_path):
     with output_path.open(encoding="utf-8") as file:
         report = json.load(file)
 
-    print(
-    [
-        (
-            finding.check_id,
-            finding.severity.value,
-            finding.evidence,
-        )
-        for finding in findings
-    ]
-)
 
     assert report["summary"]["total_findings"] == 5
 

@@ -88,9 +88,22 @@ def discover_resources(
 
     if source == "aws":
         provider = AWSProvider(region=region)
-        return provider.discover_s3_buckets()
 
-    raise ValueError(f"Unsupported source: {source}")
+        resources = []
+
+        resources.extend(
+            provider.discover_s3_buckets()
+        )
+
+        resources.extend(
+            provider.discover_iam_policies()
+        )
+
+        resources.extend(
+            provider.discover_iam_roles()
+        )
+
+        return resources
 
 
 def run_scan(
