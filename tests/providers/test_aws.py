@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 from botocore.exceptions import ClientError
 
@@ -631,3 +631,50 @@ def test_aws_provider_discovers_iam_policies_from_multiple_pages():
         Scope="Local",
         Marker="next-page",
     )
+
+def test_aws_provider_discovers_iam_roles_from_multiple_pages():
+    iam_client = Mock()
+
+    iam_client.list_roles.side_effect = [
+        {
+            "Roles": [
+                {
+                    "RoleName": "FirstRole",
+                    "AssumeRolePolicyDocument": {
+                        "Statement": []
+                    },
+                }
+            ],
+            "IsTruncated": True,
+            "Marker": "next-page",
+        },
+        {
+            "Roles": [
+                {
+                    "RoleName": "SecondRole",
+                    "AssumeRolePolicyDocument": {
+                        "Statement": []
+                    },
+                }
+            ],
+            "IsTruncated": False,
+        },
+    ]
+
+    provider = AWSProvider(
+        s3_client=Mock(),
+        iam_client=iam_client,
+        region="eu-west-2",
+    )
+
+    resources = provider.discover_iam_roles()
+
+    assert len(resources) == 2
+
+    assert resources[0].resource_id == "FirstRole"
+    assert resources[1].resource_id == "SecondRole"
+
+    assert iam_client.list_roles.call_args_list == [
+        call(),
+        call(Marker="next-page"),
+    ]

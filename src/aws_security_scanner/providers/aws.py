@@ -124,30 +124,42 @@ class AWSProvider:
     def discover_iam_roles(self) -> list[Resource]:
         """Discover IAM roles and their trust policies."""
 
-        response = self.iam_client.list_roles()
-
         resources = []
+        marker = None
 
-        for role in response.get("Roles", []):
-            role_name = role["RoleName"]
-
-            assume_role_policy = role.get(
-                "AssumeRolePolicyDocument"
-            )
-
-            resources.append(
-                Resource(
-                    resource_type="aws_iam_role",
-                    resource_id=role_name,
-                    attributes={
-                        "assume_role_policy_document": (
-                            assume_role_policy
-                        ),
-                    },
-                    source="aws",
-                    region=self.region,
+        while True:
+            if marker:
+                response = self.iam_client.list_roles(
+                    Marker=marker,
                 )
-            )
+            else:
+                response = self.iam_client.list_roles()
+
+            for role in response.get("Roles", []):
+                role_name = role["RoleName"]
+
+                assume_role_policy = role.get(
+                    "AssumeRolePolicyDocument"
+                )
+
+                resources.append(
+                    Resource(
+                        resource_type="aws_iam_role",
+                        resource_id=role_name,
+                        attributes={
+                            "assume_role_policy_document": (
+                                assume_role_policy
+                            ),
+                        },
+                        source="aws",
+                        region=self.region,
+                    )
+                )
+
+            if not response.get("IsTruncated"):
+                break
+
+            marker = response.get("Marker")
 
         return resources
 
