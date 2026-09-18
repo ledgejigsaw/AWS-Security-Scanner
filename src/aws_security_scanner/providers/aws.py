@@ -73,39 +73,51 @@ class AWSProvider:
         return resources
 
     def discover_iam_policies(self) -> list[Resource]:
-        """Discover IAM managed policies and their default policy documents."""
-
-        response = self.iam_client.list_policies(
-            Scope="Local",
-        )
-
+    
         resources = []
+        marker = None
 
-        for policy in response.get("Policies", []):
-            policy_name = policy["PolicyName"]
-            policy_arn = policy["Arn"]
-            version_id = policy["DefaultVersionId"]
-
-            version_response = self.iam_client.get_policy_version(
-                PolicyArn=policy_arn,
-                VersionId=version_id,
-            )
-
-            policy_document = version_response[
-                "PolicyVersion"
-            ]["Document"]
-
-            resources.append(
-                Resource(
-                    resource_type="aws_iam_policy",
-                    resource_id=policy_name,
-                    attributes={
-                        "policy_document": policy_document,
-                    },
-                    source="aws",
-                    region=self.region,
+        while True:
+            if marker:
+                response = self.iam_client.list_policies(
+                    Scope="Local",
+                    Marker=marker,
                 )
-            )
+            else:
+                response = self.iam_client.list_policies(
+                    Scope="Local",
+                )
+
+            for policy in response.get("Policies", []):
+                policy_name = policy["PolicyName"]
+                policy_arn = policy["Arn"]
+                version_id = policy["DefaultVersionId"]
+
+                version_response = self.iam_client.get_policy_version(
+                    PolicyArn=policy_arn,
+                    VersionId=version_id,
+                )
+
+                policy_document = version_response[
+                    "PolicyVersion"
+                ]["Document"]
+
+                resources.append(
+                    Resource(
+                        resource_type="aws_iam_policy",
+                        resource_id=policy_name,
+                        attributes={
+                            "policy_document": policy_document,
+                        },
+                        source="aws",
+                        region=self.region,
+                    )
+                )
+
+            if not response.get("IsTruncated"):
+                break
+
+            marker = response.get("Marker")
 
         return resources
 

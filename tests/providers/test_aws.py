@@ -579,3 +579,55 @@ def test_aws_iam_role_discovery_integrates_with_iam_004():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-004"
     assert findings[0].resource == "InsecureRole"
+
+def test_aws_provider_discovers_iam_policies_from_multiple_pages():
+    iam_client = Mock()
+
+    iam_client.list_policies.side_effect = [
+        {
+            "Policies": [
+                {
+                    "PolicyName": "FirstPolicy",
+                    "Arn": "arn:aws:iam::123456789012:policy/FirstPolicy",
+                    "DefaultVersionId": "v1",
+                }
+            ],
+            "IsTruncated": True,
+            "Marker": "next-page",
+        },
+        {
+            "Policies": [
+                {
+                    "PolicyName": "SecondPolicy",
+                    "Arn": "arn:aws:iam::123456789012:policy/SecondPolicy",
+                    "DefaultVersionId": "v1",
+                }
+            ],
+            "IsTruncated": False,
+        },
+    ]
+
+    iam_client.get_policy_version.return_value = {
+        "PolicyVersion": {
+            "Document": {
+                "Version": "2012-10-17",
+                "Statement": [],
+            }
+        }
+    }
+
+    provider = AWSProvider(iam_client=iam_client)
+
+    resources = provider.discover_iam_policies()
+
+    assert len(resources) == 2
+    assert resources[0].resource_id == "FirstPolicy"
+    assert resources[1].resource_id == "SecondPolicy"
+
+    iam_client.list_policies.assert_any_call(
+        Scope="Local",
+    )
+    iam_client.list_policies.assert_any_call(
+        Scope="Local",
+        Marker="next-page",
+    )
