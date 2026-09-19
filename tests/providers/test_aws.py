@@ -209,6 +209,32 @@ def test_aws_provider_detects_s3_versioning_disabled():
     assert len(resources) == 1
     assert resources[0].attributes["versioning"] is False
 
+def test_aws_provider_handles_s3_versioning_error():
+    s3_client = Mock()
+
+    s3_client.list_buckets.return_value = {
+        "Buckets": [
+            {"Name": "versioning-error"}
+        ]
+    }
+
+    s3_client.get_bucket_versioning.side_effect = ClientError(
+        {
+            "Error": {
+                "Code": "AccessDenied",
+                "Message": "Access denied.",
+            }
+        },
+        "GetBucketVersioning",
+    )
+
+    provider = AWSProvider(s3_client=s3_client)
+
+    resources = provider.discover_s3_buckets()
+
+    assert len(resources) == 1
+    assert resources[0].attributes["versioning"] is False
+    
 def test_aws_provider_detects_s3_block_public_access():
     s3_client = Mock()
 

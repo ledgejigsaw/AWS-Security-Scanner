@@ -185,15 +185,15 @@ class AWSProvider:
 
         return bool(rules)
 
-    def _get_bucket_versioning(
-        self,
-        bucket_name: str,
-    ) -> bool:
-        """Return whether S3 bucket versioning is enabled."""
+    def _get_bucket_versioning(self, bucket_name: str) -> bool:
+        """Return whether versioning is enabled for an S3 bucket."""
 
-        response = self.s3_client.get_bucket_versioning(
-            Bucket=bucket_name
-        )
+        try:
+            response = self.s3_client.get_bucket_versioning(
+                Bucket=bucket_name
+            )
+        except ClientError:
+            return False
 
         return response.get("Status") == "Enabled"
 
