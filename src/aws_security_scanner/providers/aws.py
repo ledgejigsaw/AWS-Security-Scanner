@@ -163,27 +163,22 @@ class AWSProvider:
 
         return resources
 
-    def _get_bucket_encryption(
-        self,
-        bucket_name: str,
-    ) -> bool:
-        """Return whether default server-side encryption is configured."""
+    def _get_bucket_encryption(self, bucket_name: str) -> bool:
+        """Return whether server-side encryption is configured."""
 
         try:
             response = self.s3_client.get_bucket_encryption(
                 Bucket=bucket_name
             )
-        except ClientError:
-            return False
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code")
 
-        configuration = response.get(
-            "ServerSideEncryptionConfiguration",
-            {},
-        )
+            if error_code == "ServerSideEncryptionConfigurationNotFoundError":
+                return False
 
-        rules = configuration.get("Rules", [])
+            raise
 
-        return bool(rules)
+        return bool(response.get("ServerSideEncryptionConfiguration"))
 
     def _get_bucket_versioning(self, bucket_name: str) -> bool:
         """Return whether versioning is enabled for an S3 bucket."""

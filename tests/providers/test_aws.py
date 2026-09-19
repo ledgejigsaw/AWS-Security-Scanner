@@ -1,6 +1,7 @@
 from unittest.mock import Mock, call
 
 from botocore.exceptions import ClientError
+import pytest
 
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.providers.aws import AWSProvider
@@ -704,3 +705,30 @@ def test_aws_provider_discovers_iam_roles_from_multiple_pages():
         call(),
         call(Marker="next-page"),
     ]
+
+
+def test_aws_provider_raises_s3_encryption_access_denied():
+    s3_client = Mock()
+
+    s3_client.list_buckets.return_value = {
+        "Buckets": [
+            {"Name": "restricted-data"}
+        ]
+    }
+
+    error = ClientError(
+        {
+            "Error": {
+                "Code": "AccessDenied",
+                "Message": "Access denied.",
+            }
+        },
+        "GetBucketEncryption",
+    )
+
+    s3_client.get_bucket_encryption.side_effect = error
+
+    provider = AWSProvider(s3_client=s3_client)
+
+    with pytest.raises(ClientError, match="AccessDenied"):
+        provider.discover_s3_buckets()
