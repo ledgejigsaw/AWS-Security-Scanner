@@ -193,17 +193,22 @@ class AWSProvider:
         return response.get("Status") == "Enabled"
 
     def _get_block_public_access(
-        self,
-        bucket_name: str,
-    ) -> bool:
-        """Return whether all S3 public access blocks are enabled."""
+    self,
+    bucket_name: str,
+) -> bool:
+        """Return whether S3 Block Public Access is fully enabled."""
 
         try:
             response = self.s3_client.get_public_access_block(
                 Bucket=bucket_name
             )
-        except ClientError:
-            return False
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code")
+
+            if error_code == "NoSuchPublicAccessBlockConfiguration":
+                return False
+
+            raise
 
         configuration = response.get(
             "PublicAccessBlockConfiguration",
@@ -211,11 +216,11 @@ class AWSProvider:
         )
 
         return all(
-            configuration.get(setting, False)
+            configuration.get(setting) is True
             for setting in (
                 "BlockPublicAcls",
-                "BlockPublicPolicy",
                 "IgnorePublicAcls",
+                "BlockPublicPolicy",
                 "RestrictPublicBuckets",
             )
         )

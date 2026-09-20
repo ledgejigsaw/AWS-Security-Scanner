@@ -732,3 +732,29 @@ def test_aws_provider_raises_s3_encryption_access_denied():
 
     with pytest.raises(ClientError, match="AccessDenied"):
         provider.discover_s3_buckets()
+
+def test_aws_provider_raises_s3_public_access_access_denied():
+    s3_client = Mock()
+
+    s3_client.list_buckets.return_value = {
+        "Buckets": [
+            {"Name": "restricted-data"}
+        ]
+    }
+
+    error = ClientError(
+        {
+            "Error": {
+                "Code": "AccessDenied",
+                "Message": "Access denied.",
+            }
+        },
+        "GetPublicAccessBlock",
+    )
+
+    s3_client.get_public_access_block.side_effect = error
+
+    provider = AWSProvider(s3_client=s3_client)
+
+    with pytest.raises(ClientError, match="AccessDenied"):
+        provider.discover_s3_buckets()
