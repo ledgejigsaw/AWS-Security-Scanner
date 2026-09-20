@@ -1,6 +1,8 @@
-from aws_security_scanner.models.finding import Finding, Severity
+from aws_security_scanner.models.finding import Finding
 from aws_security_scanner.models.resource import Resource
+from aws_security_scanner.models.rule import Severity
 from aws_security_scanner.rules.decorators import rule_for
+
 
 @rule_for(
     "aws_s3_bucket",
@@ -478,5 +480,61 @@ def check_public_write_access(resource: Resource) -> list[Finding]:
                 )
             )
             break
+
+    return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-008",
+    service="S3",
+    severity=Severity.HIGH,
+    category="Data Protection",
+    title="S3 bucket policy allows insecure transport",
+    description=(
+        "The S3 bucket policy does not explicitly deny "
+        "requests made without secure transport."
+    ),
+    remediation=(
+        "Add a bucket policy statement that explicitly denies "
+        "S3 actions when aws:SecureTransport is false."
+    ),
+)
+def check_insecure_transport(resource: Resource) -> list[Finding]:
+    """Detect S3 bucket policies that do not enforce HTTPS."""
+
+    findings = []
+
+    policy = resource.attributes.get("bucket_policy")
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if statement.get("Effect") != "Deny":
+            continue
+
+        condition = statement.get("Condition", {})
+
+        bool_condition = condition.get("Bool", {})
+
+        if bool_condition.get("aws:SecureTransport") is False:
+            return findings
+
+        if bool_condition.get("aws:SecureTransport") == "false":
+            return findings
+
+    findings.append(
+        Finding.from_rule(
+            check_insecure_transport,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence="No explicit aws:SecureTransport=false deny statement",
+        )
+    )
 
     return findings

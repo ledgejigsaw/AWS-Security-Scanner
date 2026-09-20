@@ -1,5 +1,7 @@
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.models.rule import Severity
+from aws_security_scanner.models.resource import Resource
+from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.rules.s3_rules import (
     check_public_bucket,
     check_encryption,
@@ -11,6 +13,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_excessive_s3_actions,
     check_wildcard_bucket_resource,
     check_public_write_access,
+    check_insecure_transport
 )
 
 
@@ -1013,5 +1016,62 @@ def test_bucket_without_policy_generates_no_s3_010_finding():
     )
 
     findings = check_public_write_access(resource)
+
+    assert findings == []
+
+def test_insecure_transport_bucket_policy_generates_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="insecure-transport-bucket",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": "*",
+                    }
+                ],
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_insecure_transport(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-008"
+    assert findings[0].severity == Severity.HIGH
+
+def test_secure_transport_bucket_policy_does_not_generate_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="secure-transport-bucket",
+        attributes={
+            "bucket_policy": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "s3:*",
+                        "Resource": "*",
+                        "Condition": {
+                            "Bool": {
+                                "aws:SecureTransport": "false"
+                            }
+                        },
+                    }
+                ],
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_insecure_transport(resource)
 
     assert findings == []
