@@ -13,7 +13,9 @@ from aws_security_scanner.rules.s3_rules import (
     check_excessive_s3_actions,
     check_wildcard_bucket_resource,
     check_public_write_access,
-    check_insecure_transport
+    check_insecure_transport,
+    check_public_acl,
+    check_acl_object_ownership,
 )
 
 
@@ -1073,5 +1075,67 @@ def test_secure_transport_bucket_policy_does_not_generate_finding():
     )
 
     findings = check_insecure_transport(resource)
+
+    assert findings == []
+
+def test_public_acl_generates_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="public-acl-bucket",
+        attributes={
+            "acl": {
+                "grants": [
+                    {
+                        "grantee": {
+                            "type": "Group",
+                            "uri": (
+                                "http://acs.amazonaws.com/groups/"
+                                "global/AllUsers"
+                            ),
+                        },
+                        "permission": "READ",
+                    }
+                ]
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_public_acl(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-009"
+    assert findings[0].severity == Severity.HIGH
+
+def test_acl_object_ownership_not_hardened_generates_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="acl-enabled-bucket",
+        attributes={
+            "object_ownership": "BucketOwnerPreferred",
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_acl_object_ownership(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-010"
+    assert findings[0].severity == Severity.HIGH
+
+def test_acl_object_ownership_hardened_does_not_generate_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="secure-acl-bucket",
+        attributes={
+            "object_ownership": "BucketOwnerEnforced",
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_acl_object_ownership(resource)
 
     assert findings == []

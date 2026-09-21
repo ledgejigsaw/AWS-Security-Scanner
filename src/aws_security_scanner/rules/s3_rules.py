@@ -538,3 +538,96 @@ def check_insecure_transport(resource: Resource) -> list[Finding]:
     )
 
     return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-009",
+    service="S3",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="S3 bucket has a public ACL",
+    description=(
+        "The S3 bucket ACL grants access to the public."
+    ),
+    remediation=(
+        "Remove public ACL grants and use S3 Block Public Access "
+        "and bucket policies to control access."
+    ),
+)
+def check_public_acl(resource: Resource) -> list[Finding]:
+    """Detect S3 bucket ACL grants to the public."""
+
+    findings = []
+
+    acl = resource.attributes.get("acl")
+
+    if not acl:
+        return findings
+
+    grants = acl.get("grants", [])
+
+    for grant in grants:
+        grantee = grant.get("grantee", {})
+
+        if grantee.get("type") != "Group":
+            continue
+
+        uri = grantee.get("uri", "")
+
+        if uri.endswith("/AllUsers"):
+            findings.append(
+                Finding.from_rule(
+                    check_public_acl,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"Public ACL grant: "
+                        f"permission={grant.get('permission')}"
+                    ),
+                )
+            )
+            break
+
+    return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-010",
+    service="S3",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="S3 bucket ACL object ownership is not hardened",
+    description=(
+        "The S3 bucket uses an Object Ownership setting that "
+        "still permits ACL-based access control."
+    ),
+    remediation=(
+        "Set S3 Object Ownership to BucketOwnerEnforced to "
+        "disable ACL-based access control."
+    ),
+)
+def check_acl_object_ownership(resource: Resource) -> list[Finding]:
+    """Detect S3 buckets where ACL-based ownership is still enabled."""
+
+    findings = []
+
+    object_ownership = resource.attributes.get(
+        "object_ownership"
+    )
+
+    if object_ownership is None:
+        return findings
+
+    if object_ownership != "BucketOwnerEnforced":
+        findings.append(
+            Finding.from_rule(
+                check_acl_object_ownership,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence=(
+                    f"ObjectOwnership={object_ownership}"
+                ),
+            )
+        )
+
+    return findings
