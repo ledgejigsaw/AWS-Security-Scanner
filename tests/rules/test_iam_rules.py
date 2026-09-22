@@ -5,6 +5,7 @@ from aws_security_scanner.rules.iam_rules import (
     check_insecure_trust_policy,
     check_overly_permissive_policy,
     check_wildcard_permissions,
+    check_user_without_mfa,
 )
 
 
@@ -986,3 +987,35 @@ def test_wildcard_permissions_detect_broad_not_action_with_specific_resource():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-002"
     assert findings[0].severity == Severity.HIGH
+
+def test_user_without_mfa_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-without-mfa",
+        attributes={
+            "mfa_enabled": False,
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_user_without_mfa(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-005"
+    assert findings[0].severity == Severity.HIGH
+
+def test_user_with_mfa_does_not_generate_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-with-mfa",
+        attributes={
+            "mfa_enabled": True,
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_user_without_mfa(resource)
+
+    assert findings == []

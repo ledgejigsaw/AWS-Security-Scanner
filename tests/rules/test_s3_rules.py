@@ -16,6 +16,8 @@ from aws_security_scanner.rules.s3_rules import (
     check_insecure_transport,
     check_public_acl,
     check_acl_object_ownership,
+    check_mfa_delete,
+    
 )
 
 
@@ -1137,5 +1139,44 @@ def test_acl_object_ownership_hardened_does_not_generate_finding():
     )
 
     findings = check_acl_object_ownership(resource)
+
+    assert findings == []
+
+
+def test_mfa_delete_disabled_generates_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="mfa-delete-disabled-bucket",
+        attributes={
+            "versioning_configuration": {
+                "status": "Enabled",
+                "mfa_delete": "Disabled",
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_mfa_delete(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-011"
+    assert findings[0].severity == Severity.MEDIUM
+
+def test_mfa_delete_enabled_does_not_generate_finding():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="mfa-delete-enabled-bucket",
+        attributes={
+            "versioning_configuration": {
+                "status": "Enabled",
+                "mfa_delete": "Enabled",
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_mfa_delete(resource)
 
     assert findings == []

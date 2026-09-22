@@ -385,3 +385,38 @@ def check_insecure_trust_policy(
             break
 
     return findings 
+
+@rule_for(
+    "aws_iam_user",
+    check_id="IAM-005",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="IAM user does not have MFA enabled",
+    description=(
+        "The IAM user does not have multi-factor authentication "
+        "enabled."
+    ),
+    remediation=(
+        "Enable MFA for IAM users, particularly users with "
+        "console access."
+    ),
+)
+def check_user_without_mfa(resource: Resource) -> list[Finding]:
+    """Detect IAM users without MFA enabled."""
+
+    findings = []
+
+    mfa_enabled = resource.attributes.get("mfa_enabled")
+
+    if mfa_enabled is False:
+        findings.append(
+            Finding.from_rule(
+                check_user_without_mfa,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence="MFA is not enabled",
+            )
+        )
+
+    return findings

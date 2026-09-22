@@ -631,3 +631,49 @@ def check_acl_object_ownership(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-011",
+    service="S3",
+    severity=Severity.MEDIUM,
+    category="Data Protection",
+    title="S3 bucket MFA Delete is disabled",
+    description=(
+        "MFA Delete is not enabled for an S3 bucket with "
+        "versioning enabled."
+    ),
+    remediation=(
+        "Enable MFA Delete for the S3 bucket to provide "
+        "additional protection against accidental or "
+        "unauthorised deletion of object versions."
+    ),
+)
+def check_mfa_delete(resource: Resource) -> list[Finding]:
+    """Detect versioned S3 buckets without MFA Delete enabled."""
+
+    findings = []
+
+    versioning_configuration = resource.attributes.get(
+        "versioning_configuration"
+    )
+
+    if not versioning_configuration:
+        return findings
+
+    if versioning_configuration.get("status") != "Enabled":
+        return findings
+
+    if versioning_configuration.get("mfa_delete") != "Enabled":
+        findings.append(
+            Finding.from_rule(
+                check_mfa_delete,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence=(
+                    "Versioning enabled but MFA Delete is not enabled"
+                ),
+            )
+        )
+
+    return findings
