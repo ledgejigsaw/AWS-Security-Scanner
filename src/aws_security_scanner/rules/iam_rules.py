@@ -1,6 +1,7 @@
 from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.decorators import rule_for
+from datetime import datetime, timezone
 
 
 
@@ -455,6 +456,65 @@ def check_active_access_key(resource: Resource) -> list[Finding]:
                     evidence=(
                         f"Active access key: "
                         f"{access_key.get('access_key_id')}"
+                    ),
+                )
+            )
+            break
+
+    return findings
+
+from datetime import datetime, timezone
+
+@rule_for(
+    "aws_iam_user",
+    check_id="IAM-007",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="IAM access key is older than 90 days",
+    description=(
+        "The IAM user has an active access key that is "
+        "older than 90 days."
+    ),
+    remediation=(
+        "Rotate old access keys regularly and remove "
+        "unused credentials."
+    ),
+)
+def check_old_access_key(resource: Resource) -> list[Finding]:
+    """Detect active IAM access keys older than 90 days."""
+
+    findings = []
+
+    access_keys = resource.attributes.get("access_keys", [])
+
+    now = datetime.now(timezone.utc)
+
+    for access_key in access_keys:
+        if access_key.get("status") != "Active":
+            continue
+
+        created_at = access_key.get("created_at")
+
+        if not created_at:
+            continue
+
+        created_date = datetime.fromisoformat(
+            created_at.replace("Z", "+00:00")
+        )
+
+        age_days = (now - created_date).days
+
+        if age_days > 90:
+            findings.append(
+                Finding.from_rule(
+                    check_old_access_key,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"Access key: "
+                        f"{access_key.get('access_key_id')}, "
+                        f"age: {age_days} days"
                     ),
                 )
             )

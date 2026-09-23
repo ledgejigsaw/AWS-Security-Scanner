@@ -7,6 +7,7 @@ from aws_security_scanner.rules.iam_rules import (
     check_wildcard_permissions,
     check_user_without_mfa,
     check_active_access_key,
+    check_old_access_key,
 )
 
 
@@ -1060,3 +1061,25 @@ def test_inactive_access_key_does_not_generate_finding():
 
     assert findings == []
     
+def test_old_access_key_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-with-old-key",
+        attributes={
+            "access_keys": [
+                {
+                    "access_key_id": "AKIAOLDKEY",
+                    "status": "Active",
+                    "created_at": "2025-01-01",
+                }
+            ],
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_old_access_key(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-007"
+    assert findings[0].severity == Severity.HIGHx
