@@ -3,9 +3,8 @@ from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.decorators import rule_for
 
 
-# ---------------------------------------------------------------------------
+
 # IAM-001 — Unrestricted IAM Permissions
-# ---------------------------------------------------------------------------
 
 @rule_for(
     "aws_iam_policy",
@@ -28,6 +27,8 @@ from aws_security_scanner.rules.decorators import rule_for
         "AWS resources that require access."
     ),
 )
+
+
 def check_overly_permissive_policy(
     resource: Resource,
 ) -> list[Finding]:
@@ -384,7 +385,7 @@ def check_insecure_trust_policy(
 
             break
 
-    return findings 
+    return findings
 
 @rule_for(
     "aws_iam_user",
@@ -436,7 +437,7 @@ def check_user_without_mfa(resource: Resource) -> list[Finding]:
         "credentials such as IAM roles where possible."
     ),
 )
-    
+
 def check_active_access_key(resource: Resource) -> list[Finding]:
     """Detect IAM users with active access keys."""
 

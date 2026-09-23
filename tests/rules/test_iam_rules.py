@@ -10,10 +10,7 @@ from aws_security_scanner.rules.iam_rules import (
 )
 
 
-# ---------------------------------------------------------------------------
 # IAM-001 — Unrestricted IAM Permissions
-# ---------------------------------------------------------------------------
-
 
 def test_overly_permissive_policy_detects_unrestricted_permissions():
     resource = Resource(
@@ -1062,3 +1059,4 @@ def test_inactive_access_key_does_not_generate_finding():
     findings = check_active_access_key(resource)
 
     assert findings == []
+    
