@@ -420,3 +420,43 @@ def check_user_without_mfa(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+@rule_for(
+    "aws_iam_user",
+    check_id="IAM-006",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="IAM user has an active access key",
+    description=(
+        "The IAM user has an active programmatic access key."
+    ),
+    remediation=(
+        "Remove unused access keys and use short-lived "
+        "credentials such as IAM roles where possible."
+    ),
+)
+    
+def check_active_access_key(resource: Resource) -> list[Finding]:
+    """Detect IAM users with active access keys."""
+
+    findings = []
+
+    access_keys = resource.attributes.get("access_keys", [])
+
+    for access_key in access_keys:
+        if access_key.get("status") == "Active":
+            findings.append(
+                Finding.from_rule(
+                    check_active_access_key,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"Active access key: "
+                        f"{access_key.get('access_key_id')}"
+                    ),
+                )
+            )
+            break
+
+    return findings

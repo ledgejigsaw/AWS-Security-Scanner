@@ -6,6 +6,7 @@ from aws_security_scanner.rules.iam_rules import (
     check_overly_permissive_policy,
     check_wildcard_permissions,
     check_user_without_mfa,
+    check_active_access_key,
 )
 
 
@@ -1017,5 +1018,47 @@ def test_user_with_mfa_does_not_generate_finding():
     )
 
     findings = check_user_without_mfa(resource)
+
+    assert findings == []
+
+def test_active_access_key_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-with-active-key",
+        attributes={
+            "access_keys": [
+                {
+                    "access_key_id": "AKIAEXAMPLE",
+                    "status": "Active",
+                }
+            ],
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_active_access_key(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-006"
+    assert findings[0].severity == Severity.HIGH
+
+def test_inactive_access_key_does_not_generate_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-with-inactive-key",
+        attributes={
+            "access_keys": [
+                {
+                    "access_key_id": "AKIAINACTIVE",
+                    "status": "Inactive",
+                }
+            ],
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_active_access_key(resource)
 
     assert findings == []
