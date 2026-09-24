@@ -8,6 +8,7 @@ from aws_security_scanner.rules.iam_rules import (
     check_user_without_mfa,
     check_active_access_key,
     check_old_access_key,
+    check_stale_password_user,
 )
 
 
@@ -1082,4 +1083,43 @@ def test_old_access_key_generates_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-007"
-    assert findings[0].severity == Severity.HIGHx
+    assert findings[0].severity == Severity.HIGH
+
+def test_recent_access_key_does_not_generate_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-with-recent-key",
+        attributes={
+            "access_keys": [
+                {
+                    "access_key_id": "AKIARECENTKEY",
+                    "status": "Active",
+                    "created_at": "2026-09-01",
+                }
+            ],
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_old_access_key(resource)
+
+    assert findings == []
+
+def test_stale_password_enabled_user_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="stale-password-user",
+        attributes={
+            "password_enabled": True,
+            "password_last_used": "2025-01-01",
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_stale_password_user(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-008"
+    assert findings[0].severity == Severity.MEDIUM

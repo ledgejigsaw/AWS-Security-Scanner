@@ -501,7 +501,10 @@ def check_old_access_key(resource: Resource) -> list[Finding]:
 
         created_date = datetime.fromisoformat(
             created_at.replace("Z", "+00:00")
-        )
+)
+
+        if created_date.tzinfo is None:
+            created_date = created_date.replace(tzinfo=timezone.utc)
 
         age_days = (now - created_date).days
 
@@ -519,5 +522,68 @@ def check_old_access_key(resource: Resource) -> list[Finding]:
                 )
             )
             break
+
+    return findings
+
+@rule_for(
+    "aws_iam_user",
+    check_id="IAM-008",
+    service="IAM",
+    severity=Severity.MEDIUM,
+    category="Access Control",
+    title="IAM user has a stale password",
+    description=(
+        "The IAM user has a password that has not been used "
+        "for more than 90 days."
+    ),
+    remediation=(
+        "Remove unused passwords or disable console access "
+        "for users that no longer require it."
+    ),
+)
+def check_stale_password_user(resource: Resource) -> list[Finding]:
+    """Detect IAM users with passwords unused for more than 90 days."""
+
+    findings = []
+
+    password_enabled = resource.attributes.get(
+        "password_enabled",
+        False,
+    )
+
+    if not password_enabled:
+        return findings
+
+    password_last_used = resource.attributes.get(
+        "password_last_used"
+    )
+
+    if not password_last_used:
+        return findings
+
+    now = datetime.now(timezone.utc)
+
+    last_used = datetime.fromisoformat(
+        password_last_used.replace("Z", "+00:00")
+    )
+
+    if last_used.tzinfo is None:
+        last_used = last_used.replace(tzinfo=timezone.utc)
+
+    age_days = (now - last_used).days
+
+    if age_days > 90:
+        findings.append(
+            Finding.from_rule(
+                check_stale_password_user,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence=(
+                    f"Password last used: "
+                    f"{password_last_used}, "
+                    f"age: {age_days} days"
+                ),
+            )
+        )
 
     return findings
