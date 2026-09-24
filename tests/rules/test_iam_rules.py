@@ -9,6 +9,10 @@ from aws_security_scanner.rules.iam_rules import (
     check_active_access_key,
     check_old_access_key,
     check_stale_password_user,
+    check_inline_wildcard_permissions,
+    check_privilege_escalation_permissions,
+    check_sensitive_iam_action,
+    check_broad_trust_relationship,
 )
 
 
@@ -1123,3 +1127,112 @@ def test_stale_password_enabled_user_generates_finding():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-008"
     assert findings[0].severity == Severity.MEDIUM
+
+def test_inline_wildcard_permissions_generate_finding():
+    resource = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-with-inline-wildcard",
+        attributes={
+            "inline_policies": [
+                {
+                    "policy_document": {
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": "*",
+                                "Resource": "*",
+                            }
+                        ]
+                    }
+                }
+            ],
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_inline_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-009"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_privilege_escalation_permissions_generate_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="privilege-escalation-policy",
+        attributes={
+            "policy_document": {
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "iam:CreatePolicyVersion",
+                        "Resource": "*",
+                    }
+                ]
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_privilege_escalation_permissions(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-010"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_sensitive_iam_action_on_wildcard_resource_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="sensitive-wildcard-policy",
+        attributes={
+            "policy_document": {
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "iam:CreateRole",
+                        "Resource": "*",
+                    }
+                ]
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_sensitive_iam_action(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-011"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_broad_trust_relationship_generates_finding():
+    resource = Resource(
+        resource_type="aws_iam_role",
+        resource_id="broad-trust-role",
+        attributes={
+            "assume_role_policy_document": {
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": "arn:aws:iam::123456789012:root"
+                        },
+                        "Action": "sts:AssumeRole",
+                    }
+                ]
+            }
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_broad_trust_relationship(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-012"
+    assert findings[0].severity == Severity.HIGH

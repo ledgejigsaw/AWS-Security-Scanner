@@ -587,3 +587,310 @@ def check_stale_password_user(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+@rule_for(
+    "aws_iam_user",
+    check_id="IAM-009",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="IAM inline policy contains wildcard permissions",
+    description=(
+        "The IAM user has an inline policy that grants "
+        "wildcard permissions."
+    ),
+    remediation=(
+        "Replace wildcard permissions with the minimum "
+        "actions and resources required."
+    ),
+)
+def check_inline_wildcard_permissions(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect wildcard permissions in IAM user inline policies."""
+
+    findings = []
+
+    inline_policies = resource.attributes.get(
+        "inline_policies",
+        [],
+    )
+
+    for policy in inline_policies:
+        policy_document = policy.get("policy_document", {})
+        statements = policy_document.get("Statement", [])
+
+        if isinstance(statements, dict):
+            statements = [statements]
+
+        for statement in statements:
+            if statement.get("Effect") != "Allow":
+                continue
+
+            action = statement.get("Action")
+            resource_value = statement.get("Resource")
+
+            wildcard_action = (
+                action == "*"
+                or isinstance(action, list)
+                and "*" in action
+            )
+
+            wildcard_resource = (
+                resource_value == "*"
+                or isinstance(resource_value, list)
+                and "*" in resource_value
+            )
+
+            if wildcard_action and wildcard_resource:
+                findings.append(
+                    Finding.from_rule(
+                        check_inline_wildcard_permissions,
+                        resource=resource.resource_id,
+                        region=resource.region,
+                        evidence=(
+                            f"Action={action}, "
+                            f"Resource={resource_value}"
+                        ),
+                    )
+                )
+                return findings
+
+    return findings
+
+@rule_for(
+    "aws_iam_policy",
+    check_id="IAM-010",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Privilege Escalation",
+    title="IAM policy allows privilege escalation",
+    description=(
+        "The IAM policy contains permissions that can be "
+        "used to escalate privileges."
+    ),
+    remediation=(
+        "Restrict privilege-management permissions to the "
+        "specific resources and actions required."
+    ),
+)
+def check_privilege_escalation_permissions(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect IAM permissions commonly associated with privilege escalation."""
+
+    findings = []
+
+    policy = resource.attributes.get("policy_document", {})
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    escalation_actions = {
+        "iam:CreatePolicyVersion",
+        "iam:SetDefaultPolicyVersion",
+        "iam:AttachUserPolicy",
+        "iam:AttachRolePolicy",
+        "iam:AttachGroupPolicy",
+        "iam:PutUserPolicy",
+        "iam:PutRolePolicy",
+        "iam:PutGroupPolicy",
+        "iam:PassRole",
+    }
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        actions = statement.get("Action", [])
+
+        if isinstance(actions, str):
+            actions = [actions]
+
+        matched_actions = [
+            action
+            for action in actions
+            if action in escalation_actions
+        ]
+
+        if matched_actions:
+            findings.append(
+                Finding.from_rule(
+                    check_privilege_escalation_permissions,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"Privilege escalation actions: "
+                        f"{matched_actions}"
+                    ),
+                )
+            )
+            break
+
+    return findings
+
+@rule_for(
+    "aws_iam_policy",
+    check_id="IAM-011",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="Sensitive IAM action allowed on all resources",
+    description=(
+        "The IAM policy allows a sensitive IAM action "
+        "against all resources."
+    ),
+    remediation=(
+        "Restrict sensitive IAM actions to specific resources "
+        "wherever possible."
+    ),
+)
+def check_sensitive_iam_action(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect sensitive IAM actions against wildcard resources."""
+
+    findings = []
+
+    policy = resource.attributes.get("policy_document", {})
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    sensitive_actions = {
+        "iam:CreateUser",
+        "iam:CreateRole",
+        "iam:CreatePolicy",
+        "iam:AttachUserPolicy",
+        "iam:AttachRolePolicy",
+        "iam:AttachGroupPolicy",
+        "iam:PutUserPolicy",
+        "iam:PutRolePolicy",
+        "iam:PutGroupPolicy",
+    }
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        resource_value = statement.get("Resource")
+
+        if resource_value != "*":
+            continue
+
+        actions = statement.get("Action", [])
+
+        if isinstance(actions, str):
+            actions = [actions]
+
+        matched_actions = [
+            action
+            for action in actions
+            if action in sensitive_actions
+        ]
+
+        if matched_actions:
+            findings.append(
+                Finding.from_rule(
+                    check_sensitive_iam_action,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"Actions={matched_actions}, "
+                        "Resource=*"
+                    ),
+                )
+            )
+            break
+
+    return findings
+
+@rule_for(
+    "aws_iam_role",
+    check_id="IAM-012",
+    service="IAM",
+    severity=Severity.HIGH,
+    category="Access Control",
+    title="IAM role has a broad trust relationship",
+    description=(
+        "The IAM role trust policy allows another AWS "
+        "account to assume the role through a broad "
+        "root principal."
+    ),
+    remediation=(
+        "Restrict the trust relationship to the specific "
+        "AWS account, role, or principal that requires access."
+    ),
+)
+def check_broad_trust_relationship(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect broad AWS account trust relationships."""
+
+    findings = []
+
+    policy = resource.attributes.get(
+        "assume_role_policy_document"
+    )
+
+    if not policy:
+        return findings
+
+    statements = policy.get("Statement", [])
+
+    if isinstance(statements, dict):
+        statements = [statements]
+
+    for statement in statements:
+        if statement.get("Effect") != "Allow":
+            continue
+
+        action = statement.get("Action")
+
+        if isinstance(action, str):
+            actions = [action]
+        elif isinstance(action, list):
+            actions = action
+        else:
+            continue
+
+        if "sts:AssumeRole" not in actions:
+            continue
+
+        principal = statement.get("Principal", {})
+
+        if not isinstance(principal, dict):
+            continue
+
+        aws_principal = principal.get("AWS")
+
+        if isinstance(aws_principal, str):
+            aws_principals = [aws_principal]
+        elif isinstance(aws_principal, list):
+            aws_principals = aws_principal
+        else:
+            continue
+
+        broad_principals = [
+            value
+            for value in aws_principals
+            if value.endswith(":root")
+        ]
+
+        if broad_principals:
+            findings.append(
+                Finding.from_rule(
+                    check_broad_trust_relationship,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"AWS principals: "
+                        f"{broad_principals}"
+                    ),
+                )
+            )
+            break
+
+    return findings
