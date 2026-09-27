@@ -252,3 +252,215 @@ def check_unrestricted_egress(resource: Resource) -> list[Finding]:
             break
 
     return findings
+
+@rule_for(
+    "aws_instance",
+    check_id="EC2-006",
+    service="EC2",
+    severity=Severity.HIGH,
+    category="Network Security",
+    title="EC2 instance has a public IPv4 address",
+    description=(
+        "The EC2 instance has a public IPv4 address and may "
+        "be directly reachable from the Internet."
+    ),
+    remediation=(
+        "Remove unnecessary public IP addresses and place "
+        "instances behind controlled network boundaries."
+    ),
+)
+def check_public_ipv4(resource: Resource) -> list[Finding]:
+    """Detect EC2 instances with a public IPv4 address."""
+
+    findings = []
+
+    public_ip = resource.attributes.get("public_ip_address")
+
+    if public_ip:
+        findings.append(
+            Finding.from_rule(
+                check_public_ipv4,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence=f"Public IPv4 address: {public_ip}",
+            )
+        )
+
+    return findings
+
+
+@rule_for(
+    "aws_instance",
+    check_id="EC2-007",
+    service="EC2",
+    severity=Severity.HIGH,
+    category="Instance Security",
+    title="EC2 instance allows IMDSv1",
+    description=(
+        "The EC2 instance metadata service allows IMDSv1 "
+        "requests."
+    ),
+    remediation=(
+        "Require IMDSv2 by configuring HttpTokens to "
+        "required."
+    ),
+)
+def check_imdsv1_enabled(resource: Resource) -> list[Finding]:
+    """Detect EC2 instances that permit IMDSv1."""
+
+    findings = []
+
+    metadata_options = resource.attributes.get(
+        "metadata_options",
+        {},
+    )
+
+    http_tokens = metadata_options.get("http_tokens")
+
+    if http_tokens == "optional":
+        findings.append(
+            Finding.from_rule(
+                check_imdsv1_enabled,
+                resource=resource.resource_id,
+                region=resource.region,
+                evidence="HttpTokens=optional",
+            )
+        )
+
+    return findings
+
+
+@rule_for(
+    "aws_security_group",
+    check_id="EC2-008",
+    service="EC2",
+    severity=Severity.HIGH,
+    category="Network Security",
+    title="Security group allows unrestricted IPv6 ingress",
+    description=(
+        "The security group allows inbound traffic from "
+        "the entire IPv6 Internet."
+    ),
+    remediation=(
+        "Restrict IPv6 inbound traffic to the specific "
+        "networks and ports required."
+    ),
+)
+def check_unrestricted_ipv6_ingress(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect unrestricted IPv6 inbound access."""
+
+    findings = []
+
+    for rule in resource.attributes.get("ingress_rules", []):
+        if (
+            rule.get("cidr") == "::/0"
+            and rule.get("protocol") != ""
+        ):
+            findings.append(
+                Finding.from_rule(
+                    check_unrestricted_ipv6_ingress,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"IPv6 ingress allowed from "
+                        f"{rule.get('cidr')}"
+                    ),
+                )
+            )
+            break
+
+    return findings
+
+
+@rule_for(
+    "aws_security_group",
+    check_id="EC2-009",
+    service="EC2",
+    severity=Severity.MEDIUM,
+    category="Network Security",
+    title="Security group allows a broad port range",
+    description=(
+        "The security group allows inbound traffic across "
+        "a broad range of TCP ports."
+    ),
+    remediation=(
+        "Restrict inbound access to only the ports required "
+        "by the workload."
+    ),
+)
+def check_broad_port_range(resource: Resource) -> list[Finding]:
+    """Detect unusually broad TCP port ranges."""
+
+    findings = []
+
+    for rule in resource.attributes.get("ingress_rules", []):
+        if rule.get("protocol") != "tcp":
+            continue
+
+        from_port = rule.get("from_port")
+        to_port = rule.get("to_port")
+
+        if from_port is None or to_port is None:
+            continue
+
+        if to_port - from_port >= 1000:
+            findings.append(
+                Finding.from_rule(
+                    check_broad_port_range,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        f"TCP port range "
+                        f"{from_port}-{to_port}"
+                    ),
+                )
+            )
+            break
+
+    return findings
+
+
+@rule_for(
+    "aws_security_group",
+    check_id="EC2-010",
+    service="EC2",
+    severity=Severity.MEDIUM,
+    category="Network Security",
+    title="Security group allows unrestricted IPv6 egress",
+    description=(
+        "The security group allows all outbound traffic "
+        "to the IPv6 Internet."
+    ),
+    remediation=(
+        "Restrict outbound IPv6 traffic where practical to "
+        "the destinations and services required."
+    ),
+)
+def check_unrestricted_ipv6_egress(
+    resource: Resource,
+) -> list[Finding]:
+    """Detect unrestricted IPv6 outbound access."""
+
+    findings = []
+
+    for rule in resource.attributes.get("egress_rules", []):
+        if (
+            rule.get("protocol") == "-1"
+            and rule.get("cidr") == "::/0"
+        ):
+            findings.append(
+                Finding.from_rule(
+                    check_unrestricted_ipv6_egress,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        "All outbound protocols and ports "
+                        "allowed to ::/0"
+                    ),
+                )
+            )
+            break
+
+    return findings
