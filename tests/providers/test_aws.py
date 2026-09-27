@@ -758,3 +758,149 @@ def test_aws_provider_raises_s3_public_access_access_denied():
 
     with pytest.raises(ClientError, match="AccessDenied"):
         provider.discover_s3_buckets()
+
+def test_discover_ec2_instances():
+    class MockEC2Client:
+        def describe_instances(self):
+            return {
+                "Reservations": [
+                    {
+                        "Instances": [
+                            {
+                                "InstanceId": "i-1234567890abcdef0",
+                                "InstanceType": "t3.micro",
+                                "State": {
+                                    "Name": "running",
+                                },
+                                "PublicIpAddress": "203.0.113.10",
+                                "PrivateIpAddress": "10.0.1.25",
+                                "SubnetId": "subnet-123456",
+                                "VpcId": "vpc-123456",
+                                "MetadataOptions": {
+                                    "HttpTokens": "optional",
+                                },
+                                "SecurityGroups": [
+                                    {
+                                        "GroupId": "sg-123456",
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+
+    provider = AWSProvider(
+        ec2_client=MockEC2Client(),
+        region="eu-west-2",
+    )
+
+    resources = provider.discover_ec2_instances()
+
+    assert len(resources) == 1
+
+    resource = resources[0]
+
+    assert resource.resource_type == "aws_instance"
+    assert resource.resource_id == "i-1234567890abcdef0"
+    assert resource.source == "aws"
+    assert resource.region == "eu-west-2"
+
+    assert resource.attributes["instance_type"] == "t3.micro"
+    assert resource.attributes["state"] == "running"
+    assert resource.attributes["public_ip_address"] == "203.0.113.10"
+    assert resource.attributes["private_ip_address"] == "10.0.1.25"
+    assert resource.attributes["subnet_id"] == "subnet-123456"
+    assert resource.attributes["vpc_id"] == "vpc-123456"
+
+    assert resource.attributes["metadata_options"]["http_tokens"] == "optional"
+
+    assert resource.attributes["security_group_ids"] == [
+        "sg-123456"
+    ]
+
+def test_discover_security_groups():
+    class MockEC2Client:
+        def describe_security_groups(self):
+            return {
+                "SecurityGroups": [
+                    {
+                        "GroupId": "sg-123456",
+                        "GroupName": "web-server",
+                        "VpcId": "vpc-123456",
+                        "IpPermissions": [
+                            {
+                                "IpProtocol": "tcp",
+                                "FromPort": 22,
+                                "ToPort": 22,
+                                "IpRanges": [
+                                    {
+                                        "CidrIp": "0.0.0.0/0",
+                                    }
+                                ],
+                                "Ipv6Ranges": [],
+                            }
+                        ],
+                        "IpPermissionsEgress": [
+                            {
+                                "IpProtocol": "-1",
+                                "FromPort": -1,
+                                "ToPort": -1,
+                                "IpRanges": [
+                                    {
+                                        "CidrIp": "0.0.0.0/0",
+                                    }
+                                ],
+                                "Ipv6Ranges": [
+                                    {
+                                        "CidrIpv6": "::/0",
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    provider = AWSProvider(
+        ec2_client=MockEC2Client(),
+        region="eu-west-2",
+    )
+
+    resources = provider.discover_security_groups()
+
+    assert len(resources) == 1
+
+    resource = resources[0]
+
+    assert resource.resource_type == "aws_security_group"
+    assert resource.resource_id == "sg-123456"
+    assert resource.source == "aws"
+    assert resource.region == "eu-west-2"
+
+    assert resource.attributes["group_name"] == "web-server"
+    assert resource.attributes["vpc_id"] == "vpc-123456"
+
+    assert resource.attributes["ingress_rules"] == [
+        {
+            "protocol": "tcp",
+            "from_port": 22,
+            "to_port": 22,
+            "cidr": "0.0.0.0/0",
+        }
+    ]
+
+    assert resource.attributes["egress_rules"] == [
+        {
+            "protocol": "-1",
+            "from_port": -1,
+            "to_port": -1,
+            "cidr": "0.0.0.0/0",
+        },
+        {
+            "protocol": "-1",
+            "from_port": -1,
+            "to_port": -1,
+            "cidr": "::/0",
+        },
+    ]

@@ -1,8 +1,8 @@
-import json
 from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
+from rich import region
 
 from aws_security_scanner.models.resource import Resource
 
@@ -22,17 +22,17 @@ class AWSProvider:
         self.s3_client = s3_client or boto3.client(
             "s3",
             region_name=region,
-        )
+    )
 
         self.iam_client = iam_client or boto3.client(
             "iam",
             region_name=region,
-        )
+    )
 
-        self.ec2_client = boto3.client(
-           "ec2",
+        self.ec2_client = ec2_client or boto3.client(
+            "ec2",
             region_name=region,
-        )
+    )
 
     def discover_s3_buckets(self) -> list[Resource]:
         """Discover S3 buckets and their security configuration."""
@@ -75,6 +75,59 @@ class AWSProvider:
                     region=self.region,
                 )
             )
+
+        return resources
+
+    def discover_ec2_instances(self) -> list[Resource]:
+        """Discover EC2 instances and normalise security attributes."""
+
+        resources = []
+
+        response = self.ec2_client.describe_instances()
+
+        for reservation in response.get("Reservations", []):
+            for instance in reservation.get("Instances", []):
+                instance_id = instance["InstanceId"]
+
+                metadata_options = instance.get(
+                    "MetadataOptions",
+                    {},
+                )
+
+                attributes = {
+                    "instance_type": instance.get("InstanceType"),
+                    "state": instance.get("State", {}).get("Name"),
+                    "public_ip_address": instance.get(
+                        "PublicIpAddress"
+                    ),
+                    "private_ip_address": instance.get(
+                        "PrivateIpAddress"
+                    ),
+                    "subnet_id": instance.get("SubnetId"),
+                    "vpc_id": instance.get("VpcId"),
+                    "metadata_options": {
+                        "http_tokens": metadata_options.get(
+                            "HttpTokens"
+                        ),
+                    },
+                    "security_group_ids": [
+                        group["GroupId"]
+                        for group in instance.get(
+                            "SecurityGroups",
+                            [],
+                        )
+                    ],
+                }
+
+                resources.append(
+                    Resource(
+                        resource_type="aws_instance",
+                        resource_id=instance_id,
+                        attributes=attributes,
+                        source="aws",
+                        region=self.region,
+                    )
+                )
 
         return resources
 
