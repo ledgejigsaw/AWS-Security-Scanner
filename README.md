@@ -13,12 +13,13 @@ The project is being developed as a practical cybersecurity and cloud security p
 * Automated testing
 * Modular architecture
 * Extensibility
+* Configurable security policies
 
 The long-term goal is to build a security scanner capable of analysing AWS environments, Terraform configurations and other supported sources using the same security rule engine.
 
-> **Current status:** The scanner currently supports local fixtures, Terraform JSON analysis and a read-only AWS S3 provider foundation. Live AWS scanning is still under development.
+> **Current status:** The scanner currently supports local fixtures, Terraform JSON analysis and a read-only AWS provider. AWS resources can now flow through the normalised `Resource` model, rule engine, S3 security rules and JSON reporting pipeline. YAML-based policy configuration is also supported.
 
-> **Current test suite:** 164 passing tests
+> **Current test suite:** 168 passing tests
 
 ---
 
@@ -58,6 +59,8 @@ For example, an S3 encryption rule can analyse:
 * An AWS resource discovered through boto3
 
 using the same internal `Resource` representation.
+
+The AWS provider therefore does not contain the security logic itself. It is responsible for discovery and normalisation, while the rule engine remains responsible for security analysis.
 
 ---
 
@@ -99,9 +102,22 @@ terraform show -json > terraform.json
 
 The resulting JSON can then be scanned by the project.
 
+Terraform resources such as:
+
+```text
+aws_s3_bucket
+aws_s3_bucket_versioning
+aws_s3_bucket_server_side_encryption_configuration
+aws_s3_bucket_public_access_block
+aws_s3_bucket_logging
+aws_s3_bucket_policy
+```
+
+can be resolved and aggregated into the logical S3 bucket representation used by the security rules.
+
 ### AWS
 
-A read-only AWS provider is currently under development using `boto3`.
+A read-only AWS provider has now been implemented using `boto3`.
 
 The current implementation supports S3 discovery and retrieves:
 
@@ -112,7 +128,27 @@ The current implementation supports S3 discovery and retrieves:
 * Server access logging
 * Bucket policies
 
-AWS API calls are currently tested using mocked boto3 clients, allowing development without storing AWS credentials or requiring a live AWS account.
+The AWS discovery path is integrated with the scanner's normalised resource model and rule engine:
+
+```text
+AWS API
+   ↓
+AWSProvider
+   ↓
+Resource
+   ↓
+RuleEngine
+   ↓
+S3 Security Rules
+   ↓
+Findings
+   ↓
+JSON Reporting
+```
+
+AWS API calls are tested using mocked boto3 clients, allowing development and testing without storing AWS credentials in the repository.
+
+The AWS provider is intentionally read-only.
 
 ---
 
@@ -144,6 +180,8 @@ Finding
 ```
 
 The approach also keeps security rules independent from individual provider implementations.
+
+A resource discovered through AWS can therefore be analysed by the same rule implementation used for a Terraform resource or local fixture.
 
 ---
 
@@ -222,6 +260,8 @@ The scanner analyses bucket policies for:
 * Wildcard resources
 * Public write permissions
 
+The same S3 security rules can be applied to resources originating from fixtures, Terraform or the AWS provider.
+
 ---
 
 # IAM Security Analysis
@@ -271,6 +311,41 @@ For example:
 
 The scanner treats broad `NotAction` permissions as a security finding because they can result in a very large effective permission set.
 
+This provides coverage for a policy construct that can otherwise be missed by scanners that only inspect conventional `Action` statements.
+
+---
+
+# Policy Configuration
+
+Security policy configuration is supported through YAML.
+
+This separates policy configuration from the core scanning and provider architecture.
+
+Conceptually:
+
+```text
+YAML Policy
+     │
+     ▼
+Policy Configuration
+     │
+     ▼
+Rule Engine
+     │
+     ▼
+Security Findings
+```
+
+This provides a foundation for configurable security policies without requiring security rules to be rewritten for every configuration change.
+
+Policy configuration is intended to support the longer-term development of:
+
+* Configuration/policy packs
+* Severity filtering
+* Custom security requirements
+* Finding suppression
+* Organisation-specific security standards
+
 ---
 
 # Architecture
@@ -307,6 +382,24 @@ src/aws_security_scanner/
     ├── s3_rules.py
     └── iam_rules.py
 ```
+
+The architecture deliberately separates:
+
+```text
+Discovery
+    ↓
+Normalisation
+    ↓
+Rule selection
+    ↓
+Security analysis
+    ↓
+Finding generation
+    ↓
+Reporting
+```
+
+This makes it possible to add additional providers and resource types without duplicating the security logic.
 
 ---
 
@@ -358,6 +451,8 @@ Resource
 
 The AWS provider currently focuses on S3.
 
+The provider is now integrated with the scanner's rule engine rather than operating as an isolated discovery component.
+
 ---
 
 # Terraform Resource Relationships
@@ -378,6 +473,8 @@ aws_s3_bucket_policy
 The scanner resolves Terraform references and aggregates the related configuration back onto the base S3 bucket resource.
 
 This allows the security rules to analyse the bucket as a single logical resource.
+
+This approach also keeps the security rules independent from Terraform's individual resource representation.
 
 ---
 
@@ -403,6 +500,21 @@ The rule engine can then determine which rules apply to a resource based on its 
 
 This provides a central rule registry without requiring the CLI or providers to know about individual security checks.
 
+The current architecture supports the same rule engine being used for:
+
+```text
+Fixtures
+    │
+Terraform
+    │
+AWS
+    │
+    ▼
+Rule Engine
+```
+
+This is an important part of the project's provider-independent design.
+
 ---
 
 # Findings
@@ -425,6 +537,8 @@ This allows the same finding structure to be used regardless of whether the reso
 * Fixtures
 * Terraform
 * AWS
+
+The AWS provider therefore produces the same type of security finding as the Terraform and fixture providers.
 
 ---
 
@@ -486,15 +600,17 @@ The report contains summary information such as:
 
 Individual findings also contain their associated evidence.
 
+JSON reporting is also part of the AWS scanning path, allowing AWS-discovered resources to produce the same structured output as Terraform and fixture scans.
+
 ---
 
 # Testing
 
 Testing is a major part of the project.
 
-The current test suite contains:
+The latest confirmed test suite contains:
 
-> **164 passing tests**
+> **168 passing tests**
 
 The tests cover:
 
@@ -511,9 +627,12 @@ The tests cover:
 * Terraform providers
 * Fixture providers
 * AWS provider
-* Reporting
+* AWS S3 discovery
+* AWS-to-rule-engine integration
+* JSON reporting
 * CLI behaviour
 * Integration paths
+* YAML policy configuration
 
 Run the complete test suite with:
 
@@ -527,7 +646,7 @@ Run only the AWS provider tests with:
 pytest -q tests/providers/test_aws.py
 ```
 
-The current AWS provider suite contains tests covering:
+The AWS provider tests cover areas including:
 
 ```text
 S3 bucket discovery
@@ -543,11 +662,13 @@ S3 bucket policies
 S3 buckets without policies
 ```
 
+AWS integration tests also verify that discovered resources can pass through the normal scanning pipeline and produce security findings and JSON reporting output.
+
 ---
 
 # Development Without AWS Credentials
 
-The project is intentionally being developed without requiring a live AWS environment.
+The project is intentionally being developed without requiring AWS credentials to be stored in the repository.
 
 AWS API calls are mocked during testing.
 
@@ -567,12 +688,14 @@ This provides several advantages:
 
 * No AWS credentials stored in the repository
 * No accidental production changes
-* No AWS infrastructure costs
+* No AWS infrastructure costs during testing
 * Deterministic tests
 * Repeatable development
 * Easier CI/CD integration
 
 The AWS provider is designed to remain **read-only**.
+
+The use of mocked AWS clients also allows individual AWS API behaviours and failure conditions to be tested without depending on a live account.
 
 ---
 
@@ -603,6 +726,12 @@ Findings should contain evidence supporting the security decision.
 ## Deterministic testing
 
 Security checks should be reproducible and independently testable.
+
+## Separation of concerns
+
+Resource discovery, normalisation, security analysis and reporting remain separate components.
+
+This makes the scanner easier to test, extend and maintain.
 
 ---
 
@@ -709,10 +838,11 @@ The project is still under active development.
 * [x] IAM-001 through IAM-004
 * [x] IAM wildcard permission analysis
 * [x] IAM `NotAction` analysis
+* [x] YAML policy configuration
 * [x] JSON reporting
 * [x] CLI integration
 * [x] Automated test suite
-* [x] Read-only AWS provider foundation
+* [x] Read-only AWS provider
 * [x] AWS S3 bucket discovery
 * [x] AWS S3 encryption discovery
 * [x] AWS S3 versioning discovery
@@ -720,17 +850,21 @@ The project is still under active development.
 * [x] AWS S3 logging discovery
 * [x] AWS S3 bucket policy discovery
 * [x] Mocked AWS provider tests
+* [x] AWS provider → Resource integration
+* [x] AWS Resource → RuleEngine integration
+* [x] AWS S3 rule integration
+* [x] AWS scan → JSON reporting integration tests
 
 ## In Progress
 
-* [ ] AWS provider → rule engine integration
-* [ ] AWS S3 security integration testing
+* [ ] Expanded AWS resource discovery
 * [ ] AWS IAM provider
 * [ ] AWS IAM policy discovery
 * [ ] AWS IAM role/trust policy discovery
-* [ ] Expanded AWS resource discovery
-* [ ] Live AWS scanning
+* [ ] Expanded AWS security integration testing
+* [ ] Live AWS environment testing
 * [ ] Improved reporting
+* [ ] Additional policy configuration capabilities
 
 ## Planned
 
@@ -800,6 +934,22 @@ The longer-term objective is to evolve the scanner into a broader cloud security
                JSON          HTML          SARIF
 ```
 
+The current implementation already demonstrates the core path represented by this architecture:
+
+```text
+AWS / Terraform / Fixtures
+          ↓
+   Resource Model
+          ↓
+      Rule Engine
+          ↓
+       Findings
+          ↓
+        JSON
+```
+
+The future architecture will extend this foundation with additional AWS services, reporting formats, policy configuration and CI/CD integration.
+
 ---
 
 # Why I'm Building This
@@ -824,6 +974,8 @@ The aim is to demonstrate understanding of:
 
 The architecture is intentionally being developed incrementally, with tests driving the implementation of individual security capabilities.
 
+The project also provides practical experience in designing a security tool around reusable interfaces rather than implementing individual checks as isolated scripts.
+
 ---
 
 # Project Status
@@ -832,17 +984,19 @@ The architecture is intentionally being developed incrementally, with tests driv
 
 **Security rules:** 14
 
-**Automated tests:** 164 passing
+**Automated tests:** 168 passing
 
 **Data sources:**
 
 * Local fixtures
 * Terraform JSON
-* AWS S3 API foundation
+* AWS S3 API
 
-**AWS access:** Read-only provider under development
+**AWS access:** Read-only AWS provider integrated with the Resource and RuleEngine pipeline
 
-**Live AWS scanning:** Not yet implemented
+**AWS S3 scanning:** Implemented and covered by integration tests
+
+**Live AWS environment testing:** Not yet completed
 
 **Status:** Active development
 
