@@ -14,6 +14,7 @@ class AWSProvider:
         self,
         s3_client: Any | None = None,
         iam_client: Any | None = None,
+        ec2_client: Any | None = None,
         region: str | None = None,
     ):
         self.region = region
@@ -25,6 +26,11 @@ class AWSProvider:
 
         self.iam_client = iam_client or boto3.client(
             "iam",
+            region_name=region,
+        )
+
+        self.ec2_client = boto3.client(
+           "ec2",
             region_name=region,
         )
 
@@ -259,3 +265,50 @@ class AWSProvider:
             return None
 
         return json.loads(policy)
+
+def discover_ec2_instances(self) -> list[Resource]:
+    """Discover EC2 instances and relevant security attributes."""
+
+    resources = []
+
+    response = self.ec2_client.describe_instances()
+
+    for reservation in response.get("Reservations", []):
+        for instance in reservation.get("Instances", []):
+            instance_id = instance["InstanceId"]
+
+            attributes = {
+                "instance_type": instance.get("InstanceType"),
+                "state": instance.get("State", {}).get("Name"),
+                "public_ip_address": instance.get(
+                    "PublicIpAddress"
+                ),
+                "private_ip_address": instance.get(
+                    "PrivateIpAddress"
+                ),
+                "subnet_id": instance.get("SubnetId"),
+                "vpc_id": instance.get("VpcId"),
+                "metadata_options": instance.get(
+                    "MetadataOptions",
+                    {},
+                ),
+                "security_group_ids": [
+                    group["GroupId"]
+                    for group in instance.get(
+                        "SecurityGroups",
+                        [],
+                    )
+                ],
+            }
+
+            resources.append(
+                Resource(
+                    resource_type="aws_instance",
+                    resource_id=instance_id,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+    return resources
