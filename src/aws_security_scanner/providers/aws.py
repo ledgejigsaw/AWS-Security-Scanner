@@ -319,49 +319,158 @@ class AWSProvider:
 
         return json.loads(policy)
 
-def discover_ec2_instances(self) -> list[Resource]:
-    """Discover EC2 instances and relevant security attributes."""
+    def discover_ec2_instances(self) -> list[Resource]:
+        """Discover EC2 instances and relevant security attributes."""
 
-    resources = []
+        resources = []
 
-    response = self.ec2_client.describe_instances()
+        response = self.ec2_client.describe_instances()
 
-    for reservation in response.get("Reservations", []):
-        for instance in reservation.get("Instances", []):
-            instance_id = instance["InstanceId"]
+        for reservation in response.get("Reservations", []):
+            for instance in reservation.get("Instances", []):
+                instance_id = instance["InstanceId"]
+
+                attributes = {
+                    "instance_type": instance.get("InstanceType"),
+                    "state": instance.get("State", {}).get("Name"),
+                    "public_ip_address": instance.get(
+                        "PublicIpAddress"
+                    ),
+                    "private_ip_address": instance.get(
+                        "PrivateIpAddress"
+                    ),
+                    "subnet_id": instance.get("SubnetId"),
+                    "vpc_id": instance.get("VpcId"),
+                    "metadata_options": instance.get(
+                        "MetadataOptions",
+                        {},
+                    ),
+                    "security_group_ids": [
+                        group["GroupId"]
+                        for group in instance.get(
+                            "SecurityGroups",
+                            [],
+                        )
+                    ],
+                }
+
+                resources.append(
+                    Resource(
+                        resource_type="aws_instance",
+                        resource_id=instance_id,
+                        attributes=attributes,
+                        source="aws",
+                        region=self.region,
+                    )
+                )
+
+        return resources
+
+    def discover_security_groups(self) -> list[Resource]:
+        """Discover EC2 security groups and normalise network rules."""
+
+        resources = []
+
+        response = self.ec2_client.describe_security_groups()
+
+        for security_group in response.get("SecurityGroups", []):
+            group_id = security_group["GroupId"]
+
+            ingress_rules = []
+
+            for permission in security_group.get(
+                "IpPermissions",
+                [],
+            ):
+                protocol = permission.get("IpProtocol")
+
+                from_port = permission.get("FromPort")
+                to_port = permission.get("ToPort")
+
+                for ip_range in permission.get("IpRanges", []):
+                    cidr = ip_range.get("CidrIp")
+
+                    if cidr:
+                        ingress_rules.append(
+                            {
+                                "protocol": protocol,
+                                "from_port": from_port,
+                                "to_port": to_port,
+                                "cidr": cidr,
+                            }
+                        )
+
+                for ipv6_range in permission.get(
+                    "Ipv6Ranges",
+                    [],
+                ):
+                    cidr = ipv6_range.get("CidrIpv6")
+
+                    if cidr:
+                        ingress_rules.append(
+                            {
+                                "protocol": protocol,
+                                "from_port": from_port,
+                                "to_port": to_port,
+                                "cidr": cidr,
+                            }
+                        )
+
+            egress_rules = []
+
+            for permission in security_group.get(
+                "IpPermissionsEgress",
+                [],
+            ):
+                protocol = permission.get("IpProtocol")
+
+                from_port = permission.get("FromPort")
+                to_port = permission.get("ToPort")
+
+                for ip_range in permission.get("IpRanges", []):
+                    cidr = ip_range.get("CidrIp")
+
+                    if cidr:
+                        egress_rules.append(
+                            {
+                                "protocol": protocol,
+                                "from_port": from_port,
+                                "to_port": to_port,
+                                "cidr": cidr,
+                            }
+                        )
+
+                for ipv6_range in permission.get(
+                    "Ipv6Ranges",
+                    [],
+                ):
+                    cidr = ipv6_range.get("CidrIpv6")
+
+                    if cidr:
+                        egress_rules.append(
+                            {
+                                "protocol": protocol,
+                                "from_port": from_port,
+                                "to_port": to_port,
+                                "cidr": cidr,
+                            }
+                        )
 
             attributes = {
-                "instance_type": instance.get("InstanceType"),
-                "state": instance.get("State", {}).get("Name"),
-                "public_ip_address": instance.get(
-                    "PublicIpAddress"
-                ),
-                "private_ip_address": instance.get(
-                    "PrivateIpAddress"
-                ),
-                "subnet_id": instance.get("SubnetId"),
-                "vpc_id": instance.get("VpcId"),
-                "metadata_options": instance.get(
-                    "MetadataOptions",
-                    {},
-                ),
-                "security_group_ids": [
-                    group["GroupId"]
-                    for group in instance.get(
-                        "SecurityGroups",
-                        [],
-                    )
-                ],
+                "group_name": security_group.get("GroupName"),
+                "vpc_id": security_group.get("VpcId"),
+                "ingress_rules": ingress_rules,
+                "egress_rules": egress_rules,
             }
 
             resources.append(
                 Resource(
-                    resource_type="aws_instance",
-                    resource_id=instance_id,
+                    resource_type="aws_security_group",
+                    resource_id=group_id,
                     attributes=attributes,
                     source="aws",
                     region=self.region,
                 )
             )
 
-    return resources
+        return resources
