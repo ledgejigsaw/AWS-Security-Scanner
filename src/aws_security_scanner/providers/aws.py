@@ -319,52 +319,6 @@ class AWSProvider:
 
         return json.loads(policy)
 
-    def discover_ec2_instances(self) -> list[Resource]:
-        """Discover EC2 instances and relevant security attributes."""
-
-        resources = []
-
-        response = self.ec2_client.describe_instances()
-
-        for reservation in response.get("Reservations", []):
-            for instance in reservation.get("Instances", []):
-                instance_id = instance["InstanceId"]
-
-                attributes = {
-                    "instance_type": instance.get("InstanceType"),
-                    "state": instance.get("State", {}).get("Name"),
-                    "public_ip_address": instance.get(
-                        "PublicIpAddress"
-                    ),
-                    "private_ip_address": instance.get(
-                        "PrivateIpAddress"
-                    ),
-                    "subnet_id": instance.get("SubnetId"),
-                    "vpc_id": instance.get("VpcId"),
-                    "metadata_options": instance.get(
-                        "MetadataOptions",
-                        {},
-                    ),
-                    "security_group_ids": [
-                        group["GroupId"]
-                        for group in instance.get(
-                            "SecurityGroups",
-                            [],
-                        )
-                    ],
-                }
-
-                resources.append(
-                    Resource(
-                        resource_type="aws_instance",
-                        resource_id=instance_id,
-                        attributes=attributes,
-                        source="aws",
-                        region=self.region,
-                    )
-                )
-
-        return resources
 
     def discover_security_groups(self) -> list[Resource]:
         """Discover EC2 security groups and normalise network rules."""
