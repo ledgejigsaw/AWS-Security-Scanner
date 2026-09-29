@@ -1,5 +1,6 @@
 from unittest.mock import Mock, call
 
+
 from botocore.exceptions import ClientError
 import pytest
 

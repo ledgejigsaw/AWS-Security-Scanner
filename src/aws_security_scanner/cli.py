@@ -102,7 +102,14 @@ def discover_resources(
         resources.extend(
             provider.discover_iam_roles()
         )
+        resources.extend(
+            provider.discover_ec2_instances()
+        )
 
+        resources.extend(
+            provider.discover_security_groups()
+        )
+        
         return resources
 
 

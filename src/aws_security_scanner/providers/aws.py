@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import boto3
@@ -15,7 +16,7 @@ class AWSProvider:
         s3_client: Any | None = None,
         iam_client: Any | None = None,
         ec2_client: Any | None = None,
-        region: str | None = None,
+        region: str | None = "eu-west-2",
     ):
         self.region = region
 
