@@ -1,0 +1,17 @@
+{
+    "resource_type": "aws_instance",
+    "instance_id": "i-secure001",
+    "region": "eu-west-2",
+    "instance_type": "t3.micro",
+    "state": "running",
+    "public_ip_address": null,
+    "private_ip_address": "10.0.2.10",
+    "subnet_id": "subnet-private01",
+    "vpc_id": "vpc-security01",
+    "metadata_options": {
+        "http_tokens": "required"
+    },
+    "security_group_ids": [
+        "sg-secure01"
+    ]
+}

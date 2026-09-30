@@ -176,3 +176,18 @@ def test_rule_engine_can_override_rule_severity_with_policy():
 
     assert len(encryption_findings) == 1
     assert encryption_findings[0].severity.value == "CRITICAL"
+
+def test_fixture_provider_discovers_ec2_instances():
+    fixture_directory = Path("tests/fixtures/ec2")
+    provider = FixtureProvider(fixture_directory)
+
+    resources = provider.discover()
+
+    instance_ids = {
+        resource.resource_id
+        for resource in resources
+        if resource.resource_type == "aws_instance"
+    }
+
+    assert "i-insecure001" in instance_ids
+    assert "i-secure001" in instance_ids

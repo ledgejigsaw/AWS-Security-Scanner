@@ -47,6 +47,9 @@ class FixtureProvider:
         if data["resource_type"] == "aws_iam_role":
             return data["role_name"]
 
+        if data["resource_type"] == "aws_instance":
+            return data["instance_id"]
+        
         raise ValueError(
             f"Unsupported fixture resource type: {data['resource_type']}"
         )
