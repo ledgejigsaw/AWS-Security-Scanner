@@ -1,0 +1,23 @@
+{
+    "resource_type": "aws_security_group",
+    "group_id": "sg-secure01",
+    "group_name": "secure-private-access",
+    "region": "eu-west-2",
+    "vpc_id": "vpc-security01",
+    "ingress_rules": [
+        {
+            "protocol": "tcp",
+            "from_port": 443,
+            "to_port": 443,
+            "cidr": "10.0.0.0/16"
+        }
+    ],
+    "egress_rules": [
+        {
+            "protocol": "tcp",
+            "from_port": 443,
+            "to_port": 443,
+            "cidr": "10.0.0.0/16"
+        }
+    ]
+}

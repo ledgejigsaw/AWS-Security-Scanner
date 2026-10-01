@@ -50,6 +50,9 @@ class FixtureProvider:
         if data["resource_type"] == "aws_instance":
             return data["instance_id"]
         
+        if data["resource_type"] == "aws_security_group":
+            return data["group_id"]
+        
         raise ValueError(
             f"Unsupported fixture resource type: {data['resource_type']}"
         )

@@ -1,0 +1,29 @@
+{
+    "resource_type": "aws_security_group",
+    "group_id": "sg-insecure01",
+    "group_name": "insecure-public-access",
+    "region": "eu-west-2",
+    "vpc_id": "vpc-security01",
+    "ingress_rules": [
+        {
+            "protocol": "tcp",
+            "from_port": 22,
+            "to_port": 22,
+            "cidr": "0.0.0.0/0"
+        },
+        {
+            "protocol": "tcp",
+            "from_port": 3389,
+            "to_port": 3389,
+            "cidr": "0.0.0.0/0"
+        }
+    ],
+    "egress_rules": [
+        {
+            "protocol": "-1",
+            "from_port": 0,
+            "to_port": 0,
+            "cidr": "0.0.0.0/0"
+        }
+    ]
+}

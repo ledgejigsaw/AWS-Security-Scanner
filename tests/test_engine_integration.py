@@ -191,3 +191,40 @@ def test_fixture_provider_discovers_ec2_instances():
 
     assert "i-insecure001" in instance_ids
     assert "i-secure001" in instance_ids
+
+def test_fixture_provider_discovers_ec2_security_groups():
+    fixture_directory = Path("tests/fixtures/ec2")
+    provider = FixtureProvider(fixture_directory)
+
+    resources = provider.discover()
+
+    security_group_ids = {
+        resource.resource_id
+        for resource in resources
+        if resource.resource_type == "aws_security_group"
+    }
+
+    assert "sg-insecure01" in security_group_ids
+    assert "sg-secure01" in security_group_ids
+
+def test_rule_engine_runs_registered_ec2_rules():
+    fixture_directory = Path("tests/fixtures/ec2")
+    provider = FixtureProvider(fixture_directory)
+
+    resources = provider.discover()
+    engine = RuleEngine(get_all_rules())
+
+    findings = engine.scan(resources)
+
+    check_ids = {
+        finding.check_id
+        for finding in findings
+    }
+
+    assert "EC2-001" in check_ids
+    assert "EC2-002" in check_ids
+    assert "EC2-003" in check_ids
+    assert "EC2-004" in check_ids
+    assert "EC2-005" in check_ids
+    assert "EC2-006" in check_ids
+    assert "EC2-007" in check_ids
