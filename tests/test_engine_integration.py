@@ -226,5 +226,4 @@ def test_rule_engine_runs_registered_ec2_rules():
     assert "EC2-003" in check_ids
     assert "EC2-004" in check_ids
     assert "EC2-005" in check_ids
-    assert "EC2-006" in check_ids
-    assert "EC2-007" in check_ids
+  

@@ -22,6 +22,12 @@
             "from_port": 3306,
             "to_port": 3306,
             "cidr": "0.0.0.0/0"
+        },
+        {
+            "protocol": "-1",
+            "from_port": 0,
+            "to_port": 0,
+            "cidr": "0.0.0.0/0"
         }
     ],
     "egress_rules": [
