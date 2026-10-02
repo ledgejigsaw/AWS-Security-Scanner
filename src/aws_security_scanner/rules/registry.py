@@ -18,6 +18,15 @@ from aws_security_scanner.rules.iam_rules import (
     check_insecure_trust_policy,
 )
 
+
+from aws_security_scanner.rules.ec2_rules import (
+    check_ssh_exposed,
+    check_rdp_exposed,
+    check_sensitive_port_exposed,
+    check_unrestricted_ingress,
+    check_unrestricted_egress,
+)
+
 def get_all_rules():
     """Return all registered security rules."""
 
@@ -36,4 +45,9 @@ def get_all_rules():
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
         check_insecure_trust_policy,
+        check_ssh_exposed,
+        check_rdp_exposed,
+        check_sensitive_port_exposed,
+        check_unrestricted_ingress,
+        check_unrestricted_egress,
     ]
