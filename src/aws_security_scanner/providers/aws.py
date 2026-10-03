@@ -429,3 +429,224 @@ class AWSProvider:
             )
 
         return resources
+
+    def discover_vpcs(self) -> list[Resource]:
+        """Discover VPCs and normalise network attributes."""
+
+        resources = []
+
+        response = self.ec2_client.describe_vpcs()
+
+        for vpc in response.get("Vpcs", []):
+            vpc_id = vpc["VpcId"]
+
+            attributes = {
+                "cidr_block": vpc.get("CidrBlock"),
+                "is_default": vpc.get("IsDefault", False),
+            }
+
+            resources.append(
+                Resource(
+                    resource_type="aws_vpc",
+                    resource_id=vpc_id,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_subnets(self) -> list[Resource]:
+        """Discover subnets and normalise network attributes."""
+
+        resources = []
+
+        response = self.ec2_client.describe_subnets()
+
+        for subnet in response.get("Subnets", []):
+            subnet_id = subnet["SubnetId"]
+
+            attributes = {
+                "vpc_id": subnet.get("VpcId"),
+                "cidr_block": subnet.get("CidrBlock"),
+                "availability_zone": subnet.get("AvailabilityZone"),
+                "map_public_ip_on_launch": subnet.get(
+                    "MapPublicIpOnLaunch"
+                ),
+            }
+
+            resources.append(
+                Resource(
+                    resource_type="aws_subnet",
+                    resource_id=subnet_id,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_route_tables(self) -> list[Resource]:
+        """Discover route tables and normalise routing attributes."""
+
+        resources = []
+
+        response = self.ec2_client.describe_route_tables()
+
+        for route_table in response.get("RouteTables", []):
+            route_table_id = route_table["RouteTableId"]
+
+            routes = []
+
+            for route in route_table.get("Routes", []):
+                routes.append(
+                    {
+                        "destination_cidr": route.get("DestinationCidrBlock"),
+                        "destination_ipv6": route.get(
+                            "DestinationIpv6CidrBlock"
+                        ),
+                        "gateway_id": route.get("GatewayId"),
+                        "nat_gateway_id": route.get("NatGatewayId"),
+                        "instance_id": route.get("InstanceId"),
+                        "state": route.get("State"),
+                    }
+                )
+
+            associations = []
+
+            for association in route_table.get(
+                "Associations",
+                [],
+            ):
+                associations.append(
+                    {
+                        "subnet_id": association.get("SubnetId"),
+                        "main": association.get("Main", False),
+                        "association_id": association.get(
+                            "RouteTableAssociationId"
+                        ),
+                    }
+                )
+
+            attributes = {
+                "vpc_id": route_table.get("VpcId"),
+                "routes": routes,
+                "associations": associations,
+            }
+
+            resources.append(
+                Resource(
+                    resource_type="aws_route_table",
+                    resource_id=route_table_id,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_network_acls(self) -> list[Resource]:
+        """Discover network ACLs and normalise network rules."""
+
+        resources = []
+
+        response = self.ec2_client.describe_network_acls()
+
+        for network_acl in response.get("NetworkAcls", []):
+            network_acl_id = network_acl["NetworkAclId"]
+
+            entries = []
+
+            for entry in network_acl.get("Entries", []):
+                entries.append(
+                    {
+                        "egress": entry.get("Egress", False),
+                        "rule_number": entry.get("RuleNumber"),
+                        "protocol": entry.get("Protocol"),
+                        "rule_action": entry.get("RuleAction"),
+                        "cidr_block": entry.get("CidrBlock"),
+                        "ipv6_cidr_block": entry.get(
+                            "Ipv6CidrBlock"
+                        ),
+                        "from_port": entry.get("PortRange", {}).get(
+                            "From"
+                        ),
+                        "to_port": entry.get("PortRange", {}).get(
+                            "To"
+                        ),
+                    }
+                )
+
+            associations = []
+
+            for association in network_acl.get(
+                "Associations",
+                [],
+            ):
+                associations.append(
+                    {
+                        "subnet_id": association.get("SubnetId"),
+                        "association_id": association.get(
+                            "NetworkAclAssociationId"
+                        ),
+                    }
+                )
+
+            attributes = {
+                "vpc_id": network_acl.get("VpcId"),
+                "is_default": network_acl.get("IsDefault", False),
+                "entries": entries,
+                "associations": associations,
+            }
+
+            resources.append(
+                Resource(
+                    resource_type="aws_network_acl",
+                    resource_id=network_acl_id,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_flow_logs(self) -> list[Resource]:
+        """Discover VPC flow logs and normalise logging attributes."""
+
+        resources = []
+
+        response = self.ec2_client.describe_flow_logs()
+
+        for flow_log in response.get("FlowLogs", []):
+            flow_log_id = flow_log["FlowLogId"]
+
+            attributes = {
+                "resource_id": flow_log.get("ResourceId"),
+                "resource_type": flow_log.get("ResourceType"),
+                "traffic_type": flow_log.get("TrafficType"),
+                "log_destination_type": flow_log.get(
+                    "LogDestinationType"
+                ),
+                "log_destination": flow_log.get(
+                    "LogDestination"
+                ),
+                "deliver_logs_status": flow_log.get(
+                    "DeliverLogsStatus"
+                ),
+            }
+
+            resources.append(
+                Resource(
+                    resource_type="aws_flow_log",
+                    resource_id=flow_log_id,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
