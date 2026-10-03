@@ -25,6 +25,11 @@ from aws_security_scanner.rules.ec2_rules import (
     check_sensitive_port_exposed,
     check_unrestricted_ingress,
     check_unrestricted_egress,
+    check_public_ipv4,
+    check_imdsv1_enabled,
+    check_unrestricted_ipv6_ingress,
+    check_broad_port_range,
+    check_unrestricted_ipv6_egress,
 )
 
 def get_all_rules():
@@ -50,4 +55,9 @@ def get_all_rules():
         check_sensitive_port_exposed,
         check_unrestricted_ingress,
         check_unrestricted_egress,
+        check_public_ipv4,
+        check_imdsv1_enabled,
+        check_unrestricted_ipv6_ingress,
+        check_broad_port_range,
+        check_unrestricted_ipv6_egress,
     ]
