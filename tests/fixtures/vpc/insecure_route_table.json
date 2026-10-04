@@ -1,0 +1,39 @@
+{
+    "resource_type": "aws_route_table",
+    "route_table_id": "rtb-public01",
+    "region": "eu-west-2",
+    "vpc_id": "vpc-security01",
+    "routes": [
+        {
+            "destination_cidr": "0.0.0.0/0",
+            "destination_ipv6": null,
+            "gateway_id": "igw-security01",
+            "nat_gateway_id": null,
+            "instance_id": null,
+            "state": "active"
+        },
+        {
+            "destination_cidr": "10.0.0.0/16",
+            "destination_ipv6": null,
+            "gateway_id": "local",
+            "nat_gateway_id": null,
+            "instance_id": null,
+            "state": "active"
+        },
+        {
+            "destination_cidr": null,
+            "destination_ipv6": "::/0",
+            "gateway_id": "igw-security01",
+            "nat_gateway_id": null,
+            "instance_id": null,
+            "state": "active"
+        }
+    ],
+    "associations": [
+        {
+            "subnet_id": "subnet-public01",
+            "main": false,
+            "association_id": "rtbassoc-public01"
+        }
+    ]
+}

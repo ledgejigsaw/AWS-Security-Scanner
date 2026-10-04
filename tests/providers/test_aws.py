@@ -905,3 +905,182 @@ def test_discover_security_groups():
             "cidr": "::/0",
         },
     ]
+
+def test_aws_provider_discovers_vpcs():
+    ec2_client = Mock()
+
+    ec2_client.describe_vpcs.return_value = {
+        "Vpcs": [
+            {
+                "VpcId": "vpc-security01",
+                "CidrBlock": "10.0.0.0/16",
+                "IsDefault": False,
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        ec2_client=ec2_client,
+    )
+
+    resources = provider.discover_vpcs()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_vpc"
+    assert resources[0].resource_id == "vpc-security01"
+    assert resources[0].attributes["cidr_block"] == "10.0.0.0/16"
+    assert resources[0].attributes["is_default"] is False
+
+
+def test_aws_provider_discovers_subnets():
+    ec2_client = Mock()
+
+    ec2_client.describe_subnets.return_value = {
+        "Subnets": [
+            {
+                "SubnetId": "subnet-private01",
+                "VpcId": "vpc-security01",
+                "CidrBlock": "10.0.1.0/24",
+                "AvailabilityZone": "eu-west-2a",
+                "MapPublicIpOnLaunch": False,
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        ec2_client=ec2_client,
+    )
+
+    resources = provider.discover_subnets()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_subnet"
+    assert resources[0].resource_id == "subnet-private01"
+    assert resources[0].attributes["vpc_id"] == "vpc-security01"
+    assert resources[0].attributes["cidr_block"] == "10.0.1.0/24"
+    assert resources[0].attributes["map_public_ip_on_launch"] is False
+
+
+def test_aws_provider_discovers_route_tables():
+    ec2_client = Mock()
+
+    ec2_client.describe_route_tables.return_value = {
+        "RouteTables": [
+            {
+                "RouteTableId": "rtb-security01",
+                "VpcId": "vpc-security01",
+                "Routes": [
+                    {
+                        "DestinationCidrBlock": "10.0.0.0/16",
+                        "GatewayId": "local",
+                        "State": "active",
+                    }
+                ],
+                "Associations": [
+                    {
+                        "SubnetId": "subnet-private01",
+                        "Main": False,
+                        "RouteTableAssociationId": "rtbassoc-security01",
+                    }
+                ],
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        ec2_client=ec2_client,
+    )
+
+    resources = provider.discover_route_tables()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_route_table"
+    assert resources[0].resource_id == "rtb-security01"
+    assert resources[0].attributes["vpc_id"] == "vpc-security01"
+    assert resources[0].attributes["routes"][0]["destination_cidr"] == (
+        "10.0.0.0/16"
+    )
+    assert resources[0].attributes["associations"][0]["subnet_id"] == (
+        "subnet-private01"
+    )
+
+
+def test_aws_provider_discovers_network_acls():
+    ec2_client = Mock()
+
+    ec2_client.describe_network_acls.return_value = {
+        "NetworkAcls": [
+            {
+                "NetworkAclId": "acl-security01",
+                "VpcId": "vpc-security01",
+                "IsDefault": False,
+                "Entries": [
+                    {
+                        "Egress": False,
+                        "RuleNumber": 100,
+                        "Protocol": "6",
+                        "RuleAction": "allow",
+                        "CidrBlock": "10.0.0.0/16",
+                        "PortRange": {
+                            "From": 443,
+                            "To": 443,
+                        },
+                    }
+                ],
+                "Associations": [
+                    {
+                        "SubnetId": "subnet-private01",
+                        "NetworkAclAssociationId": "aclassoc-security01",
+                    }
+                ],
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        ec2_client=ec2_client,
+    )
+
+    resources = provider.discover_network_acls()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_network_acl"
+    assert resources[0].resource_id == "acl-security01"
+    assert resources[0].attributes["vpc_id"] == "vpc-security01"
+    assert resources[0].attributes["entries"][0]["rule_action"] == "allow"
+    assert resources[0].attributes["entries"][0]["from_port"] == 443
+    assert resources[0].attributes["associations"][0]["subnet_id"] == (
+        "subnet-private01"
+    )
+
+
+def test_aws_provider_discovers_flow_logs():
+    ec2_client = Mock()
+
+    ec2_client.describe_flow_logs.return_value = {
+        "FlowLogs": [
+            {
+                "FlowLogId": "fl-security01",
+                "ResourceId": "vpc-security01",
+                "ResourceType": "VPC",
+                "TrafficType": "ALL",
+                "LogDestinationType": "cloud-watch-logs",
+                "LogDestination": "arn:aws:logs:eu-west-2:123456789012:log-group:vpc-flow-logs",
+                "DeliverLogsStatus": "SUCCESS",
+            }
+        ]
+    }
+
+    provider = AWSProvider(
+        ec2_client=ec2_client,
+    )
+
+    resources = provider.discover_flow_logs()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_flow_log"
+    assert resources[0].resource_id == "fl-security01"
+    assert resources[0].attributes["resource_id"] == "vpc-security01"
+    assert resources[0].attributes["resource_type"] == "VPC"
+    assert resources[0].attributes["traffic_type"] == "ALL"
+    assert resources[0].attributes["deliver_logs_status"] == "SUCCESS"

@@ -1,0 +1,23 @@
+{
+    "resource_type": "aws_route_table",
+    "route_table_id": "rtb-private01",
+    "region": "eu-west-2",
+    "vpc_id": "vpc-security01",
+    "routes": [
+        {
+            "destination_cidr": "10.0.0.0/16",
+            "destination_ipv6": null,
+            "gateway_id": "local",
+            "nat_gateway_id": null,
+            "instance_id": null,
+            "state": "active"
+        }
+    ],
+    "associations": [
+        {
+            "subnet_id": "subnet-private01",
+            "main": false,
+            "association_id": "rtbassoc-private01"
+        }
+    ]
+}

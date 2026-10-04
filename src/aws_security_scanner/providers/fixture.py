@@ -53,6 +53,21 @@ class FixtureProvider:
         if data["resource_type"] == "aws_security_group":
             return data["group_id"]
         
+        if data["resource_type"] == "aws_vpc":
+            return data["vpc_id"]
+        
+        if data["resource_type"] == "aws_subnet":
+            return data["subnet_id"]
+        
+        if data["resource_type"] == "aws_route_table":
+            return data["route_table_id"]
+        
+        if data["resource_type"] == "aws_network_acl":
+            return data["network_acl_id"]
+        
+        if data["resource_type"] == "aws_flow_log":
+            return data["flow_log_id"]
+        
         raise ValueError(
             f"Unsupported fixture resource type: {data['resource_type']}"
         )

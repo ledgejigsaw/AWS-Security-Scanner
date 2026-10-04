@@ -1,0 +1,9 @@
+{
+    "resource_type": "aws_subnet",
+    "subnet_id": "subnet-private01",
+    "region": "eu-west-2",
+    "vpc_id": "vpc-security01",
+    "cidr_block": "10.0.2.0/24",
+    "availability_zone": "eu-west-2a",
+    "map_public_ip_on_launch": false
+}
