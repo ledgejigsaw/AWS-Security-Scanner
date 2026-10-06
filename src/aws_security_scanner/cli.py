@@ -109,7 +109,26 @@ def discover_resources(
         resources.extend(
             provider.discover_security_groups()
         )
-        
+
+        resources.extend(
+            provider.discover_vpcs()
+        )
+
+        resources.extend(
+            provider.discover_subnets()
+        )
+
+        resources.extend(
+            provider.discover_route_tables()
+        )
+
+        resources.extend(
+            provider.discover_network_acls()
+        )
+
+        resources.extend(
+            provider.discover_flow_logs()
+        )
         return resources
 
 

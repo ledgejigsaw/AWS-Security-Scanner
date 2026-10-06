@@ -34,7 +34,7 @@ def test_public_subnet_generates_high_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "VPC-001"
-    assert findings[0].severity.value == "HIGH"
+    assert findings[0].severity == "HIGH"
     assert findings[0].resource == "subnet-public01"
 
 
@@ -69,7 +69,7 @@ def test_unrestricted_ipv4_route_generates_high_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "VPC-002"
-    assert findings[0].severity.value == "HIGH"
+    assert findings[0].severity == "HIGH"
     assert findings[0].resource == "rtb-public01"
 
 
@@ -88,7 +88,7 @@ def test_unrestricted_ipv6_route_generates_high_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "VPC-003"
-    assert findings[0].severity.value == "HIGH"
+    assert findings[0].severity == "HIGH"
     assert findings[0].resource == "rtb-public01"
 
 
@@ -122,7 +122,7 @@ def test_unrestricted_nacl_ingress_generates_high_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "VPC-004"
-    assert findings[0].severity.value == "HIGH"
+    assert findings[0].severity == "HIGH"
     assert findings[0].resource == "acl-insecure01"
 
 
@@ -141,7 +141,7 @@ def test_unrestricted_nacl_egress_generates_high_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "VPC-005"
-    assert findings[0].severity.value == "HIGH"
+    assert findings[0].severity == "HIGH"
     assert findings[0].resource == "acl-insecure01"
 
 
