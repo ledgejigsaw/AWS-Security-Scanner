@@ -38,6 +38,11 @@ from aws_security_scanner.rules.vpc_rules import (
     check_unrestricted_ipv6_route,
     check_unrestricted_nacl_ingress,
     check_unrestricted_nacl_egress,
+    check_unrestricted_nacl_ipv6_ingress,
+    check_unrestricted_nacl_ipv6_egress,
+    check_default_nacl_ingress,
+    check_default_nacl_egress,
+    check_associated_public_route,
 )
 
 def get_all_rules():
@@ -73,4 +78,9 @@ def get_all_rules():
         check_unrestricted_ipv6_route,
         check_unrestricted_nacl_ingress,
         check_unrestricted_nacl_egress,
+        check_unrestricted_nacl_ipv6_ingress,
+        check_unrestricted_nacl_ipv6_egress,
+        check_default_nacl_ingress,
+        check_default_nacl_egress,
+        check_associated_public_route,
     ]

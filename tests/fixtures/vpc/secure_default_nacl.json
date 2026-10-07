@@ -1,0 +1,35 @@
+{
+    "resource_type": "aws_network_acl",
+    "network_acl_id": "acl-default-secure01",
+    "region": "eu-west-2",
+    "vpc_id": "vpc-security01",
+    "is_default": true,
+    "entries": [
+        {
+            "egress": false,
+            "rule_number": 100,
+            "protocol": "tcp",
+            "rule_action": "allow",
+            "cidr_block": "10.0.0.0/16",
+            "ipv6_cidr_block": null,
+            "from_port": 443,
+            "to_port": 443
+        },
+        {
+            "egress": true,
+            "rule_number": 100,
+            "protocol": "tcp",
+            "rule_action": "allow",
+            "cidr_block": "10.0.0.0/16",
+            "ipv6_cidr_block": null,
+            "from_port": 443,
+            "to_port": 443
+        }
+    ],
+    "associations": [
+        {
+            "subnet_id": "subnet-default01",
+            "association_id": "aclassoc-default-secure01"
+        }
+    ]
+}
