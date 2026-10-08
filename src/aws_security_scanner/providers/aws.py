@@ -650,3 +650,30 @@ class AWSProvider:
             )
 
         return resources
+
+
+def discover_iam_users(self) -> list[Resource]:
+    """Discover IAM users and normalise security-relevant attributes."""
+    resources = []
+
+    response = self.iam_client.list_users()
+
+    for user in response.get("Users", []):
+        username = user["UserName"]
+
+        resources.append(
+            Resource(
+                resource_type="aws_iam_user",
+                resource_id=username,
+                attributes={
+                    "user_name": username,
+                    "user_id": user.get("UserId"),
+                    "arn": user.get("Arn"),
+                    "path": user.get("Path"),
+                },
+                source="aws",
+                region=None,
+            )
+        )
+
+    return resources
