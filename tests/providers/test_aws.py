@@ -1084,3 +1084,87 @@ def test_aws_provider_discovers_flow_logs():
     assert resources[0].attributes["resource_type"] == "VPC"
     assert resources[0].attributes["traffic_type"] == "ALL"
     assert resources[0].attributes["deliver_logs_status"] == "SUCCESS"
+
+def test_aws_provider_discovers_iam_user_security_attributes():
+    from datetime import datetime, timezone
+
+    iam_client = Mock()
+    iam_client.list_users.return_value = {
+        "Users": [{
+            "UserName": "legacy-user",
+            "UserId": "AIDAEXAMPLE",
+            "Arn": "arn:aws:iam::123456789012:user/legacy-user",
+            "Path": "/",
+        }],
+        "IsTruncated": False,
+    }
+    iam_client.get_credential_report.return_value = {
+        "Content": (
+            "user,password_enabled,password_last_used\\n"
+            "legacy-user,true,2025-01-01T00:00:00+00:00\\n"
+        ).encode("utf-8")
+    }
+    iam_client.list_mfa_devices.return_value = {"MFADevices": []}
+    iam_client.list_access_keys.return_value = {
+        "AccessKeyMetadata": [{
+            "AccessKeyId": "AKIAEXAMPLE",
+            "Status": "Active",
+            "CreateDate": datetime(2025, 1, 1, tzinfo=timezone.utc),
+        }]
+    }
+    iam_client.get_access_key_last_used.return_value = {
+        "AccessKeyLastUsed": {
+            "LastUsedDate": datetime(2025, 2, 1, tzinfo=timezone.utc),
+            "ServiceName": "s3",
+            "Region": "eu-west-2",
+        }
+    }
+    iam_client.list_user_policies.return_value = {
+        "PolicyNames": ["InlineAdmin"],
+        "IsTruncated": False,
+    }
+    iam_client.get_user_policy.return_value = {
+        "PolicyDocument": {
+            "Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]
+        }
+    }
+
+    user = AWSProvider(iam_client=iam_client).discover_iam_users()[0]
+
+    assert user.resource_type == "aws_iam_user"
+    assert user.resource_id == "legacy-user"
+    assert user.attributes["mfa_enabled"] is False
+    assert user.attributes["password_enabled"] is True
+    assert user.attributes["password_last_used"] == "2025-01-01T00:00:00+00:00"
+    assert user.attributes["access_keys"][0]["status"] == "Active"
+    assert user.attributes["access_keys"][0]["created_at"] == "2025-01-01T00:00:00+00:00"
+    assert user.attributes["access_keys"][0]["last_used_service"] == "s3"
+    assert user.attributes["inline_policies"][0]["policy_name"] == "InlineAdmin"
+
+
+def test_aws_provider_parses_iam_credential_report():
+    iam_client = Mock()
+    iam_client.get_credential_report.return_value = {
+        "Content": (
+            "user,password_enabled,password_last_used\\n"
+            "alice,false,N/A\\n"
+            "bob,true,no_information\\n"
+        ).encode("utf-8")
+    }
+
+    report = AWSProvider(iam_client=iam_client).discover_iam_credential_report()
+
+    assert report["alice"]["password_enabled"] == "false"
+    assert report["bob"]["password_last_used"] == "no_information"
+
+
+def test_aws_provider_generates_missing_iam_credential_report():
+    iam_client = Mock()
+    iam_client.get_credential_report.side_effect = ClientError(
+        {"Error": {"Code": "CredentialReportNotPresent", "Message": "No report."}},
+        "GetCredentialReport",
+    )
+    iam_client.generate_credential_report.return_value = {"State": "STARTED"}
+
+    assert AWSProvider(iam_client=iam_client).discover_iam_credential_report() == {}
+    iam_client.generate_credential_report.assert_called_once_with()

@@ -16,6 +16,11 @@ from aws_security_scanner.rules.iam_rules import (
     check_wildcard_permissions,
     check_excessive_administrative_permissions,
     check_insecure_trust_policy,
+    check_user_without_mfa,
+    check_active_access_key,
+    check_old_access_key,
+    check_stale_password_user,
+    check_inline_wildcard_permissions,
 )
 
 
@@ -63,6 +68,11 @@ def get_all_rules():
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
         check_insecure_trust_policy,
+        check_user_without_mfa,
+        check_active_access_key,
+        check_old_access_key,
+        check_stale_password_user,
+        check_inline_wildcard_permissions,
         check_ssh_exposed,
         check_rdp_exposed,
         check_sensitive_port_exposed,

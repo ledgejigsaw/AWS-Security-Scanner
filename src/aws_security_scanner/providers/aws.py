@@ -1,4 +1,7 @@
+import csv
+import io
 import json
+from datetime import datetime
 from typing import Any
 
 import boto3
@@ -652,17 +655,80 @@ class AWSProvider:
         return resources
 
 
-def discover_iam_users(self) -> list[Resource]:
-    """Discover IAM users and normalise security-relevant attributes."""
-    resources = []
+    def discover_iam_users(self) -> list[Resource]:
+        """Discover IAM users and normalise security-relevant attributes."""
+        users = []
+        marker = None
+        while True:
+            response = (
+                self.iam_client.list_users(Marker=marker)
+                if marker
+                else self.iam_client.list_users()
+            )
+            users.extend(response.get("Users", []))
+            if not response.get("IsTruncated"):
+                break
+            marker = response.get("Marker")
 
-    response = self.iam_client.list_users()
+        credential_report = self.discover_iam_credential_report()
+        resources = []
+        for user in users:
+            username = user["UserName"]
+            report = credential_report.get(username, {})
+            mfa_response = self.iam_client.list_mfa_devices(UserName=username)
+            key_response = self.iam_client.list_access_keys(UserName=username)
+            access_keys = []
 
-    for user in response.get("Users", []):
-        username = user["UserName"]
+            for key in key_response.get("AccessKeyMetadata", []):
+                key_id = key.get("AccessKeyId")
+                last_used_response = (
+                    self.iam_client.get_access_key_last_used(AccessKeyId=key_id)
+                    if key_id else {}
+                )
+                last_used = last_used_response.get("AccessKeyLastUsed", {})
+                created_at = key.get("CreateDate")
+                last_used_date = last_used.get("LastUsedDate")
+                access_keys.append({
+                    "access_key_id": key_id,
+                    "status": key.get("Status"),
+                    "created_at": created_at.isoformat() if isinstance(created_at, datetime) else created_at,
+                    "last_used_date": last_used_date.isoformat() if isinstance(last_used_date, datetime) else last_used_date,
+                    "last_used_service": last_used.get("ServiceName"),
+                    "last_used_region": last_used.get("Region"),
+                })
 
-        resources.append(
-            Resource(
+            inline_policies = []
+            policy_marker = None
+            while True:
+                policy_response = (
+                    self.iam_client.list_user_policies(UserName=username, Marker=policy_marker)
+                    if policy_marker
+                    else self.iam_client.list_user_policies(UserName=username)
+                )
+                for policy_name in policy_response.get("PolicyNames", []):
+                    policy = self.iam_client.get_user_policy(
+                        UserName=username,
+                        PolicyName=policy_name,
+                    )
+                    inline_policies.append({
+                        "policy_name": policy_name,
+                        "policy_document": policy.get("PolicyDocument", {}),
+                    })
+                if not policy_response.get("IsTruncated"):
+                    break
+                policy_marker = policy_response.get("Marker")
+
+            password_enabled_value = report.get("password_enabled")
+            password_enabled = (
+                password_enabled_value.lower() == "true"
+                if password_enabled_value in {"true", "false"}
+                else None
+            )
+            password_last_used = report.get("password_last_used")
+            if password_last_used in {None, "", "N/A", "no_information", "not_supported"}:
+                password_last_used = None
+
+            resources.append(Resource(
                 resource_type="aws_iam_user",
                 resource_id=username,
                 attributes={
@@ -670,10 +736,37 @@ def discover_iam_users(self) -> list[Resource]:
                     "user_id": user.get("UserId"),
                     "arn": user.get("Arn"),
                     "path": user.get("Path"),
+                    "mfa_enabled": bool(mfa_response.get("MFADevices", [])),
+                    "access_keys": access_keys,
+                    "password_enabled": password_enabled,
+                    "password_last_used": password_last_used,
+                    "inline_policies": inline_policies,
                 },
                 source="aws",
                 region=None,
-            )
-        )
+            ))
+        return resources
 
-    return resources
+    def discover_iam_credential_report(self) -> dict[str, dict[str, str]]:
+        """Retrieve the IAM credential report indexed by username."""
+        try:
+            response = self.iam_client.get_credential_report()
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if code == "CredentialReportNotPresent":
+                self.iam_client.generate_credential_report()
+                return {}
+            if code in {"CredentialReportNotReady", "CredentialReportExpired", "ReportInProgress"}:
+                return {}
+            raise
+
+        content = response.get("Content", b"")
+        if isinstance(content, bytes):
+            content = content.decode("utf-8")
+        if not content:
+            return {}
+        return {
+            row["user"]: row
+            for row in csv.DictReader(io.StringIO(content))
+            if row.get("user")
+        }
