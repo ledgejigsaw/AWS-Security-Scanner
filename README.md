@@ -7,12 +7,12 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 ## At a glance
 
 - **47 registered security rules:** 10 S3, 17 IAM, 10 EC2 and 10 VPC/network checks.
-- **Latest CI validation:** 247 tests passed on Python 3.11 and 3.13. **Last local baseline on main:** 238 passed.
+- **Latest CI validation:** 257 tests passed on Python 3.11 and 3.13.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
-- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting.
+- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
-The 247-test result is from GitHub Actions on this branch. It does not replace validation against a real AWS account; live scans remain unverified.
+The 257-test result is from GitHub Actions on this branch. It does not replace validation against a real AWS account; live scans remain unverified.
 
 ## Capabilities
 
@@ -65,6 +65,38 @@ aws-security-scan \
   --format json \
   --output reports/scan.json
 ```
+
+Filter a scan to HIGH and CRITICAL findings:
+
+```bash
+aws-security-scan \
+  --source terraform \
+  --file tests/fixtures/terraform/realistic_s3.json \
+  --min-severity HIGH
+```
+
+Severity filtering is applied after policy overrides, so it uses each finding's effective severity. Valid thresholds are `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` and `INFO`.
+
+Create a baseline of the current findings:
+
+```bash
+aws-security-scan \
+  --source terraform \
+  --file tests/fixtures/terraform/realistic_s3.json \
+  --write-baseline reports/baseline.json
+```
+
+On later scans, suppress findings that match that baseline:
+
+```bash
+aws-security-scan \
+  --source terraform \
+  --file tests/fixtures/terraform/realistic_s3.json \
+  --baseline reports/baseline.json \
+  --min-severity HIGH
+```
+
+The baseline uses a stable fingerprint derived from check ID, service, resource and region; changing evidence text does not create a new finding identity. A baseline suppresses matching findings from the report—it does not disable checks or alter the underlying rules. Use `--write-baseline` to explicitly replace/update the known-findings baseline after reviewing the current findings. The two baseline options are mutually exclusive.
 
 Generate SARIF for CI/code-scanning ingestion:
 
@@ -121,12 +153,14 @@ pip install -e .
 pytest -q
 ```
 
-Latest confirmed local baseline:
+Latest CI result for this branch:
 
 ```text
-pytest tests/rules/test_iam_rules.py -q  -> 55 passed
-pytest -q                               -> 238 passed
+Python 3.11: 257 passed
+Python 3.13: 257 passed
 ```
+
+The most recent user-run local baseline on the previous main commit was 238 passing tests.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
 
@@ -151,17 +185,18 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] Wire IAM user and account-level credential-report resources into the AWS CLI scan path
 - [x] Add SARIF output for CI/code-scanning ingestion
 - [x] Add GitHub Actions test workflow for Python 3.11 and 3.13
+- [x] Add minimum-severity filtering after policy overrides
+- [x] Add versioned JSON finding baselines with stable fingerprints and suppression
 
-### In progress in this branch
+### In progress
 
-- [ ] Run the expanded test suite locally after pulling this branch
-- [ ] Validate HTML and IAM integration against realistic fixtures and a non-production AWS account
-- [ ] Keep documentation and rule counts aligned with the implementation
+- [ ] Validate AWS discovery and credential-report edge cases against a non-production account
+- [ ] Keep API pagination and unavailable-data handling from producing incomplete or misleading results
 
 ### Next feature batches
 
 1. **AWS scan completeness:** harden pagination and partial/unavailable credential data handling; add integration tests.
-2. **Triage and reporting:** severity filtering, baseline/deduplication and finding suppression.
+2. **Triage and reporting:** finding deduplication, baseline comparison/diffs and more explicit suppression controls.
 3. **More AWS security coverage:** CloudTrail, KMS, RDS, Lambda and Secrets Manager, each with fixture data, mocked discovery and tests.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
 5. **Delivery workflow:** GitHub Actions tests, packaging checks and CI/CD scanning examples.
@@ -172,7 +207,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [ ] End-to-end scan against a real AWS account
 - [ ] Direct Terraform HCL parsing
 - [ ] CloudTrail, KMS, RDS, Lambda and Secrets Manager security checks
-- [ ] Severity filtering, finding baselines and suppression
+- [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
 - [ ] Automated code-scanning upload and CI/CD scanning examples
 - [ ] Architecture visualisation
 

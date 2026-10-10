@@ -356,3 +356,30 @@ def test_aws_scan_includes_iam_user_and_account_findings():
     check_ids = {finding.check_id for finding in findings}
     assert "IAM-005" in check_ids
     assert "IAM-013" in check_ids
+
+
+
+def test_cli_accepts_minimum_severity_and_baseline_options():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--source", "terraform",
+        "--file", "tests/fixtures/terraform/realistic_s3.json",
+        "--min-severity", "HIGH",
+        "--baseline", "reports/baseline.json",
+    ])
+
+    assert args.min_severity == "HIGH"
+    assert args.baseline == Path("reports/baseline.json")
+    assert args.write_baseline is None
+
+
+def test_cli_accepts_write_baseline_option():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--source", "terraform",
+        "--file", "tests/fixtures/terraform/realistic_s3.json",
+        "--write-baseline", "reports/baseline.json",
+    ])
+
+    assert args.write_baseline == Path("reports/baseline.json")
+    assert args.baseline is None

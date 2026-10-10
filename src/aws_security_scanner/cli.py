@@ -11,6 +11,13 @@ from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
+from aws_security_scanner.models.finding import Severity
+from aws_security_scanner.triage import (
+    exclude_baselined_findings,
+    filter_by_minimum_severity,
+    load_baseline,
+    write_baseline,
+)
 
 
 
@@ -58,6 +65,25 @@ def build_parser() -> argparse.ArgumentParser:
     type=Path,
     help="Path to a YAML security policy file.",
 )
+
+    parser.add_argument(
+        "--min-severity",
+        choices=[severity.value for severity in Severity],
+        default=None,
+        help="Only include findings at this severity or higher.",
+    )
+
+    baseline_group = parser.add_mutually_exclusive_group()
+    baseline_group.add_argument(
+        "--baseline",
+        type=Path,
+        help="Suppress findings already recorded in a baseline JSON file.",
+    )
+    baseline_group.add_argument(
+        "--write-baseline",
+        type=Path,
+        help="Write current finding identities to a baseline JSON file.",
+    )
 
     return parser
 
@@ -181,8 +207,23 @@ def main() -> None:
         args.region
     )
 
+    if args.write_baseline:
+        write_baseline(findings, args.write_baseline)
+
+    if args.baseline:
+        findings = exclude_baselined_findings(
+            findings,
+            load_baseline(args.baseline),
+        )
+
+    findings = filter_by_minimum_severity(findings, args.min_severity)
+
     output_path = args.output or Path(
-        "reports/scan.html" if args.format == "html" else ("reports/scan.sarif" if args.format == "sarif" else "reports/scan.json")
+        "reports/scan.html"
+        if args.format == "html"
+        else "reports/scan.sarif"
+        if args.format == "sarif"
+        else "reports/scan.json"
     )
 
     if args.format == "json":
