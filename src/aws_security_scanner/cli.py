@@ -11,6 +11,13 @@ from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
+from aws_security_scanner.models.finding import Severity
+from aws_security_scanner.triage import (
+    exclude_baselined_findings,
+    filter_by_minimum_severity,
+    load_baseline,
+    write_baseline,
+)
 
 
 
@@ -181,8 +188,23 @@ def main() -> None:
         args.region
     )
 
+    if args.write_baseline:
+        write_baseline(findings, args.write_baseline)
+
+    if args.baseline:
+        findings = exclude_baselined_findings(
+            findings,
+            load_baseline(args.baseline),
+        )
+
+    findings = filter_by_minimum_severity(findings, args.min_severity)
+
     output_path = args.output or Path(
-        "reports/scan.html" if args.format == "html" else ("reports/scan.sarif" if args.format == "sarif" else "reports/scan.json")
+        "reports/scan.html"
+        if args.format == "html"
+        else "reports/scan.sarif"
+        if args.format == "sarif"
+        else "reports/scan.json"
     )
 
     if args.format == "json":
