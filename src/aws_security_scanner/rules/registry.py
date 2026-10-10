@@ -21,6 +21,11 @@ from aws_security_scanner.rules.iam_rules import (
     check_old_access_key,
     check_stale_password_user,
     check_inline_wildcard_permissions,
+    check_root_account_without_mfa,
+    check_root_account_access_keys,
+    check_unused_access_key,
+    check_never_used_console_password,
+    check_unused_iam_role,
 )
 
 
@@ -73,6 +78,11 @@ def get_all_rules():
         check_old_access_key,
         check_stale_password_user,
         check_inline_wildcard_permissions,
+        check_root_account_without_mfa,
+        check_root_account_access_keys,
+        check_unused_access_key,
+        check_never_used_console_password,
+        check_unused_iam_role,
         check_ssh_exposed,
         check_rdp_exposed,
         check_sensitive_port_exposed,

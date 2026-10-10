@@ -894,3 +894,129 @@ def check_broad_trust_relationship(
             break
 
     return findings
+
+
+# IAM-013 — Root account MFA disabled
+@rule_for("aws_iam_account", check_id="IAM-013", service="IAM",
+    severity=Severity.CRITICAL, category="Access Control",
+    title="AWS root account does not have MFA enabled",
+    description="The credential report indicates that MFA is not enabled for the AWS root account.",
+    remediation="Enable MFA on the root account and secure the root credentials.")
+def check_root_account_without_mfa(resource: Resource) -> list[Finding]:
+    """Detect an AWS root account without MFA."""
+    if resource.attributes.get("root_mfa_enabled") is not False:
+        return []
+    return [Finding.from_rule(check_root_account_without_mfa,
+        resource=resource.resource_id, region=resource.region,
+        evidence="Credential report: mfa_active=false")]
+
+
+# IAM-014 — Root account access keys present
+@rule_for("aws_iam_account", check_id="IAM-014", service="IAM",
+    severity=Severity.CRITICAL, category="Credential Management",
+    title="AWS root account has an active access key",
+    description="The AWS root account has an active programmatic access key, increasing the impact of credential compromise.",
+    remediation="Delete root-account access keys. Use an appropriately scoped IAM role or identity for programmatic access.")
+def check_root_account_access_keys(resource: Resource) -> list[Finding]:
+    """Detect active access keys on the AWS root account."""
+    active = [name for name in ("root_access_key_1_active", "root_access_key_2_active")
+              if resource.attributes.get(name) is True]
+    if not active:
+        return []
+    return [Finding.from_rule(check_root_account_access_keys,
+        resource=resource.resource_id, region=resource.region,
+        evidence=f"Active root access-key fields: {active}")]
+
+
+# IAM-015 — Active access key unused for more than 90 days
+@rule_for("aws_iam_user", check_id="IAM-015", service="IAM",
+    severity=Severity.MEDIUM, category="Credential Management",
+    title="IAM access key has not been used in more than 90 days",
+    description="An active IAM access key has never been used or has not been used for more than 90 days.",
+    remediation="Confirm whether the key is still required. Deactivate or delete unused keys and rotate keys that remain necessary.")
+def check_unused_access_key(resource: Resource) -> list[Finding]:
+    """Detect active access keys with no use in the last 90 days."""
+    now = datetime.now(timezone.utc)
+    for key in resource.attributes.get("access_keys", []):
+        if key.get("status") != "Active" or not key.get("created_at"):
+            continue
+        try:
+            created = datetime.fromisoformat(key["created_at"].replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        last_used_at = key.get("last_used_date")
+        if last_used_at in (None, "", "N/A", "no_information", "not_supported"):
+            age_days = (now - created).days
+        else:
+            try:
+                last_used = datetime.fromisoformat(last_used_at.replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                continue
+            if last_used.tzinfo is None:
+                last_used = last_used.replace(tzinfo=timezone.utc)
+            age_days = (now - last_used).days
+        if age_days > 90:
+            return [Finding.from_rule(check_unused_access_key,
+                resource=resource.resource_id, region=resource.region,
+                evidence=f"Access key {key.get('access_key_id')} has no use in {age_days} days or has never been used")]
+    return []
+
+
+# IAM-016 — Never-used console password
+@rule_for("aws_iam_user", check_id="IAM-016", service="IAM",
+    severity=Severity.MEDIUM, category="Credential Management",
+    title="IAM console password has never been used",
+    description="An IAM user has an enabled console password that has never been used, and the password has existed for more than 90 days.",
+    remediation="Confirm whether console access is required. Remove unnecessary passwords or disable console access for unused accounts.")
+def check_never_used_console_password(resource: Resource) -> list[Finding]:
+    """Detect long-lived console passwords that have never been used."""
+    if resource.attributes.get("password_enabled") is not True:
+        return []
+    last_used = resource.attributes.get("password_last_used")
+    if last_used not in (None, "", "N/A", "no_information", "not_supported"):
+        return []
+    changed_at = resource.attributes.get("password_last_changed")
+    if not changed_at or changed_at in ("N/A", "no_information", "not_supported"):
+        return []
+    try:
+        changed = datetime.fromisoformat(changed_at.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return []
+    if changed.tzinfo is None:
+        changed = changed.replace(tzinfo=timezone.utc)
+    age_days = (datetime.now(timezone.utc) - changed).days
+    if age_days <= 90:
+        return []
+    return [Finding.from_rule(check_never_used_console_password,
+        resource=resource.resource_id, region=resource.region,
+        evidence=f"Password has never been used; last changed {age_days} days ago")]
+
+
+# IAM-017 — IAM role unused for more than 90 days
+@rule_for("aws_iam_role", check_id="IAM-017", service="IAM",
+    severity=Severity.LOW, category="Credential Management",
+    title="IAM role has not been used in more than 90 days",
+    description="The role has no recorded use within the last 90 days, or has never been used despite being older than 90 days. Review it for removal or tighter trust and permission policies.",
+    remediation="Verify dependencies and ownership before removing the role. If it is still required, document its purpose and review its trust and permission policies.")
+def check_unused_iam_role(resource: Resource) -> list[Finding]:
+    """Identify potentially stale IAM roles for review."""
+    now = datetime.now(timezone.utc)
+    last_used_at = resource.attributes.get("last_used_date")
+    reference_date = last_used_at or resource.attributes.get("create_date")
+    if not reference_date:
+        return []
+    try:
+        reference = datetime.fromisoformat(reference_date.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return []
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    age_days = (now - reference).days
+    if age_days <= 90:
+        return []
+    return [Finding.from_rule(check_unused_iam_role,
+        resource=resource.resource_id, region=resource.region,
+        evidence=(f"Last used {age_days} days ago" if last_used_at
+                  else f"No recorded use; role created {age_days} days ago"))]
