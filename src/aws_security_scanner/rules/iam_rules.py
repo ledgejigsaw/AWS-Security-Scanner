@@ -427,20 +427,24 @@ def check_user_without_mfa(resource: Resource) -> list[Finding]:
     "aws_iam_user",
     check_id="IAM-006",
     service="IAM",
-    severity=Severity.HIGH,
-    category="Access Control",
+    severity=Severity.INFO,
+    category="Credential Management",
     title="IAM user has an active access key",
     description=(
-        "The IAM user has an active programmatic access key."
+        "The IAM user has an active programmatic access key. "
+        "An active key is not inherently insecure, but it should "
+        "be justified, appropriately scoped, rotated, and monitored."
     ),
     remediation=(
-        "Remove unused access keys and use short-lived "
-        "credentials such as IAM roles where possible."
+        "Confirm that the key is required and restrict it to the "
+        "minimum permissions necessary. Prefer IAM roles and "
+        "short-lived credentials where possible. Review IAM-007 "
+        "and IAM-015 findings for key age and inactivity."
     ),
 )
 
 def check_active_access_key(resource: Resource) -> list[Finding]:
-    """Detect IAM users with active access keys."""
+    """Report active IAM access keys as informational observations."""
 
     findings = []
 
