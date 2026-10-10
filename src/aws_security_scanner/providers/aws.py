@@ -6,7 +6,6 @@ from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-from rich import region
 
 from aws_security_scanner.models.resource import Resource
 
@@ -23,6 +22,8 @@ class AWSProvider:
         s3_client: Any | None = None,
         iam_client: Any | None = None,
         ec2_client: Any | None = None,
+        cloudtrail_client: Any | None = None,
+        kms_client: Any | None = None,
         region: str | None = "eu-west-2",
     ):
         self.region = region
@@ -40,7 +41,15 @@ class AWSProvider:
         self.ec2_client = ec2_client or boto3.client(
             "ec2",
             region_name=region,
-    )
+        )
+        self.cloudtrail_client = cloudtrail_client or boto3.client(
+            "cloudtrail",
+            region_name=region,
+        )
+        self.kms_client = kms_client or boto3.client(
+            "kms",
+            region_name=region,
+        )
 
     def _collect_pages(
         self,
@@ -904,3 +913,108 @@ class AWSProvider:
                 "refusing to treat incomplete credential data as a clean result."
             )
         return report
+
+
+    def discover_cloudtrail_trails(self) -> list[Resource]:
+        """Discover CloudTrail trails and their logging status."""
+        trails = self._collect_pages(
+            self.cloudtrail_client.describe_trails,
+            "trailList",
+            includeShadowTrails=False,
+        )
+        resources = []
+
+        for trail in trails:
+            trail_name = trail.get("Name") or trail.get("TrailARN")
+            trail_arn = trail.get("TrailARN") or trail_name
+            if not trail_name:
+                continue
+
+            status = self.cloudtrail_client.get_trail_status(Name=trail_arn)
+            resources.append(
+                Resource(
+                    resource_type="aws_cloudtrail_trail",
+                    resource_id=trail_arn,
+                    attributes={
+                        "name": trail_name,
+                        "trail_arn": trail_arn,
+                        "is_multi_region_trail": trail.get(
+                            "IsMultiRegionTrail", False
+                        ),
+                        "is_organization_trail": trail.get(
+                            "IsOrganizationTrail", False
+                        ),
+                        "log_file_validation_enabled": trail.get(
+                            "LogFileValidationEnabled", False
+                        ),
+                        "kms_key_id": trail.get("KmsKeyId"),
+                        "s3_bucket_name": trail.get("S3BucketName"),
+                        "home_region": trail.get("HomeRegion"),
+                        "is_logging": status.get("IsLogging"),
+                        "latest_delivery_error": status.get("LatestDeliveryError"),
+                    },
+                    source="aws",
+                    region=trail.get("HomeRegion") or self.region,
+                )
+            )
+
+        return resources
+
+    def discover_kms_keys(self) -> list[Resource]:
+        """Discover KMS keys and rotation/state metadata."""
+        key_ids = self._collect_pages(
+            self.kms_client.list_keys,
+            "Keys",
+            request_token="Marker",
+            response_token="NextMarker",
+        )
+        resources = []
+
+        for key in key_ids:
+            key_id = key.get("KeyId")
+            if not key_id:
+                continue
+
+            metadata = self.kms_client.describe_key(KeyId=key_id).get(
+                "KeyMetadata", {}
+            )
+            key_manager = metadata.get("KeyManager")
+            key_spec = metadata.get("KeySpec", metadata.get("CustomerMasterKeySpec"))
+            key_usage = metadata.get("KeyUsage")
+            is_rotation_applicable = (
+                key_manager == "CUSTOMER"
+                and key_usage == "ENCRYPT_DECRYPT"
+                and isinstance(key_spec, str)
+                and key_spec.startswith("SYMMETRIC")
+            )
+            rotation_enabled = (
+                self.kms_client.get_key_rotation_status(KeyId=key_id).get(
+                    "KeyRotationEnabled"
+                )
+                if is_rotation_applicable
+                else None
+            )
+
+            resources.append(
+                Resource(
+                    resource_type="aws_kms_key",
+                    resource_id=metadata.get("Arn") or key_id,
+                    attributes={
+                        "key_id": key_id,
+                        "arn": metadata.get("Arn"),
+                        "key_manager": key_manager,
+                        "key_spec": key_spec,
+                        "key_usage": key_usage,
+                        "key_state": metadata.get("KeyState"),
+                        "rotation_applicable": is_rotation_applicable,
+                        "rotation_enabled": rotation_enabled,
+                        "description": metadata.get("Description"),
+                    },
+                    source="aws",
+                    region=metadata.get("Arn", "").split(":")[3]
+                    if metadata.get("Arn") and len(metadata.get("Arn", "").split(":")) > 3
+                    else self.region,
+                )
+            )
+
+        return resources

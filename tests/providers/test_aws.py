@@ -1304,3 +1304,119 @@ def test_aws_provider_rejects_credential_report_without_root_account():
 
     with pytest.raises(CredentialReportUnavailableError, match="root_account"):
         AWSProvider(iam_client=iam_client).discover_iam_account()
+
+
+def test_aws_provider_discovers_cloudtrail_trails_and_logging_status():
+    cloudtrail_client = Mock()
+    cloudtrail_client.describe_trails.return_value = {
+        "trailList": [
+            {
+                "Name": "organization-trail",
+                "TrailARN": "arn:aws:cloudtrail:eu-west-2:123456789012:trail/organization-trail",
+                "IsMultiRegionTrail": True,
+                "LogFileValidationEnabled": True,
+                "HomeRegion": "eu-west-2",
+            }
+        ]
+    }
+    cloudtrail_client.get_trail_status.return_value = {
+        "IsLogging": False,
+        "LatestDeliveryError": "Access denied",
+    }
+
+    resources = AWSProvider(
+        cloudtrail_client=cloudtrail_client,
+        region="eu-west-2",
+    ).discover_cloudtrail_trails()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_cloudtrail_trail"
+    assert resources[0].attributes["is_logging"] is False
+    assert resources[0].attributes["is_multi_region_trail"] is True
+    assert resources[0].attributes["latest_delivery_error"] == "Access denied"
+    cloudtrail_client.get_trail_status.assert_called_once_with(
+        Name="arn:aws:cloudtrail:eu-west-2:123456789012:trail/organization-trail"
+    )
+
+
+def test_aws_provider_paginates_cloudtrail_trail_discovery():
+    cloudtrail_client = Mock()
+    cloudtrail_client.describe_trails.side_effect = [
+        {"trailList": [{"Name": "first", "TrailARN": "arn:first"}], "NextToken": "page-2"},
+        {"trailList": [{"Name": "second", "TrailARN": "arn:second"}]},
+    ]
+    cloudtrail_client.get_trail_status.return_value = {"IsLogging": True}
+
+    resources = AWSProvider(
+        cloudtrail_client=cloudtrail_client,
+    ).discover_cloudtrail_trails()
+
+    assert [resource.attributes["name"] for resource in resources] == [
+        "first",
+        "second",
+    ]
+    cloudtrail_client.describe_trails.assert_has_calls([
+        call(includeShadowTrails=False),
+        call(includeShadowTrails=False, NextToken="page-2"),
+    ])
+
+
+def test_aws_provider_discovers_kms_keys_and_rotation_state():
+    kms_client = Mock()
+    kms_client.list_keys.side_effect = [
+        {
+            "Keys": [{"KeyId": "customer-key"}],
+            "Truncated": True,
+            "NextMarker": "page-2",
+        },
+        {
+            "Keys": [{"KeyId": "aws-managed-key"}],
+            "Truncated": False,
+        },
+    ]
+
+    def describe_key(*, KeyId):
+        if KeyId == "customer-key":
+            return {
+                "KeyMetadata": {
+                    "KeyId": KeyId,
+                    "Arn": "arn:aws:kms:eu-west-2:123456789012:key/customer-key",
+                    "KeyManager": "CUSTOMER",
+                    "KeySpec": "SYMMETRIC_DEFAULT",
+                    "KeyUsage": "ENCRYPT_DECRYPT",
+                    "KeyState": "Enabled",
+                }
+            }
+        return {
+            "KeyMetadata": {
+                "KeyId": KeyId,
+                "Arn": "arn:aws:kms:eu-west-2:123456789012:key/aws-managed-key",
+                "KeyManager": "AWS",
+                "KeySpec": "SYMMETRIC_DEFAULT",
+                "KeyUsage": "ENCRYPT_DECRYPT",
+                "KeyState": "Enabled",
+            }
+        }
+
+    kms_client.describe_key.side_effect = describe_key
+    kms_client.get_key_rotation_status.return_value = {
+        "KeyRotationEnabled": False
+    }
+
+    resources = AWSProvider(
+        kms_client=kms_client,
+        region="eu-west-2",
+    ).discover_kms_keys()
+
+    assert len(resources) == 2
+    assert resources[0].attributes["rotation_applicable"] is True
+    assert resources[0].attributes["rotation_enabled"] is False
+    assert resources[1].attributes["rotation_applicable"] is False
+    assert resources[1].attributes["rotation_enabled"] is None
+    kms_client.list_keys.assert_has_calls([
+        call(),
+        call(Marker="page-2"),
+    ])
+    kms_client.get_key_rotation_status.assert_called_once_with(
+        KeyId="customer-key"
+    )

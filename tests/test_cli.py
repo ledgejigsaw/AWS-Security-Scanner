@@ -154,6 +154,8 @@ def test_run_scan_uses_aws_provider():
         ]
         mock_provider.return_value.discover_iam_policies.return_value = []
         mock_provider.return_value.discover_iam_roles.return_value = []
+        mock_provider.return_value.discover_cloudtrail_trails.return_value = []
+        mock_provider.return_value.discover_kms_keys.return_value = []
 
         findings = run_scan(
             "aws",
@@ -200,6 +202,8 @@ def test_aws_scan_can_write_json_report(tmp_path):
         ]
         mock_provider.return_value.discover_iam_policies.return_value = []
         mock_provider.return_value.discover_iam_roles.return_value = []
+        mock_provider.return_value.discover_cloudtrail_trails.return_value = []
+        mock_provider.return_value.discover_kms_keys.return_value = []
 
         findings = run_scan(
             "aws",
@@ -297,6 +301,8 @@ def test_run_scan_uses_s3_and_iam_resources():
         mock_provider.return_value.discover_iam_roles.return_value = [
             iam_role
         ]
+        mock_provider.return_value.discover_cloudtrail_trails.return_value = []
+        mock_provider.return_value.discover_kms_keys.return_value = []
 
         findings = run_scan(
             "aws",
@@ -350,6 +356,8 @@ def test_aws_scan_includes_iam_user_and_account_findings():
         provider.discover_route_tables.return_value = []
         provider.discover_network_acls.return_value = []
         provider.discover_flow_logs.return_value = []
+        provider.discover_cloudtrail_trails.return_value = []
+        provider.discover_kms_keys.return_value = []
 
         findings = run_scan("aws", region="eu-west-2")
 
