@@ -1287,7 +1287,7 @@ def test_aws_provider_does_not_hide_unavailable_credential_report(error_code):
         AWSProvider(iam_client=iam_client).discover_iam_credential_report()
 
 
-@pytest.mark.parametrize("content", [b"", b"user,password_enabled\\n"])
+@pytest.mark.parametrize("content", [b"", b"user,password_enabled\n"])
 def test_aws_provider_rejects_empty_or_incomplete_credential_report(content):
     iam_client = Mock()
     iam_client.get_credential_report.return_value = {"Content": content}
@@ -1299,7 +1299,7 @@ def test_aws_provider_rejects_empty_or_incomplete_credential_report(content):
 def test_aws_provider_rejects_credential_report_without_root_account():
     iam_client = Mock()
     iam_client.get_credential_report.return_value = {
-        "Content": b"user,password_enabled\\nalice,true\\n"
+        "Content": b"user,password_enabled\nalice,true\n"
     }
 
     with pytest.raises(CredentialReportUnavailableError, match="root_account"):
