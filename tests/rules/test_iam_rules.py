@@ -1029,7 +1029,7 @@ def test_user_with_mfa_does_not_generate_finding():
 
     assert findings == []
 
-def test_active_access_key_generates_finding():
+def test_active_access_key_generates_informational_observation():
     resource = Resource(
         resource_type="aws_iam_user",
         resource_id="user-with-active-key",
@@ -1049,7 +1049,9 @@ def test_active_access_key_generates_finding():
 
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-006"
-    assert findings[0].severity == Severity.HIGH
+    assert findings[0].severity == Severity.INFO
+    assert "not inherently insecure" in findings[0].description
+    assert "minimum permissions" in findings[0].remediation
 
 def test_inactive_access_key_does_not_generate_finding():
     resource = Resource(
