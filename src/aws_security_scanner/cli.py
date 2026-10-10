@@ -7,6 +7,8 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.reporting.json_reporter import write_json_report
+from aws_security_scanner.reporting.html_reporter import write_html_report
+from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
 
@@ -39,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--format",
-        choices=["json"],
+        choices=["json", "html", "sarif"],
         default="json",
         help="Report output format.",
     )
@@ -47,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("reports/scan.json"),
+        default=None,
         help="Path for the generated report.",
     )
 
@@ -101,6 +103,14 @@ def discover_resources(
 
         resources.extend(
             provider.discover_iam_roles()
+        )
+
+        resources.extend(
+            provider.discover_iam_users()
+        )
+
+        resources.extend(
+            provider.discover_iam_account()
         )
         resources.extend(
             provider.discover_ec2_instances()
@@ -171,16 +181,21 @@ def main() -> None:
         args.region
     )
 
-    if args.format == "json":
-        write_json_report(
-            findings,
-            args.output,
-        )
+    output_path = args.output or Path(
+        "reports/scan.html" if args.format == "html" else ("reports/scan.sarif" if args.format == "sarif" else "reports/scan.json")
+    )
 
-        print(
-            f"Security scan complete. "
-            f"{len(findings)} findings written to {args.output}"
-        )
+    if args.format == "json":
+        write_json_report(findings, output_path)
+    elif args.format == "html":
+        write_html_report(findings, output_path)
+    else:
+        write_sarif_report(findings, output_path)
+
+    print(
+        f"Security scan complete. "
+        f"{len(findings)} findings written to {output_path}"
+    )
 
 
 if __name__ == "__main__":

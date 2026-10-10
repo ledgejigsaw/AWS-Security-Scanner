@@ -23,6 +23,35 @@ def test_cli_accepts_policy_argument():
     assert args.policy == Path("policies/default.yaml")
 
 
+
+def test_cli_accepts_sarif_report_format():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--source", "terraform",
+        "--file", "tests/fixtures/terraform/realistic_s3.json",
+        "--format", "sarif",
+    ])
+    assert args.format == "sarif"
+    assert args.output is None
+
+
+def test_cli_accepts_html_report_format():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "--source",
+            "terraform",
+            "--file",
+            "tests/fixtures/terraform/realistic_s3.json",
+            "--format",
+            "html",
+        ]
+    )
+
+    assert args.format == "html"
+    assert args.output is None
+
 def test_run_scan_without_policy_preserves_default_behaviour():
     findings = run_scan(
         "terraform",
@@ -118,6 +147,8 @@ def test_run_scan_uses_aws_provider():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_iam_users.return_value = []
+        mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
             resource
         ]
@@ -162,6 +193,8 @@ def test_aws_scan_can_write_json_report(tmp_path):
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_iam_users.return_value = []
+        mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
             resource
         ]
@@ -253,6 +286,8 @@ def test_run_scan_uses_s3_and_iam_resources():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_iam_users.return_value = []
+        mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
             s3_resource
         ]
@@ -276,3 +311,48 @@ def test_run_scan_uses_s3_and_iam_resources():
     assert "S3-002" in check_ids
     assert "IAM-001" in check_ids
     assert "IAM-004" in check_ids
+
+
+def test_aws_scan_includes_iam_user_and_account_findings():
+    user = Resource(
+        resource_type="aws_iam_user",
+        resource_id="user-without-mfa",
+        attributes={
+            "mfa_enabled": False,
+            "access_keys": [],
+            "password_enabled": False,
+            "inline_policies": [],
+        },
+        source="aws",
+    )
+    account = Resource(
+        resource_type="aws_iam_account",
+        resource_id="root",
+        attributes={
+            "root_mfa_enabled": False,
+            "root_access_key_1_active": False,
+            "root_access_key_2_active": False,
+        },
+        source="aws",
+    )
+
+    with patch("aws_security_scanner.cli.AWSProvider") as mock_provider:
+        provider = mock_provider.return_value
+        provider.discover_s3_buckets.return_value = []
+        provider.discover_iam_policies.return_value = []
+        provider.discover_iam_roles.return_value = []
+        provider.discover_iam_users.return_value = [user]
+        provider.discover_iam_account.return_value = [account]
+        provider.discover_ec2_instances.return_value = []
+        provider.discover_security_groups.return_value = []
+        provider.discover_vpcs.return_value = []
+        provider.discover_subnets.return_value = []
+        provider.discover_route_tables.return_value = []
+        provider.discover_network_acls.return_value = []
+        provider.discover_flow_logs.return_value = []
+
+        findings = run_scan("aws", region="eu-west-2")
+
+    check_ids = {finding.check_id for finding in findings}
+    assert "IAM-005" in check_ids
+    assert "IAM-013" in check_ids
