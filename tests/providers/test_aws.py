@@ -1100,8 +1100,8 @@ def test_aws_provider_discovers_iam_user_security_attributes():
     }
     iam_client.get_credential_report.return_value = {
         "Content": (
-            "user,password_enabled,password_last_used\\n"
-            "legacy-user,true,2025-01-01T00:00:00+00:00\\n"
+            "user,password_enabled,password_last_used\n"
+            "legacy-user,true,2025-01-01T00:00:00+00:00\n"
         ).encode("utf-8")
     }
     iam_client.list_mfa_devices.return_value = {"MFADevices": []}
@@ -1146,9 +1146,9 @@ def test_aws_provider_parses_iam_credential_report():
     iam_client = Mock()
     iam_client.get_credential_report.return_value = {
         "Content": (
-            "user,password_enabled,password_last_used\\n"
-            "alice,false,N/A\\n"
-            "bob,true,no_information\\n"
+            "user,password_enabled,password_last_used\n"
+            "alice,false,N/A\n"
+            "bob,true,no_information\n"
         ).encode("utf-8")
     }
 
@@ -1173,8 +1173,8 @@ def test_aws_provider_generates_missing_iam_credential_report():
 def test_aws_provider_discovers_iam_account_root_security():
     iam_client = Mock()
     iam_client.get_credential_report.return_value = {"Content": (
-        "user,mfa_active,access_key_1_active,access_key_2_active\\n"
-        "<root_account>,false,true,false\\n"
+        "user,mfa_active,access_key_1_active,access_key_2_active\n"
+        "<root_account>,false,true,false\n"
     ).encode("utf-8")}
     resources = AWSProvider(iam_client=iam_client).discover_iam_account()
     assert len(resources) == 1
