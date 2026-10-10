@@ -1260,7 +1260,7 @@ def test_root_account_access_key_detected():
 
 
 def test_unused_active_access_key_detected():
-    from datetime import timedelta
+    from datetime import datetime, timedelta, timezone
     old_date = (datetime.now(timezone.utc) - timedelta(days=120)).isoformat()
     resource = Resource("aws_iam_user", "old-key-user", {"access_keys": [{
         "access_key_id": "AKIAOLD", "status": "Active",
@@ -1272,7 +1272,7 @@ def test_unused_active_access_key_detected():
 
 
 def test_never_used_old_console_password_detected():
-    from datetime import timedelta
+    from datetime import datetime, timedelta, timezone
     old_date = (datetime.now(timezone.utc) - timedelta(days=150)).isoformat()
     resource = Resource("aws_iam_user", "unused-console-user", {
         "password_enabled": True, "password_last_used": None,
@@ -1284,7 +1284,7 @@ def test_never_used_old_console_password_detected():
 
 
 def test_unused_iam_role_detected():
-    from datetime import timedelta
+    from datetime import datetime, timedelta, timezone
     old_date = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
     resource = Resource("aws_iam_role", "stale-role", {
         "create_date": old_date, "last_used_date": None
