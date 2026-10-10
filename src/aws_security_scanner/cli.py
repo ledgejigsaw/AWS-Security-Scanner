@@ -8,6 +8,7 @@ from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
+from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
 
@@ -40,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--format",
-        choices=["json", "html"],
+        choices=["json", "html", "sarif"],
         default="json",
         help="Report output format.",
     )
@@ -181,13 +182,15 @@ def main() -> None:
     )
 
     output_path = args.output or Path(
-        "reports/scan.html" if args.format == "html" else "reports/scan.json"
+        "reports/scan.html" if args.format == "html" else ("reports/scan.sarif" if args.format == "sarif" else "reports/scan.json")
     )
 
     if args.format == "json":
         write_json_report(findings, output_path)
-    else:
+    elif args.format == "html":
         write_html_report(findings, output_path)
+    else:
+        write_sarif_report(findings, output_path)
 
     print(
         f"Security scan complete. "
