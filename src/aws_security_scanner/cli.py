@@ -66,6 +66,25 @@ def build_parser() -> argparse.ArgumentParser:
     help="Path to a YAML security policy file.",
 )
 
+    parser.add_argument(
+        "--min-severity",
+        choices=[severity.value for severity in Severity],
+        default=None,
+        help="Only include findings at this severity or higher.",
+    )
+
+    baseline_group = parser.add_mutually_exclusive_group()
+    baseline_group.add_argument(
+        "--baseline",
+        type=Path,
+        help="Suppress findings already recorded in a baseline JSON file.",
+    )
+    baseline_group.add_argument(
+        "--write-baseline",
+        type=Path,
+        help="Write current finding identities to a baseline JSON file.",
+    )
+
     return parser
 
 
