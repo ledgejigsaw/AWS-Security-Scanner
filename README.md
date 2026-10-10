@@ -7,7 +7,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 ## At a glance
 
 - **51 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 2 CloudTrail and 2 KMS checks.
-- **Latest CI validation:** 257 tests passed on Python 3.11 and 3.13.
+- **Latest CI validation:** 267 tests passed on Python 3.11 and 3.13.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
@@ -156,8 +156,8 @@ pytest -q
 Latest CI result for this branch:
 
 ```text
-Python 3.11: 257 passed
-Python 3.13: 257 passed
+Python 3.11: 267 passed
+Python 3.13: 267 passed
 ```
 
 The most recent user-run local baseline on the previous main commit was 238 passing tests.
