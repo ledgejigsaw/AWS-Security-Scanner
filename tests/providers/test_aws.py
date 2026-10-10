@@ -5,7 +5,10 @@ from botocore.exceptions import ClientError
 import pytest
 
 from aws_security_scanner.models.resource import Resource
-from aws_security_scanner.providers.aws import AWSProvider
+from aws_security_scanner.providers.aws import (
+    AWSProvider,
+    CredentialReportUnavailableError,
+)
 
 from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.rules.iam_rules import (
@@ -1166,7 +1169,8 @@ def test_aws_provider_generates_missing_iam_credential_report():
     )
     iam_client.generate_credential_report.return_value = {"State": "STARTED"}
 
-    assert AWSProvider(iam_client=iam_client).discover_iam_credential_report() == {}
+    with pytest.raises(CredentialReportUnavailableError, match="does not exist"):
+        AWSProvider(iam_client=iam_client).discover_iam_credential_report()
     iam_client.generate_credential_report.assert_called_once_with()
 
 
@@ -1182,3 +1186,121 @@ def test_aws_provider_discovers_iam_account_root_security():
     assert resources[0].attributes["root_mfa_enabled"] is False
     assert resources[0].attributes["root_access_key_1_active"] is True
     assert resources[0].attributes["root_access_key_2_active"] is False
+
+
+
+def test_aws_provider_paginates_s3_bucket_listing():
+    s3_client = Mock()
+    s3_client.list_buckets.side_effect = [
+        {
+            "Buckets": [{"Name": "first-bucket"}],
+            "NextContinuationToken": "page-2",
+        },
+        {
+            "Buckets": [{"Name": "second-bucket"}],
+        },
+    ]
+
+    resources = AWSProvider(s3_client=s3_client).discover_s3_buckets()
+
+    assert [resource.resource_id for resource in resources] == [
+        "first-bucket",
+        "second-bucket",
+    ]
+    s3_client.list_buckets.assert_has_calls([
+        call(),
+        call(ContinuationToken="page-2"),
+    ])
+
+
+def test_aws_provider_paginates_ec2_instance_discovery():
+    ec2_client = Mock()
+    ec2_client.describe_instances.side_effect = [
+        {
+            "Reservations": [{
+                "Instances": [{
+                    "InstanceId": "i-first",
+                    "State": {"Name": "running"},
+                }],
+            }],
+            "NextToken": "page-2",
+        },
+        {
+            "Reservations": [{
+                "Instances": [{
+                    "InstanceId": "i-second",
+                    "State": {"Name": "stopped"},
+                }],
+            }],
+        },
+    ]
+
+    resources = AWSProvider(
+        ec2_client=ec2_client,
+        region="eu-west-2",
+    ).discover_ec2_instances()
+
+    assert [resource.resource_id for resource in resources] == [
+        "i-first",
+        "i-second",
+    ]
+    ec2_client.describe_instances.assert_has_calls([
+        call(),
+        call(NextToken="page-2"),
+    ])
+
+
+def test_aws_provider_rejects_truncated_response_without_token():
+    ec2_client = Mock()
+    ec2_client.describe_vpcs.return_value = {
+        "Vpcs": [{"VpcId": "vpc-first"}],
+        "IsTruncated": True,
+    }
+
+    with pytest.raises(RuntimeError, match="without a continuation token"):
+        AWSProvider(ec2_client=ec2_client).discover_vpcs()
+
+
+def test_aws_provider_rejects_repeated_pagination_token():
+    ec2_client = Mock()
+    ec2_client.describe_vpcs.side_effect = [
+        {"Vpcs": [{"VpcId": "vpc-first"}], "NextToken": "same-token"},
+        {"Vpcs": [{"VpcId": "vpc-second"}], "NextToken": "same-token"},
+    ]
+
+    with pytest.raises(RuntimeError, match="repeated continuation token"):
+        AWSProvider(ec2_client=ec2_client).discover_vpcs()
+
+
+@pytest.mark.parametrize(
+    "error_code",
+    ["CredentialReportNotReady", "CredentialReportExpired", "ReportInProgress"],
+)
+def test_aws_provider_does_not_hide_unavailable_credential_report(error_code):
+    iam_client = Mock()
+    iam_client.get_credential_report.side_effect = ClientError(
+        {"Error": {"Code": error_code, "Message": "Report unavailable."}},
+        "GetCredentialReport",
+    )
+
+    with pytest.raises(CredentialReportUnavailableError, match="unavailable"):
+        AWSProvider(iam_client=iam_client).discover_iam_credential_report()
+
+
+@pytest.mark.parametrize("content", [b"", b"user,password_enabled\\n"])
+def test_aws_provider_rejects_empty_or_incomplete_credential_report(content):
+    iam_client = Mock()
+    iam_client.get_credential_report.return_value = {"Content": content}
+
+    with pytest.raises(CredentialReportUnavailableError):
+        AWSProvider(iam_client=iam_client).discover_iam_credential_report()
+
+
+def test_aws_provider_rejects_credential_report_without_root_account():
+    iam_client = Mock()
+    iam_client.get_credential_report.return_value = {
+        "Content": b"user,password_enabled\\nalice,true\\n"
+    }
+
+    with pytest.raises(CredentialReportUnavailableError, match="root_account"):
+        AWSProvider(iam_client=iam_client).discover_iam_account()
