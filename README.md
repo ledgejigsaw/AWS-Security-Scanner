@@ -69,10 +69,10 @@ aws-security-scan \
 Generate SARIF for CI/code-scanning ingestion:
 
 ```bash
-aws-security-scan \\
-  --source terraform \\
-  --file tests/fixtures/terraform/realistic_s3.json \\
-  --format sarif \\
+aws-security-scan \
+  --source terraform \
+  --file tests/fixtures/terraform/realistic_s3.json \
+  --format sarif \
   --output reports/scan.sarif
 ```
 
