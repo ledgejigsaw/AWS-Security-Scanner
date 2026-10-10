@@ -6,10 +6,10 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **44 registered security rules:** 10 S3, 14 IAM, 10 EC2 and 10 VPC/network checks.
+- **47 registered security rules:** 10 S3, 17 IAM, 10 EC2 and 10 VPC/network checks.
 - **Test baseline:** 238 tests passed locally on 10 October 2026.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
-- **Output:** JSON reporting; HTML reporting is being added in this development branch.
+- **Output:** JSON and self-contained HTML reporting.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
 The test count above records the latest user-run test suite; it is not a claim that tests were executed in the current environment. Live AWS scans and coverage in a real account remain unverified.
@@ -39,7 +39,7 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules |
 | VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 44 rules (10 S3, 14 IAM, 10 EC2 and 10 VPC). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 47 rules (10 S3, 17 IAM, 10 EC2 and 10 VPC). Three existing IAM checks (privilege escalation, sensitive IAM actions on all resources, and broad role trust) were added to the central registry in this branch. Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -132,21 +132,22 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] IAM, EC2 and VPC/network rule modules
 - [x] Read-only AWS discovery methods for S3, IAM, EC2 and VPC/network resources
 - [x] YAML policy loading, per-rule enable/disable and severity overrides
-- [x] JSON report and scan summary
+- [x] JSON and self-contained HTML reports with summary and escaped finding content
 - [x] Mocked provider, rule, CLI and integration tests
 - [x] IAM-006 severity corrected to INFO: an active key alone is not proof of a vulnerability
+- [x] Register IAM-010, IAM-011 and IAM-012 so the existing privilege-escalation, sensitive-action and broad-trust checks execute
+- [x] Wire IAM user and account-level credential-report resources into the AWS CLI scan path
 
 ### In progress in this branch
 
-- [ ] Wire IAM user and account-level credential-report resources into the AWS CLI scan path so the existing user/account checks can run during AWS scans
-- [ ] Add HTML reporting for easier human review
-- [ ] Update and test CLI/report integration
+- [ ] Run the expanded test suite locally after pulling this branch
+- [ ] Validate HTML and IAM integration against realistic fixtures and a non-production AWS account
 - [ ] Keep documentation and rule counts aligned with the implementation
 
 ### Next feature batches
 
-1. **AWS scan completeness:** exercise IAM user/account checks in the normal pipeline; harden pagination and partial/unavailable credential data handling; add integration tests.
-2. **Triage and reporting:** HTML and SARIF output, severity filtering, baseline/deduplication and finding suppression.
+1. **AWS scan completeness:** harden pagination and partial/unavailable credential data handling; add integration tests.
+2. **Triage and reporting:** SARIF output, severity filtering, baseline/deduplication and finding suppression.
 3. **More AWS security coverage:** CloudTrail, KMS, RDS, Lambda and Secrets Manager, each with fixture data, mocked discovery and tests.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
 5. **Delivery workflow:** GitHub Actions tests, packaging checks and CI/CD scanning examples.
