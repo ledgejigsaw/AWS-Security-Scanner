@@ -24,6 +24,17 @@ def test_cli_accepts_policy_argument():
 
 
 
+def test_cli_accepts_sarif_report_format():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--source", "terraform",
+        "--file", "tests/fixtures/terraform/realistic_s3.json",
+        "--format", "sarif",
+    ])
+    assert args.format == "sarif"
+    assert args.output is None
+
+
 def test_cli_accepts_html_report_format():
     parser = build_parser()
 
