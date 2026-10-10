@@ -7,12 +7,12 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 ## At a glance
 
 - **47 registered security rules:** 10 S3, 17 IAM, 10 EC2 and 10 VPC/network checks.
-- **Latest CI validation:** 247 tests passed on Python 3.11 and 3.13. **Last local baseline on main:** 238 passed.
+- **Latest CI validation:** 257 tests passed on Python 3.11 and 3.13.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
-The 247-test result is from GitHub Actions on this branch. It does not replace validation against a real AWS account; live scans remain unverified.
+The 257-test result is from GitHub Actions on this branch. It does not replace validation against a real AWS account; live scans remain unverified.
 
 ## Capabilities
 
@@ -153,12 +153,14 @@ pip install -e .
 pytest -q
 ```
 
-Latest confirmed local baseline:
+Latest CI result for this branch:
 
 ```text
-pytest tests/rules/test_iam_rules.py -q  -> 55 passed
-pytest -q                               -> 238 passed
+Python 3.11: 257 passed
+Python 3.13: 257 passed
 ```
+
+The most recent user-run local baseline on the previous main commit was 238 passing tests.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
 
@@ -186,11 +188,10 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] Add minimum-severity filtering after policy overrides
 - [x] Add versioned JSON finding baselines with stable fingerprints and suppression
 
-### In progress in this branch
+### In progress
 
-- [ ] Run the expanded test suite locally after pulling this branch
-- [ ] Validate HTML and IAM integration against realistic fixtures and a non-production AWS account
-- [ ] Keep documentation and rule counts aligned with the implementation
+- [ ] Validate AWS discovery and credential-report edge cases against a non-production account
+- [ ] Keep API pagination and unavailable-data handling from producing incomplete or misleading results
 
 ### Next feature batches
 
