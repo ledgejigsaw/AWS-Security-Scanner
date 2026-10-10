@@ -9,7 +9,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 - **47 registered security rules:** 10 S3, 17 IAM, 10 EC2 and 10 VPC/network checks.
 - **Test baseline:** 238 tests passed locally on 10 October 2026.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
-- **Output:** JSON and self-contained HTML reporting.
+- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
 The test count above records the latest user-run test suite; it is not a claim that tests were executed in the current environment. Live AWS scans and coverage in a real account remain unverified.
@@ -43,7 +43,7 @@ Rules are registered centrally and receive the normalised `Resource` model. The 
 
 ### Policy and reporting
 
-YAML policy files can enable/disable individual checks and override their severity. The JSON report includes a summary and structured findings with check ID, severity, resource, description, remediation, region and evidence where available.
+YAML policy files can enable/disable individual checks and override their severity. JSON reports include a summary and structured findings with check ID, severity, resource, description, remediation, region and evidence where available. HTML reports provide a self-contained table for human review. SARIF 2.1.0 output maps scanner severities to SARIF levels and includes resource/evidence metadata for code-scanning ingestion.
 
 Example fixture/Terraform scan:
 
@@ -65,6 +65,18 @@ aws-security-scan \
   --format json \
   --output reports/scan.json
 ```
+
+Generate SARIF for CI/code-scanning ingestion:
+
+```bash
+aws-security-scan \\
+  --source terraform \\
+  --file tests/fixtures/terraform/realistic_s3.json \\
+  --format sarif \\
+  --output reports/scan.sarif
+```
+
+Generate an HTML report with `--format html` (the default output is `reports/scan.html`). JSON remains the default format and writes to `reports/scan.json` unless `--output` is specified.
 
 Run a read-only AWS scan (requires credentials with the necessary read permissions):
 
@@ -132,11 +144,12 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] IAM, EC2 and VPC/network rule modules
 - [x] Read-only AWS discovery methods for S3, IAM, EC2 and VPC/network resources
 - [x] YAML policy loading, per-rule enable/disable and severity overrides
-- [x] JSON and self-contained HTML reports with summary and escaped finding content
+- [x] JSON, self-contained HTML and SARIF 2.1.0 reporting
 - [x] Mocked provider, rule, CLI and integration tests
 - [x] IAM-006 severity corrected to INFO: an active key alone is not proof of a vulnerability
 - [x] Register IAM-010, IAM-011 and IAM-012 so the existing privilege-escalation, sensitive-action and broad-trust checks execute
 - [x] Wire IAM user and account-level credential-report resources into the AWS CLI scan path
+- [x] Add SARIF output for CI/code-scanning ingestion
 
 ### In progress in this branch
 
@@ -147,7 +160,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 ### Next feature batches
 
 1. **AWS scan completeness:** harden pagination and partial/unavailable credential data handling; add integration tests.
-2. **Triage and reporting:** SARIF output, severity filtering, baseline/deduplication and finding suppression.
+2. **Triage and reporting:** severity filtering, baseline/deduplication and finding suppression.
 3. **More AWS security coverage:** CloudTrail, KMS, RDS, Lambda and Secrets Manager, each with fixture data, mocked discovery and tests.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
 5. **Delivery workflow:** GitHub Actions tests, packaging checks and CI/CD scanning examples.
@@ -158,7 +171,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [ ] End-to-end scan against a real AWS account
 - [ ] Direct Terraform HCL parsing
 - [ ] CloudTrail, KMS, RDS, Lambda and Secrets Manager security checks
-- [ ] SARIF output, finding baselines and suppression
+- [ ] Severity filtering, finding baselines and suppression
 - [ ] GitHub Actions CI workflow
 - [ ] Architecture visualisation
 
