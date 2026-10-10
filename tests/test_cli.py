@@ -23,6 +23,24 @@ def test_cli_accepts_policy_argument():
     assert args.policy == Path("policies/default.yaml")
 
 
+
+def test_cli_accepts_html_report_format():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "--source",
+            "terraform",
+            "--file",
+            "tests/fixtures/terraform/realistic_s3.json",
+            "--format",
+            "html",
+        ]
+    )
+
+    assert args.format == "html"
+    assert args.output is None
+
 def test_run_scan_without_policy_preserves_default_behaviour():
     findings = run_scan(
         "terraform",
@@ -118,6 +136,8 @@ def test_run_scan_uses_aws_provider():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_iam_users.return_value = []
+        mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
             resource
         ]
@@ -162,6 +182,8 @@ def test_aws_scan_can_write_json_report(tmp_path):
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_iam_users.return_value = []
+        mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
             resource
         ]
@@ -253,6 +275,8 @@ def test_run_scan_uses_s3_and_iam_resources():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_iam_users.return_value = []
+        mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
             s3_resource
         ]
