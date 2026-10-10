@@ -190,12 +190,14 @@ Roadmap status is based on the current repository code and tests, not on the pre
 
 ### In progress
 
+- [x] Add continuation-token pagination for S3 bucket listing and EC2 resource discovery
+- [x] Fail explicitly when IAM credential-report data is missing, stale, not ready or incomplete
+- [x] Add regression tests for pagination and unavailable credential-report data
 - [ ] Validate AWS discovery and credential-report edge cases against a non-production account
-- [ ] Keep API pagination and unavailable-data handling from producing incomplete or misleading results
 
 ### Next feature batches
 
-1. **AWS scan completeness:** harden pagination and partial/unavailable credential data handling; add integration tests.
+1. **AWS scan completeness:** extend pagination safeguards to remaining IAM list operations and validate against a non-production account.
 2. **Triage and reporting:** finding deduplication, baseline comparison/diffs and more explicit suppression controls.
 3. **More AWS security coverage:** CloudTrail, KMS, RDS, Lambda and Secrets Manager, each with fixture data, mocked discovery and tests.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
@@ -204,7 +206,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 
 ### Not yet verified or implemented
 
-- [ ] End-to-end scan against a real AWS account
+- [ ] End-to-end scan against a real AWS account (not yet performed)
 - [ ] Direct Terraform HCL parsing
 - [ ] CloudTrail, KMS, RDS, Lambda and Secrets Manager security checks
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
