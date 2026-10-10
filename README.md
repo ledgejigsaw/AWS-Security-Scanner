@@ -150,6 +150,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] Register IAM-010, IAM-011 and IAM-012 so the existing privilege-escalation, sensitive-action and broad-trust checks execute
 - [x] Wire IAM user and account-level credential-report resources into the AWS CLI scan path
 - [x] Add SARIF output for CI/code-scanning ingestion
+- [x] Add GitHub Actions test workflow for Python 3.11 and 3.13
 
 ### In progress in this branch
 
@@ -172,7 +173,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [ ] Direct Terraform HCL parsing
 - [ ] CloudTrail, KMS, RDS, Lambda and Secrets Manager security checks
 - [ ] Severity filtering, finding baselines and suppression
-- [ ] GitHub Actions CI workflow
+- [ ] Automated code-scanning upload and CI/CD scanning examples
 - [ ] Architecture visualisation
 
 ## Project goals
