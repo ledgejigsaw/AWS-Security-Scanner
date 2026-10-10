@@ -153,7 +153,8 @@ def test_run_scan_uses_aws_provider():
             resource
         ]
         mock_provider.return_value.discover_iam_policies.return_value = []
-        mock_provider.return_value.discover_iam_roles.return_value = []\n        mock_provider.return_value.discover_cloudtrail_trails.return_value = []\n        mock_provider.return_value.discover_kms_keys.return_value = []
+        mock_provider.return_value.discover_iam_roles.return_value = []
+        mock_provider.return_value.discover_cloudtrail_trails.return_value = []\n        mock_provider.return_value.discover_kms_keys.return_value = []
 
         findings = run_scan(
             "aws",
