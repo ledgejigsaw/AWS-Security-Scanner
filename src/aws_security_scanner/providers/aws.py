@@ -210,8 +210,16 @@ class AWSProvider:
                         resource_type="aws_iam_role",
                         resource_id=role_name,
                         attributes={
-                            "assume_role_policy_document": (
-                                assume_role_policy
+                            "assume_role_policy_document": assume_role_policy,
+                            "create_date": (
+                                role.get("CreateDate").isoformat()
+                                if isinstance(role.get("CreateDate"), datetime)
+                                else role.get("CreateDate")
+                            ),
+                            "last_used_date": (
+                                role.get("RoleLastUsed", {}).get("LastUsedDate").isoformat()
+                                if isinstance(role.get("RoleLastUsed", {}).get("LastUsedDate"), datetime)
+                                else role.get("RoleLastUsed", {}).get("LastUsedDate")
                             ),
                         },
                         source="aws",
@@ -225,6 +233,34 @@ class AWSProvider:
             marker = response.get("Marker")
 
         return resources
+
+
+
+    def discover_iam_account(self) -> list[Resource]:
+        """Discover account-level IAM security settings from the credential report."""
+        report = self.discover_iam_credential_report()
+        root = report.get("<root_account>")
+        if root is None:
+            return []
+
+        def report_bool(value: str | None) -> bool | None:
+            if value == "true":
+                return True
+            if value == "false":
+                return False
+            return None
+
+        return [Resource(
+            resource_type="aws_iam_account",
+            resource_id="root",
+            attributes={
+                "root_mfa_enabled": report_bool(root.get("mfa_active")),
+                "root_access_key_1_active": report_bool(root.get("access_key_1_active")),
+                "root_access_key_2_active": report_bool(root.get("access_key_2_active")),
+            },
+            source="aws",
+            region=None,
+        )]
 
     def _get_bucket_encryption(self, bucket_name: str) -> bool:
         """Return whether server-side encryption is configured."""
@@ -740,6 +776,7 @@ class AWSProvider:
                     "access_keys": access_keys,
                     "password_enabled": password_enabled,
                     "password_last_used": password_last_used,
+                    "password_last_changed": report.get("password_last_changed"),
                     "inline_policies": inline_policies,
                 },
                 source="aws",

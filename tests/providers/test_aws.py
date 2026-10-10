@@ -1168,3 +1168,17 @@ def test_aws_provider_generates_missing_iam_credential_report():
 
     assert AWSProvider(iam_client=iam_client).discover_iam_credential_report() == {}
     iam_client.generate_credential_report.assert_called_once_with()
+
+
+def test_aws_provider_discovers_iam_account_root_security():
+    iam_client = Mock()
+    iam_client.get_credential_report.return_value = {"Content": (
+        "user,mfa_active,access_key_1_active,access_key_2_active\\n"
+        "<root_account>,false,true,false\\n"
+    ).encode("utf-8")}
+    resources = AWSProvider(iam_client=iam_client).discover_iam_account()
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_iam_account"
+    assert resources[0].attributes["root_mfa_enabled"] is False
+    assert resources[0].attributes["root_access_key_1_active"] is True
+    assert resources[0].attributes["root_access_key_2_active"] is False

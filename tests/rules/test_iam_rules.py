@@ -13,6 +13,11 @@ from aws_security_scanner.rules.iam_rules import (
     check_privilege_escalation_permissions,
     check_sensitive_iam_action,
     check_broad_trust_relationship,
+    check_root_account_without_mfa,
+    check_root_account_access_keys,
+    check_unused_access_key,
+    check_never_used_console_password,
+    check_unused_iam_role,
 )
 
 
@@ -1236,3 +1241,54 @@ def test_broad_trust_relationship_generates_finding():
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-012"
     assert findings[0].severity == Severity.HIGH
+
+def test_root_account_without_mfa_detected():
+    resource = Resource("aws_iam_account", "root", {"root_mfa_enabled": False}, "fixture")
+    findings = check_root_account_without_mfa(resource)
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-013"
+    assert findings[0].severity == Severity.CRITICAL
+
+
+def test_root_account_access_key_detected():
+    resource = Resource("aws_iam_account", "root", {
+        "root_access_key_1_active": False, "root_access_key_2_active": True
+    }, "fixture")
+    findings = check_root_account_access_keys(resource)
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-014"
+
+
+def test_unused_active_access_key_detected():
+    from datetime import datetime, timedelta, timezone
+    old_date = (datetime.now(timezone.utc) - timedelta(days=120)).isoformat()
+    resource = Resource("aws_iam_user", "old-key-user", {"access_keys": [{
+        "access_key_id": "AKIAOLD", "status": "Active",
+        "created_at": old_date, "last_used_date": None
+    }]}, "fixture")
+    findings = check_unused_access_key(resource)
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-015"
+
+
+def test_never_used_old_console_password_detected():
+    from datetime import datetime, timedelta, timezone
+    old_date = (datetime.now(timezone.utc) - timedelta(days=150)).isoformat()
+    resource = Resource("aws_iam_user", "unused-console-user", {
+        "password_enabled": True, "password_last_used": None,
+        "password_last_changed": old_date
+    }, "fixture")
+    findings = check_never_used_console_password(resource)
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-016"
+
+
+def test_unused_iam_role_detected():
+    from datetime import datetime, timedelta, timezone
+    old_date = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
+    resource = Resource("aws_iam_role", "stale-role", {
+        "create_date": old_date, "last_used_date": None
+    }, "fixture")
+    findings = check_unused_iam_role(resource)
+    assert len(findings) == 1
+    assert findings[0].check_id == "IAM-017"
