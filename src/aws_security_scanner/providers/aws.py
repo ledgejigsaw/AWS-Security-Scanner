@@ -11,6 +11,10 @@ from rich import region
 from aws_security_scanner.models.resource import Resource
 
 
+class CredentialReportUnavailableError(RuntimeError):
+    """Raised when IAM credential-report data is not ready or incomplete."""
+
+
 class AWSProvider:
     """Discover AWS resources using read-only boto3 clients."""
 
@@ -38,14 +42,61 @@ class AWSProvider:
             region_name=region,
     )
 
+    def _collect_pages(
+        self,
+        method: Any,
+        result_key: str,
+        *,
+        request_token: str = "NextToken",
+        response_token: str = "NextToken",
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        """Collect every page from AWS APIs that use continuation tokens."""
+        items: list[dict[str, Any]] = []
+        token = None
+
+        while True:
+            request = dict(kwargs)
+            if token:
+                request[request_token] = token
+
+            response = method(**request)
+            items.extend(response.get(result_key, []))
+
+            if response.get("IsTruncated"):
+                next_token = response.get(response_token)
+                if not next_token:
+                    raise RuntimeError(
+                        f"AWS API {getattr(method, '__name__', method)!s} "
+                        "reported truncated results without a continuation token."
+                    )
+            else:
+                next_token = response.get(response_token)
+                if not next_token:
+                    break
+
+            if next_token == token:
+                raise RuntimeError(
+                    f"AWS API {getattr(method, '__name__', method)!s} "
+                    "returned a repeated continuation token."
+                )
+            token = next_token
+
+        return items
+
     def discover_s3_buckets(self) -> list[Resource]:
         """Discover S3 buckets and their security configuration."""
 
-        response = self.s3_client.list_buckets()
+        buckets = self._collect_pages(
+            self.s3_client.list_buckets,
+            "Buckets",
+            request_token="ContinuationToken",
+            response_token="NextContinuationToken",
+        )
 
         resources = []
 
-        for bucket in response.get("Buckets", []):
+        for bucket in buckets:
             bucket_name = bucket["Name"]
 
             attributes = bucket.copy()
@@ -87,9 +138,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_instances()
+        reservations = self._collect_pages(
+            self.ec2_client.describe_instances, "Reservations"
+        )
 
-        for reservation in response.get("Reservations", []):
+        for reservation in reservations:
             for instance in reservation.get("Instances", []):
                 instance_id = instance["InstanceId"]
 
@@ -241,7 +294,10 @@ class AWSProvider:
         report = self.discover_iam_credential_report()
         root = report.get("<root_account>")
         if root is None:
-            return []
+            raise CredentialReportUnavailableError(
+                "IAM credential report did not contain the <root_account> row; "
+                "root-account checks cannot be evaluated reliably."
+            )
 
         def report_bool(value: str | None) -> bool | None:
             if value == "true":
@@ -365,9 +421,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_security_groups()
+        security_groups = self._collect_pages(
+            self.ec2_client.describe_security_groups, "SecurityGroups"
+        )
 
-        for security_group in response.get("SecurityGroups", []):
+        for security_group in security_groups:
             group_id = security_group["GroupId"]
 
             ingress_rules = []
@@ -474,9 +532,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_vpcs()
+        vpcs = self._collect_pages(
+            self.ec2_client.describe_vpcs, "Vpcs"
+        )
 
-        for vpc in response.get("Vpcs", []):
+        for vpc in vpcs:
             vpc_id = vpc["VpcId"]
 
             attributes = {
@@ -501,9 +561,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_subnets()
+        subnets = self._collect_pages(
+            self.ec2_client.describe_subnets, "Subnets"
+        )
 
-        for subnet in response.get("Subnets", []):
+        for subnet in subnets:
             subnet_id = subnet["SubnetId"]
 
             attributes = {
@@ -532,9 +594,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_route_tables()
+        route_tables = self._collect_pages(
+            self.ec2_client.describe_route_tables, "RouteTables"
+        )
 
-        for route_table in response.get("RouteTables", []):
+        for route_table in route_tables:
             route_table_id = route_table["RouteTableId"]
 
             routes = []
@@ -592,9 +656,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_network_acls()
+        network_acls = self._collect_pages(
+            self.ec2_client.describe_network_acls, "NetworkAcls"
+        )
 
-        for network_acl in response.get("NetworkAcls", []):
+        for network_acl in network_acls:
             network_acl_id = network_acl["NetworkAclId"]
 
             entries = []
@@ -658,9 +724,11 @@ class AWSProvider:
 
         resources = []
 
-        response = self.ec2_client.describe_flow_logs()
+        flow_logs = self._collect_pages(
+            self.ec2_client.describe_flow_logs, "FlowLogs"
+        )
 
-        for flow_log in response.get("FlowLogs", []):
+        for flow_log in flow_logs:
             flow_log_id = flow_log["FlowLogId"]
 
             attributes = {
@@ -711,11 +779,23 @@ class AWSProvider:
         for user in users:
             username = user["UserName"]
             report = credential_report.get(username, {})
-            mfa_response = self.iam_client.list_mfa_devices(UserName=username)
-            key_response = self.iam_client.list_access_keys(UserName=username)
+            mfa_devices = self._collect_pages(
+                self.iam_client.list_mfa_devices,
+                "MFADevices",
+                request_token="Marker",
+                response_token="Marker",
+                UserName=username,
+            )
+            access_key_metadata = self._collect_pages(
+                self.iam_client.list_access_keys,
+                "AccessKeyMetadata",
+                request_token="Marker",
+                response_token="Marker",
+                UserName=username,
+            )
             access_keys = []
 
-            for key in key_response.get("AccessKeyMetadata", []):
+            for key in access_key_metadata:
                 key_id = key.get("AccessKeyId")
                 last_used_response = (
                     self.iam_client.get_access_key_last_used(AccessKeyId=key_id)
@@ -772,7 +852,7 @@ class AWSProvider:
                     "user_id": user.get("UserId"),
                     "arn": user.get("Arn"),
                     "path": user.get("Path"),
-                    "mfa_enabled": bool(mfa_response.get("MFADevices", [])),
+                    "mfa_enabled": bool(mfa_devices),
                     "access_keys": access_keys,
                     "password_enabled": password_enabled,
                     "password_last_used": password_last_used,
@@ -791,19 +871,36 @@ class AWSProvider:
         except ClientError as error:
             code = error.response.get("Error", {}).get("Code")
             if code == "CredentialReportNotPresent":
-                self.iam_client.generate_credential_report()
-                return {}
+                generation = self.iam_client.generate_credential_report()
+                state = generation.get("State", "unknown")
+                raise CredentialReportUnavailableError(
+                    "IAM credential report does not exist. Requested generation "
+                    f"(state: {state}); rerun the scan after AWS finishes generating it."
+                ) from error
             if code in {"CredentialReportNotReady", "CredentialReportExpired", "ReportInProgress"}:
-                return {}
+                raise CredentialReportUnavailableError(
+                    f"IAM credential report is unavailable ({code}). "
+                    "Rerun the scan after the report is ready."
+                ) from error
             raise
 
         content = response.get("Content", b"")
         if isinstance(content, bytes):
             content = content.decode("utf-8")
         if not content:
-            return {}
-        return {
+            raise CredentialReportUnavailableError(
+                "AWS returned an empty IAM credential report; refusing to "
+                "treat unavailable credential data as a clean result."
+            )
+
+        report = {
             row["user"]: row
             for row in csv.DictReader(io.StringIO(content))
             if row.get("user")
         }
+        if not report:
+            raise CredentialReportUnavailableError(
+                "AWS returned an IAM credential report with no user rows; "
+                "refusing to treat incomplete credential data as a clean result."
+            )
+        return report
