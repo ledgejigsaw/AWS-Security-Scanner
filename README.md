@@ -37,8 +37,11 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | S3 | Public exposure, encryption, versioning, Block Public Access, server-access logging, risky bucket-policy principals/actions/resources, TLS enforcement and public write access |
 | IAM | Unrestricted and broad permissions, high-risk administrative actions, role trust policies, MFA, access-key state/age/inactivity, password/console credential hygiene and unused roles |
 | EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules |
-| VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |\n| CloudTrail | Trail logging status, multi-region coverage and log-file validation |\n| KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |
-| RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |\n| Lambda | Function URLs configured with unauthenticated access and unconditional wildcard-principal invocation policies |
+| VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |
+| CloudTrail | Trail logging status, multi-region coverage and log-file validation |
+| KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |
+| RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
+| Lambda | Function URLs configured with unauthenticated access and unconditional wildcard-principal invocation policies |
 
 Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 61 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda and 2 Secrets Manager). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
@@ -177,7 +180,9 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] Terraform relationship resolution and S3 resource aggregation
 - [x] S3 checks S3-001 through S3-010
 - [x] IAM, EC2 and VPC/network rule modules
-- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail and KMS resources\n- [x] CloudTrail logging, multi-region and log-file validation checks\n- [x] KMS automatic-rotation, pending-deletion and broad wildcard key-policy checks
+- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail and KMS resources
+- [x] CloudTrail logging, multi-region and log-file validation checks
+- [x] KMS automatic-rotation, pending-deletion and broad wildcard key-policy checks
 - [x] YAML policy loading, per-rule enable/disable and severity overrides
 - [x] JSON, self-contained HTML and SARIF 2.1.0 reporting
 - [x] Mocked provider, rule, CLI and integration tests
@@ -198,7 +203,8 @@ Roadmap status is based on the current repository code and tests, not on the pre
 
 ### Next feature batches
 
-1. **AWS scan completeness:** validate discovery and permissions against a non-production account.\n2. **Additional security coverage:** expand CloudTrail and KMS checks with account-wide coverage and organization-trail considerations.
+1. **AWS scan completeness:** validate discovery and permissions against a non-production account.
+2. **Additional security coverage:** expand CloudTrail and KMS checks with account-wide coverage and organization-trail considerations.
 2. **Triage and reporting:** finding deduplication, baseline comparison/diffs and more explicit suppression controls.
 3. **More AWS security coverage:** CloudTrail, KMS, RDS, Lambda and Secrets Manager, each with fixture data, mocked discovery and tests.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
@@ -209,7 +215,9 @@ Roadmap status is based on the current repository code and tests, not on the pre
 
 - [ ] End-to-end scan against a real AWS account (not yet performed)
 - [ ] Direct Terraform HCL parsing
-- [x] RDS discovery and four baseline security checks\n- [x] Lambda discovery and two baseline security checks\n- [ ] Additional CloudTrail/KMS account-wide coverage, Lambda and Secrets Manager security checks
+- [x] RDS discovery and four baseline security checks
+- [x] Lambda discovery and two baseline security checks
+- [ ] Additional CloudTrail/KMS account-wide coverage, Lambda and Secrets Manager security checks
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
 - [ ] Automated code-scanning upload and CI/CD scanning examples
 - [ ] Architecture visualisation
