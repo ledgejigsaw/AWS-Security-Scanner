@@ -46,3 +46,29 @@ def test_multi_region_cloudtrail_generates_no_finding():
         )
         == []
     )
+
+
+
+def test_cloudtrail_log_file_validation_disabled_generates_medium_finding():
+    from aws_security_scanner.rules.cloudtrail_rules import (
+        check_cloudtrail_log_file_validation,
+    )
+
+    findings = check_cloudtrail_log_file_validation(
+        make_trail(log_file_validation_enabled=False)
+    )
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "CT-003"
+    assert findings[0].severity == Severity.MEDIUM
+    assert findings[0].evidence == "log_file_validation_enabled=false"
+
+
+def test_cloudtrail_log_file_validation_enabled_generates_no_finding():
+    from aws_security_scanner.rules.cloudtrail_rules import (
+        check_cloudtrail_log_file_validation,
+    )
+
+    assert check_cloudtrail_log_file_validation(
+        make_trail(log_file_validation_enabled=True)
+    ) == []
