@@ -47,11 +47,13 @@ from aws_security_scanner.rules.ec2_rules import (
 from aws_security_scanner.rules.cloudtrail_rules import (
     check_cloudtrail_logging,
     check_cloudtrail_multi_region,
+    check_cloudtrail_log_file_validation,
 )
 
 from aws_security_scanner.rules.kms_rules import (
     check_kms_key_rotation,
     check_kms_key_pending_deletion,
+    check_kms_key_policy_wildcard_access,
 )
 
 from aws_security_scanner.rules.vpc_rules import (
@@ -111,8 +113,10 @@ def get_all_rules():
         check_unrestricted_ipv6_egress,
         check_cloudtrail_logging,
         check_cloudtrail_multi_region,
+        check_cloudtrail_log_file_validation,
         check_kms_key_rotation,
         check_kms_key_pending_deletion,
+        check_kms_key_policy_wildcard_access,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,
