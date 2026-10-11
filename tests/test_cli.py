@@ -154,8 +154,38 @@ def test_run_scan_uses_aws_provider():
         ]
         mock_provider.return_value.discover_iam_policies.return_value = []
         mock_provider.return_value.discover_iam_roles.return_value = []
-        mock_provider.return_value.discover_cloudtrail_trails.return_value = []
-        mock_provider.return_value.discover_kms_keys.return_value = []
+        cloudtrail_resource = Resource(
+            resource_type="aws_cloudtrail_trail",
+            resource_id="trail-example",
+            attributes={
+                "is_logging": False,
+                "is_multi_region_trail": True,
+                "log_file_validation_enabled": False,
+            },
+            source="aws",
+            region="eu-west-2",
+        )
+        kms_resource = Resource(
+            resource_type="aws_kms_key",
+            resource_id="key-example",
+            attributes={
+                "rotation_applicable": True,
+                "rotation_enabled": True,
+                "key_state": "Enabled",
+                "key_policy": {
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "kms:*",
+                        "Resource": "*",
+                    }]
+                },
+            },
+            source="aws",
+            region="eu-west-2",
+        )
+        mock_provider.return_value.discover_cloudtrail_trails.return_value = [cloudtrail_resource]
+        mock_provider.return_value.discover_kms_keys.return_value = [kms_resource]
 
         findings = run_scan(
             "aws",
@@ -317,6 +347,9 @@ def test_run_scan_uses_s3_and_iam_resources():
     assert "S3-002" in check_ids
     assert "IAM-001" in check_ids
     assert "IAM-004" in check_ids
+    assert "CT-001" in check_ids
+    assert "CT-003" in check_ids
+    assert "KMS-003" in check_ids
 
 
 def test_aws_scan_includes_iam_user_and_account_findings():
