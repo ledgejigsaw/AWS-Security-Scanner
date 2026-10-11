@@ -71,3 +71,77 @@ def check_kms_key_pending_deletion(resource: Resource) -> list[Finding]:
             evidence="key_state=PendingDeletion",
         )
     ]
+
+
+
+@rule_for(
+    "aws_kms_key",
+    check_id="KMS-003",
+    service="KMS",
+    severity=Severity.CRITICAL,
+    category="Access Control",
+    title="KMS key policy grants broad wildcard access",
+    description=(
+        "The key policy contains an Allow statement granting a wildcard "
+        "principal unrestricted KMS actions without a condition. This may "
+        "allow unintended identities to use or administer the key."
+    ),
+    remediation=(
+        "Restrict the Principal to the specific AWS account, roles or users "
+        "that require access. Replace wildcard KMS actions with the minimum "
+        "required actions and review any intended cross-account access."
+    ),
+)
+def check_kms_key_policy_wildcard_access(resource: Resource) -> list[Finding]:
+    """Detect unconditioned wildcard-principal statements granting broad KMS actions."""
+    policy = resource.attributes.get("key_policy")
+    if not isinstance(policy, dict):
+        return []
+
+    statements = policy.get("Statement", [])
+    if isinstance(statements, dict):
+        statements = [statements]
+    if not isinstance(statements, list):
+        return []
+
+    for statement in statements:
+        if not isinstance(statement, dict) or statement.get("Effect") != "Allow":
+            continue
+        if statement.get("Condition"):
+            continue
+
+        principal = statement.get("Principal")
+        wildcard_principal = (
+            principal == "*"
+            or (isinstance(principal, dict) and principal.get("AWS") == "*")
+            or (
+                isinstance(principal, dict)
+                and isinstance(principal.get("AWS"), list)
+                and "*" in principal.get("AWS", [])
+            )
+        )
+        action = statement.get("Action")
+        actions = [action] if isinstance(action, str) else action
+        broad_actions = (
+            isinstance(actions, list)
+            and any(
+                isinstance(item, str)
+                and (item == "*" or item.lower() == "kms:*")
+                for item in actions
+            )
+        )
+
+        if wildcard_principal and broad_actions:
+            return [
+                Finding.from_rule(
+                    check_kms_key_policy_wildcard_access,
+                    resource=resource.resource_id,
+                    region=resource.region,
+                    evidence=(
+                        "Effect=Allow, wildcard Principal, "
+                        f"Action={action}, no Condition"
+                    ),
+                )
+            ]
+
+    return []
