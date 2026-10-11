@@ -28,6 +28,7 @@ class AWSProvider:
         rds_client: Any | None = None,
         lambda_client: Any | None = None,
         secretsmanager_client: Any | None = None,
+        ecr_client: Any | None = None,
     ):
         self.region = region
 
@@ -63,6 +64,10 @@ class AWSProvider:
         )
         self.secretsmanager_client = secretsmanager_client or boto3.client(
             "secretsmanager",
+            region_name=region,
+        )
+        self.ecr_client = ecr_client or boto3.client(
+            "ecr",
             region_name=region,
         )
 
@@ -980,6 +985,48 @@ class AWSProvider:
                     resource_type="aws_secretsmanager_secret",
                     resource_id=name,
                     attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_ecr_repositories(self) -> list[Resource]:
+        """Discover ECR repository security metadata without downloading images."""
+        repositories = self._collect_pages(
+            self.ecr_client.describe_repositories,
+            "repositories",
+            request_token="nextToken",
+            response_token="nextToken",
+        )
+        resources = []
+
+        for repository in repositories:
+            repository_name = repository.get("repositoryName")
+            if not repository_name:
+                continue
+
+            scanning = repository.get("imageScanningConfiguration")
+            if not isinstance(scanning, dict):
+                scanning = {}
+            encryption = repository.get("encryptionConfiguration")
+            if not isinstance(encryption, dict):
+                encryption = {}
+
+            resources.append(
+                Resource(
+                    resource_type="aws_ecr_repository",
+                    resource_id=repository_name,
+                    attributes={
+                        "arn": repository.get("repositoryArn"),
+                        "name": repository_name,
+                        "uri": repository.get("repositoryUri"),
+                        "image_tag_mutability": repository.get("imageTagMutability"),
+                        "scan_on_push": scanning.get("scanOnPush"),
+                        "encryption_type": encryption.get("encryptionType"),
+                        "kms_key": encryption.get("kmsKey"),
+                    },
                     source="aws",
                     region=self.region,
                 )
