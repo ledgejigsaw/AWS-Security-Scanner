@@ -29,6 +29,7 @@ class AWSProvider:
         lambda_client: Any | None = None,
         secretsmanager_client: Any | None = None,
         ecr_client: Any | None = None,
+        dynamodb_client: Any | None = None,
     ):
         self.region = region
 
@@ -68,6 +69,10 @@ class AWSProvider:
         )
         self.ecr_client = ecr_client or boto3.client(
             "ecr",
+            region_name=region,
+        )
+        self.dynamodb_client = dynamodb_client or boto3.client(
+            "dynamodb",
             region_name=region,
         )
 
@@ -1026,6 +1031,67 @@ class AWSProvider:
                         "scan_on_push": scanning.get("scanOnPush"),
                         "encryption_type": encryption.get("encryptionType"),
                         "kms_key": encryption.get("kmsKey"),
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
+    def discover_dynamodb_tables(self) -> list[Resource]:
+        """Discover DynamoDB table security metadata without reading table items."""
+        table_names = self._collect_pages(
+            self.dynamodb_client.list_tables,
+            "TableNames",
+            request_token="ExclusiveStartTableName",
+            response_token="LastEvaluatedTableName",
+        )
+        resources = []
+
+        for table_summary in table_names:
+            table_name = table_summary.get("TableName") if isinstance(table_summary, dict) else table_summary
+            if not table_name:
+                continue
+
+            response = self.dynamodb_client.describe_table(TableName=table_name)
+            table = response.get("Table", {})
+            if not isinstance(table, dict):
+                table = {}
+
+            backups = self.dynamodb_client.describe_continuous_backups(
+                TableName=table_name,
+            )
+            backup_description = backups.get("ContinuousBackupsDescription", {})
+            if not isinstance(backup_description, dict):
+                backup_description = {}
+            pitr_description = backup_description.get(
+                "PointInTimeRecoveryDescription", {}
+            )
+            if not isinstance(pitr_description, dict):
+                pitr_description = {}
+
+            encryption = table.get("SSEDescription", {})
+            if not isinstance(encryption, dict):
+                encryption = {}
+
+            resources.append(
+                Resource(
+                    resource_type="aws_dynamodb_table",
+                    resource_id=table_name,
+                    attributes={
+                        "arn": table.get("TableArn"),
+                        "name": table_name,
+                        "status": table.get("TableStatus"),
+                        "point_in_time_recovery_status": pitr_description.get(
+                            "PointInTimeRecoveryStatus"
+                        ),
+                        "sse_status": encryption.get("Status"),
+                        "sse_type": encryption.get("SSEType"),
+                        "kms_key_arn": encryption.get("KMSMasterKeyArn"),
+                        "deletion_protection_enabled": table.get(
+                            "DeletionProtectionEnabled"
+                        ),
                     },
                     source="aws",
                     region=self.region,
