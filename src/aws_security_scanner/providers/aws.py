@@ -26,6 +26,7 @@ class AWSProvider:
         kms_client: Any | None = None,
         region: str | None = "eu-west-2",
         rds_client: Any | None = None,
+        lambda_client: Any | None = None,
     ):
         self.region = region
 
@@ -53,6 +54,10 @@ class AWSProvider:
         )
         self.rds_client = rds_client or boto3.client(
             "rds",
+            region_name=region,
+        )
+        self.lambda_client = lambda_client or boto3.client(
+            "lambda",
             region_name=region,
         )
 
@@ -919,6 +924,69 @@ class AWSProvider:
             )
         return report
 
+
+    def discover_lambda_functions(self) -> list[Resource]:
+        """Discover Lambda functions, URL authentication and resource policies."""
+        functions = self._collect_pages(
+            self.lambda_client.list_functions,
+            "Functions",
+            request_token="Marker",
+            response_token="NextMarker",
+        )
+        resources = []
+
+        for function in functions:
+            function_name = function.get("FunctionName")
+            if not function_name:
+                continue
+
+            function_url_auth_type = None
+            url_configs = self._collect_pages(
+                self.lambda_client.list_function_url_configs,
+                "FunctionUrlConfigs",
+                request_token="Marker",
+                response_token="NextMarker",
+                FunctionName=function_name,
+            )
+            if url_configs:
+                function_url_auth_type = url_configs[0].get("AuthType")
+
+            resource_policy = None
+            try:
+                policy_response = self.lambda_client.get_policy(
+                    FunctionName=function_name,
+                )
+                policy_document = policy_response.get("Policy")
+                if isinstance(policy_document, str):
+                    try:
+                        resource_policy = json.loads(policy_document)
+                    except json.JSONDecodeError:
+                        resource_policy = None
+                elif isinstance(policy_document, dict):
+                    resource_policy = policy_document
+            except ClientError as error:
+                error_code = error.response.get("Error", {}).get("Code")
+                if error_code not in {"ResourceNotFoundException", "ResourceNotFound"}:
+                    raise
+
+            resources.append(
+                Resource(
+                    resource_type="aws_lambda_function",
+                    resource_id=function_name,
+                    attributes={
+                        "runtime": function.get("Runtime"),
+                        "handler": function.get("Handler"),
+                        "role": function.get("Role"),
+                        "state": function.get("State"),
+                        "function_url_auth_type": function_url_auth_type,
+                        "resource_policy": resource_policy,
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
 
     def discover_rds_instances(self) -> list[Resource]:
         """Discover RDS DB instances and normalise security attributes."""
