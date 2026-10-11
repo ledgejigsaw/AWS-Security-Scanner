@@ -190,6 +190,10 @@ def discover_resources(
             provider.discover_ecr_repositories()
         )
 
+        resources.extend(
+            provider.discover_dynamodb_tables()
+        )
+
         return resources
 
 
