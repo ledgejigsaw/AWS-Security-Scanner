@@ -188,6 +188,7 @@ def test_run_scan_uses_aws_provider():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_ecr_repositories.return_value = []
         mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_secrets_manager_secrets.return_value = [secret_resource]
         mock_provider.return_value.discover_rds_instances.return_value = [rds_resource]
@@ -273,6 +274,7 @@ def test_aws_scan_can_write_json_report(tmp_path):
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_ecr_repositories.return_value = []
         mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_rds_instances.return_value = []
         mock_provider.return_value.discover_iam_users.return_value = []
@@ -420,6 +422,7 @@ def test_run_scan_uses_s3_and_iam_resources():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_ecr_repositories.return_value = []
         mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_secrets_manager_secrets.return_value = [secret_resource]
         mock_provider.return_value.discover_rds_instances.return_value = []
@@ -485,6 +488,7 @@ def test_aws_scan_includes_iam_user_and_account_findings():
     )
 
     with patch("aws_security_scanner.cli.AWSProvider") as mock_provider:
+        mock_provider.return_value.discover_ecr_repositories.return_value = []
         provider = mock_provider.return_value
         provider.discover_s3_buckets.return_value = []
         provider.discover_iam_policies.return_value = []
