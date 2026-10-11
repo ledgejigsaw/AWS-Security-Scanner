@@ -63,7 +63,6 @@ def _allows_wildcard_secret_access(policy: Any) -> bool:
             isinstance(action, str)
             and (
                 action.lower() in sensitive_actions
-                or action.lower().endswith(":*")
             )
             for action in actions
         ) and not statement.get("Condition"):
