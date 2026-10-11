@@ -86,3 +86,16 @@ def test_malformed_or_unavailable_policy_is_not_flagged():
     assert check_secret_wildcard_resource_policy(
         make_secret(resource_policy="{invalid")
     ) == []
+
+def test_unrelated_service_wildcard_action_is_not_flagged():
+    resource = make_secret(
+        resource_policy={
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:*",
+                "Resource": "*",
+            }]
+        }
+    )
+    assert check_secret_wildcard_resource_policy(resource) == []
