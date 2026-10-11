@@ -4,7 +4,7 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 53
+    assert len(rules) == 57
 
 
 def test_rule_registry_contains_iam_rules():
@@ -42,3 +42,11 @@ def test_rule_registry_contains_cloudtrail_validation_and_kms_policy_rules():
 
     assert "check_cloudtrail_log_file_validation" in rule_names
     assert "check_kms_key_policy_wildcard_access" in rule_names
+
+def test_rule_registry_contains_rds_rules():
+    rule_names = [rule.__name__ for rule in get_all_rules()]
+
+    assert "check_rds_storage_encryption" in rule_names
+    assert "check_rds_public_accessibility" in rule_names
+    assert "check_rds_backup_retention" in rule_names
+    assert "check_rds_deletion_protection" in rule_names
