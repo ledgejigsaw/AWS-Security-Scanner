@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **51 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 2 CloudTrail and 2 KMS checks.
+- **53 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail and 3 KMS checks.
 - **Latest CI validation:** 267 tests passed on Python 3.11 and 3.13.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
@@ -37,9 +37,9 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | S3 | Public exposure, encryption, versioning, Block Public Access, server-access logging, risky bucket-policy principals/actions/resources, TLS enforcement and public write access |
 | IAM | Unrestricted and broad permissions, high-risk administrative actions, role trust policies, MFA, access-key state/age/inactivity, password/console credential hygiene and unused roles |
 | EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules |
-| VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |\n| CloudTrail | Trail logging status and multi-region coverage |\n| KMS | Automatic rotation for applicable customer-managed symmetric keys and keys pending deletion |
+| VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |\n| CloudTrail | Trail logging status, multi-region coverage and log-file validation |\n| KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 51 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 2 CloudTrail and 2 KMS). Three existing IAM checks (privilege escalation, sensitive IAM actions on all resources, and broad role trust) were added to the central registry in this branch. Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 53 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail and 3 KMS). Three existing IAM checks (privilege escalation, sensitive IAM actions on all resources, and broad role trust) were added to the central registry in this branch. Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -176,7 +176,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] Terraform relationship resolution and S3 resource aggregation
 - [x] S3 checks S3-001 through S3-010
 - [x] IAM, EC2 and VPC/network rule modules
-- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail and KMS resources\n- [x] CloudTrail logging and multi-region checks\n- [x] KMS automatic-rotation and pending-deletion checks
+- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail and KMS resources\n- [x] CloudTrail logging, multi-region and log-file validation checks\n- [x] KMS automatic-rotation, pending-deletion and broad wildcard key-policy checks
 - [x] YAML policy loading, per-rule enable/disable and severity overrides
 - [x] JSON, self-contained HTML and SARIF 2.1.0 reporting
 - [x] Mocked provider, rule, CLI and integration tests
