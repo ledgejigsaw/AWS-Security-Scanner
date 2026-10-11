@@ -73,6 +73,11 @@ from aws_security_scanner.rules.secretsmanager_rules import (
     check_secret_wildcard_resource_policy,
 )
 
+from aws_security_scanner.rules.ecr_rules import (
+    check_ecr_mutable_image_tags,
+    check_ecr_scan_on_push_disabled,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -142,6 +147,8 @@ def get_all_rules():
         check_lambda_wildcard_invoke_policy,
         check_secret_rotation_disabled,
         check_secret_wildcard_resource_policy,
+        check_ecr_mutable_image_tags,
+        check_ecr_scan_on_push_disabled,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,
