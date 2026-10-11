@@ -37,7 +37,8 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | S3 | Public exposure, encryption, versioning, Block Public Access, server-access logging, risky bucket-policy principals/actions/resources, TLS enforcement and public write access |
 | IAM | Unrestricted and broad permissions, high-risk administrative actions, role trust policies, MFA, access-key state/age/inactivity, password/console credential hygiene and unused roles |
 | EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules |
-| VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |\n| CloudTrail | Trail logging status, multi-region coverage and log-file validation |\n| KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |\n| RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
+| VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |\n| CloudTrail | Trail logging status, multi-region coverage and log-file validation |\n| KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |
+| RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
 
 Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 57 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS and 4 RDS). Three existing IAM checks (privilege escalation, sensitive IAM actions on all resources, and broad role trust) were added to the central registry in this branch. Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
