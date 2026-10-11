@@ -2,11 +2,11 @@
 
 A Python-based, read-only cloud security posture assessment tool for AWS resources and Terraform JSON. The project is being built as a practical cloud-security engineering portfolio, with reusable rules, evidence-based findings, deterministic tests and CI-friendly output.
 
-> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager and ECR resources. Live-account validation has not yet been completed.
+> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR and DynamoDB resources. Live-account validation has not yet been completed.
 
 ## At a glance
 
-- **63 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager and 2 ECR checks.
+- **66 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR and 3 DynamoDB checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
@@ -44,6 +44,7 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | Lambda | Function URLs configured with unauthenticated access and unconditional wildcard-principal invocation policies |
 | Secrets Manager | Explicitly disabled automatic rotation and unconditional wildcard-principal access in resource policies |
 | ECR | Mutable image tags and disabled image scanning on push (where the API explicitly reports the setting) |
+| DynamoDB | Point-in-time recovery, explicit server-side encryption status and deletion protection |
 
 Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 63 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager and 2 ECR). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
@@ -198,7 +199,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 
 ### Next feature batches
 
-1. **Additional AWS coverage:** ECR, DynamoDB, SQS/SNS, API Gateway and ECS/Fargate checks with mocked discovery and tests.
+1. **Additional AWS coverage:** SQS/SNS, API Gateway and ECS/Fargate checks with mocked discovery and tests.
 2. **Lifecycle and data quality:** maintained Lambda runtime lifecycle data, then broaden CloudTrail/KMS account-wide coverage.
 3. **Triage and reporting:** finding deduplication, baseline comparison/diffs and more explicit suppression controls.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.

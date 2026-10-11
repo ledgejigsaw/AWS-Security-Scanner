@@ -78,6 +78,12 @@ from aws_security_scanner.rules.ecr_rules import (
     check_ecr_scan_on_push_disabled,
 )
 
+from aws_security_scanner.rules.dynamodb_rules import (
+    check_dynamodb_pitr_disabled,
+    check_dynamodb_sse_disabled,
+    check_dynamodb_deletion_protection_disabled,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -149,6 +155,9 @@ def get_all_rules():
         check_secret_wildcard_resource_policy,
         check_ecr_mutable_image_tags,
         check_ecr_scan_on_push_disabled,
+        check_dynamodb_pitr_disabled,
+        check_dynamodb_sse_disabled,
+        check_dynamodb_deletion_protection_disabled,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,
