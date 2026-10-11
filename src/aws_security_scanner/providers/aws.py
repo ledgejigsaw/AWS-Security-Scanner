@@ -995,6 +995,19 @@ class AWSProvider:
                 else None
             )
 
+            policy_response = self.kms_client.get_key_policy(
+                KeyId=key_id,
+                PolicyName="default",
+            )
+            policy_document = policy_response.get("Policy")
+            if isinstance(policy_document, str):
+                try:
+                    policy_document = json.loads(policy_document)
+                except json.JSONDecodeError:
+                    policy_document = None
+            else:
+                policy_document = None
+
             resources.append(
                 Resource(
                     resource_type="aws_kms_key",
@@ -1009,6 +1022,7 @@ class AWSProvider:
                         "rotation_applicable": is_rotation_applicable,
                         "rotation_enabled": rotation_enabled,
                         "description": metadata.get("Description"),
+                        "key_policy": policy_document,
                     },
                     source="aws",
                     region=metadata.get("Arn", "").split(":")[3]

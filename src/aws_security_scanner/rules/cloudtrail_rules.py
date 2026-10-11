@@ -64,3 +64,36 @@ def check_cloudtrail_multi_region(resource: Resource) -> list[Finding]:
             evidence="is_multi_region_trail=false",
         )
     ]
+
+
+
+@rule_for(
+    "aws_cloudtrail_trail",
+    check_id="CT-003",
+    service="CloudTrail",
+    severity=Severity.MEDIUM,
+    category="Logging & Monitoring",
+    title="CloudTrail log-file validation is disabled",
+    description=(
+        "Log-file validation helps detect modification or deletion of "
+        "CloudTrail log files after delivery. It does not prevent changes, "
+        "but supports integrity verification."
+    ),
+    remediation=(
+        "Enable log-file validation for the trail and ensure the operational "
+        "process periodically validates delivered digest files."
+    ),
+)
+def check_cloudtrail_log_file_validation(resource: Resource) -> list[Finding]:
+    """Detect trails that do not have log-file validation enabled."""
+    if resource.attributes.get("log_file_validation_enabled") is not False:
+        return []
+
+    return [
+        Finding.from_rule(
+            check_cloudtrail_log_file_validation,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence="log_file_validation_enabled=false",
+        )
+    ]

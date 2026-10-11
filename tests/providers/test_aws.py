@@ -1420,3 +1420,35 @@ def test_aws_provider_discovers_kms_keys_and_rotation_state():
     kms_client.get_key_rotation_status.assert_called_once_with(
         KeyId="customer-key"
     )
+
+
+
+def test_aws_provider_discovers_kms_key_policy():
+    kms_client = Mock()
+    kms_client.list_keys.return_value = {
+        "Keys": [{"KeyId": "customer-key"}],
+    }
+    kms_client.describe_key.return_value = {
+        "KeyMetadata": {
+            "KeyId": "customer-key",
+            "Arn": "arn:aws:kms:eu-west-2:123456789012:key/customer-key",
+            "KeyManager": "CUSTOMER",
+            "KeySpec": "SYMMETRIC_DEFAULT",
+            "KeyUsage": "ENCRYPT_DECRYPT",
+            "KeyState": "Enabled",
+        }
+    }
+    kms_client.get_key_rotation_status.return_value = {
+        "KeyRotationEnabled": True,
+    }
+    kms_client.get_key_policy.return_value = {
+        "Policy": '{"Statement":[{"Effect":"Allow","Principal":"*","Action":"kms:*","Resource":"*"}]}'
+    }
+
+    resources = AWSProvider(kms_client=kms_client).discover_kms_keys()
+
+    assert resources[0].attributes["key_policy"]["Statement"][0]["Principal"] == "*"
+    kms_client.get_key_policy.assert_called_once_with(
+        KeyId="customer-key",
+        PolicyName="default",
+    )

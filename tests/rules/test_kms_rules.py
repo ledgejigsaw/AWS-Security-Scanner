@@ -3,6 +3,7 @@ from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.kms_rules import (
     check_kms_key_pending_deletion,
     check_kms_key_rotation,
+    check_kms_key_policy_wildcard_access,
 )
 
 
@@ -54,3 +55,55 @@ def test_key_pending_deletion_generates_medium_finding():
 
 def test_enabled_key_generates_no_pending_deletion_finding():
     assert check_kms_key_pending_deletion(make_key(key_state="Enabled")) == []
+
+
+
+def test_kms_wildcard_principal_and_actions_generates_critical_finding():
+    resource = make_key(
+        key_policy={
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "kms:*",
+                "Resource": "*",
+            }],
+        }
+    )
+
+    findings = check_kms_key_policy_wildcard_access(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "KMS-003"
+    assert findings[0].severity == Severity.CRITICAL
+
+
+def test_kms_wildcard_key_policy_with_condition_is_not_flagged():
+    resource = make_key(
+        key_policy={
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"AWS": "*"},
+                "Action": ["kms:*"],
+                "Resource": "*",
+                "Condition": {"StringEquals": {"aws:PrincipalOrgID": "o-example"}},
+            }]
+        }
+    )
+
+    assert check_kms_key_policy_wildcard_access(resource) == []
+
+
+def test_kms_specific_principal_is_not_flagged():
+    resource = make_key(
+        key_policy={
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:aws:iam::123456789012:role/app"},
+                "Action": "kms:Decrypt",
+                "Resource": "*",
+            }]
+        }
+    )
+
+    assert check_kms_key_policy_wildcard_access(resource) == []

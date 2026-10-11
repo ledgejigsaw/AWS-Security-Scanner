@@ -165,6 +165,15 @@ def discover_resources(
         resources.extend(
             provider.discover_flow_logs()
         )
+
+        resources.extend(
+            provider.discover_cloudtrail_trails()
+        )
+
+        resources.extend(
+            provider.discover_kms_keys()
+        )
+
         return resources
 
 
