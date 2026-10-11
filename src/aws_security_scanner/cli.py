@@ -186,6 +186,10 @@ def discover_resources(
             provider.discover_secrets_manager_secrets()
         )
 
+        resources.extend(
+            provider.discover_ecr_repositories()
+        )
+
         return resources
 
 

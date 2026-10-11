@@ -4,7 +4,7 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 61
+    assert len(rules) == 63
 
 
 def test_rule_registry_contains_iam_rules():
@@ -62,3 +62,10 @@ def test_rule_registry_contains_secrets_manager_rules():
 
     assert "check_secret_rotation_disabled" in rule_names
     assert "check_secret_wildcard_resource_policy" in rule_names
+
+
+def test_rule_registry_contains_ecr_rules():
+    rule_names = [rule.__name__ for rule in get_all_rules()]
+
+    assert "check_ecr_mutable_image_tags" in rule_names
+    assert "check_ecr_scan_on_push_disabled" in rule_names
