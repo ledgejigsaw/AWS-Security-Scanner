@@ -68,6 +68,11 @@ from aws_security_scanner.rules.lambda_rules import (
     check_lambda_wildcard_invoke_policy,
 )
 
+from aws_security_scanner.rules.secretsmanager_rules import (
+    check_secret_rotation_disabled,
+    check_secret_wildcard_resource_policy,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -135,6 +140,8 @@ def get_all_rules():
         check_rds_deletion_protection,
         check_lambda_public_function_url,
         check_lambda_wildcard_invoke_policy,
+        check_secret_rotation_disabled,
+        check_secret_wildcard_resource_policy,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,

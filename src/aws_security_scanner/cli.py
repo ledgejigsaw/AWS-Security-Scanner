@@ -182,6 +182,10 @@ def discover_resources(
             provider.discover_lambda_functions()
         )
 
+        resources.extend(
+            provider.discover_secrets_manager_secrets()
+        )
+
         return resources
 
 

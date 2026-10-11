@@ -156,6 +156,24 @@ def test_run_scan_uses_aws_provider():
         region="eu-west-2",
     )
 
+    secret_resource = Resource(
+        resource_type="aws_secretsmanager_secret",
+        resource_id="customer-api-token",
+        attributes={
+            "rotation_enabled": False,
+            "resource_policy": {
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "secretsmanager:GetSecretValue",
+                    "Resource": "*",
+                }]
+            },
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
     lambda_resource = Resource(
         resource_type="aws_lambda_function",
         resource_id="public-handler",
@@ -171,6 +189,7 @@ def test_run_scan_uses_aws_provider():
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
         mock_provider.return_value.discover_lambda_functions.return_value = []
+        mock_provider.return_value.discover_secrets_manager_secrets.return_value = [secret_resource]
         mock_provider.return_value.discover_rds_instances.return_value = [rds_resource]
         mock_provider.return_value.discover_lambda_functions.return_value = [lambda_resource]
         mock_provider.return_value.discover_iam_users.return_value = []
@@ -380,10 +399,29 @@ def test_run_scan_uses_s3_and_iam_resources():
         region="eu-west-2",
     )
 
+    secret_resource = Resource(
+        resource_type="aws_secretsmanager_secret",
+        resource_id="customer-api-token",
+        attributes={
+            "rotation_enabled": False,
+            "resource_policy": {
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "secretsmanager:GetSecretValue",
+                    "Resource": "*",
+                }]
+            },
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
         mock_provider.return_value.discover_lambda_functions.return_value = []
+        mock_provider.return_value.discover_secrets_manager_secrets.return_value = [secret_resource]
         mock_provider.return_value.discover_rds_instances.return_value = []
         mock_provider.return_value.discover_iam_users.return_value = []
         mock_provider.return_value.discover_iam_account.return_value = []
@@ -419,6 +457,8 @@ def test_run_scan_uses_s3_and_iam_resources():
     assert "CT-001" in check_ids
     assert "CT-003" in check_ids
     assert "KMS-003" in check_ids
+    assert "SM-001" in check_ids
+    assert "SM-002" in check_ids
 
 
 def test_aws_scan_includes_iam_user_and_account_findings():
