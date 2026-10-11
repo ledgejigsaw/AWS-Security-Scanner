@@ -25,6 +25,7 @@ class AWSProvider:
         cloudtrail_client: Any | None = None,
         kms_client: Any | None = None,
         region: str | None = "eu-west-2",
+        rds_client: Any | None = None,
     ):
         self.region = region
 
@@ -48,6 +49,10 @@ class AWSProvider:
         )
         self.kms_client = kms_client or boto3.client(
             "kms",
+            region_name=region,
+        )
+        self.rds_client = rds_client or boto3.client(
+            "rds",
             region_name=region,
         )
 
