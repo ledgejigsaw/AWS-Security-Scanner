@@ -174,6 +174,10 @@ def discover_resources(
             provider.discover_kms_keys()
         )
 
+        resources.extend(
+            provider.discover_rds_instances()
+        )
+
         return resources
 
 

@@ -56,6 +56,13 @@ from aws_security_scanner.rules.kms_rules import (
     check_kms_key_policy_wildcard_access,
 )
 
+from aws_security_scanner.rules.rds_rules import (
+    check_rds_storage_encryption,
+    check_rds_public_accessibility,
+    check_rds_backup_retention,
+    check_rds_deletion_protection,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -117,6 +124,10 @@ def get_all_rules():
         check_kms_key_rotation,
         check_kms_key_pending_deletion,
         check_kms_key_policy_wildcard_access,
+        check_rds_storage_encryption,
+        check_rds_public_accessibility,
+        check_rds_backup_retention,
+        check_rds_deletion_protection,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,
