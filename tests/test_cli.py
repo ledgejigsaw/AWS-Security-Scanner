@@ -156,10 +156,23 @@ def test_run_scan_uses_aws_provider():
         region="eu-west-2",
     )
 
+    lambda_resource = Resource(
+        resource_type="aws_lambda_function",
+        resource_id="public-handler",
+        attributes={
+            "function_url_auth_type": "NONE",
+            "resource_policy": None,
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_rds_instances.return_value = [rds_resource]
+        mock_provider.return_value.discover_lambda_functions.return_value = [lambda_resource]
         mock_provider.return_value.discover_iam_users.return_value = []
         mock_provider.return_value.discover_iam_account.return_value = []
         mock_provider.return_value.discover_s3_buckets.return_value = [
@@ -220,6 +233,7 @@ def test_run_scan_uses_aws_provider():
     assert "S3-005" in check_ids
 
     assert "RDS-001" in check_ids
+    assert "LAMBDA-001" in check_ids
 
 def test_aws_scan_can_write_json_report(tmp_path):
     resource = Resource(
@@ -240,6 +254,7 @@ def test_aws_scan_can_write_json_report(tmp_path):
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_rds_instances.return_value = []
         mock_provider.return_value.discover_iam_users.return_value = []
         mock_provider.return_value.discover_iam_account.return_value = []
@@ -368,6 +383,7 @@ def test_run_scan_uses_s3_and_iam_resources():
     with patch(
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
+        mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_rds_instances.return_value = []
         mock_provider.return_value.discover_iam_users.return_value = []
         mock_provider.return_value.discover_iam_account.return_value = []
