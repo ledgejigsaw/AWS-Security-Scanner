@@ -915,6 +915,46 @@ class AWSProvider:
         return report
 
 
+    def discover_rds_instances(self) -> list[Resource]:
+        """Discover RDS DB instances and normalise security attributes."""
+        instances = self._collect_pages(
+            self.rds_client.describe_db_instances,
+            "DBInstances",
+            request_token="Marker",
+            response_token="Marker",
+        )
+        resources = []
+
+        for instance in instances:
+            instance_id = instance.get("DBInstanceIdentifier")
+            if not instance_id:
+                continue
+
+            resources.append(
+                Resource(
+                    resource_type="aws_db_instance",
+                    resource_id=instance_id,
+                    attributes={
+                        "engine": instance.get("Engine"),
+                        "status": instance.get("DBInstanceStatus"),
+                        "storage_encrypted": instance.get("StorageEncrypted"),
+                        "publicly_accessible": instance.get("PubliclyAccessible"),
+                        "backup_retention_period": instance.get("BackupRetentionPeriod"),
+                        "deletion_protection": instance.get("DeletionProtection"),
+                        "multi_az": instance.get("MultiAZ"),
+                        "endpoint_address": (
+                            instance.get("Endpoint", {}).get("Address")
+                            if isinstance(instance.get("Endpoint"), dict)
+                            else None
+                        ),
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
+
     def discover_cloudtrail_trails(self) -> list[Resource]:
         """Discover CloudTrail trails and their logging status."""
         trails = self._collect_pages(
