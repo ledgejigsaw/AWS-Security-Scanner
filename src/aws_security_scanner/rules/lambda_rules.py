@@ -67,16 +67,16 @@ def _has_unconditional_wildcard_invoke(policy: Any) -> bool:
     service="Lambda",
     severity=Severity.HIGH,
     category="Network Exposure",
-    title="Lambda function URL allows unauthenticated requests",
+    title="Lambda function URL does not require IAM authentication",
     description=(
-        "The function has a Lambda Function URL configured with AuthType NONE. "
-        "Requests to the URL do not require AWS IAM authentication; any "
-        "additional resource-policy conditions should be reviewed separately."
+        "The function has a Lambda Function URL configured with AuthType NONE, "
+        "so the URL does not require AWS IAM authentication. Actual public "
+        "reachability also depends on the function resource policy."
     ),
     remediation=(
-        "Use AWS_IAM authentication unless unauthenticated access is an "
-        "intentional application requirement. If public access is required, "
-        "validate input handling, authorisation and abuse protections."
+        "Use AWS_IAM authentication unless unauthenticated URL access is an "
+        "intentional application requirement. Review the resource policy and "
+        "validate application authorisation and abuse protections."
     ),
 )
 def check_lambda_public_function_url(resource: Resource) -> list[Finding]:
