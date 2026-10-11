@@ -27,6 +27,7 @@ class AWSProvider:
         region: str | None = "eu-west-2",
         rds_client: Any | None = None,
         lambda_client: Any | None = None,
+        secretsmanager_client: Any | None = None,
     ):
         self.region = region
 
@@ -58,6 +59,10 @@ class AWSProvider:
         )
         self.lambda_client = lambda_client or boto3.client(
             "lambda",
+            region_name=region,
+        )
+        self.secretsmanager_client = secretsmanager_client or boto3.client(
+            "secretsmanager",
             region_name=region,
         )
 
@@ -924,6 +929,63 @@ class AWSProvider:
             )
         return report
 
+
+    def discover_secrets_manager_secrets(self) -> list[Resource]:
+        """Discover secret metadata and resource policies without retrieving values."""
+        secrets = self._collect_pages(
+            self.secretsmanager_client.list_secrets,
+            "SecretList",
+            request_token="NextToken",
+            response_token="NextToken",
+        )
+        resources = []
+
+        for secret in secrets:
+            secret_id = secret.get("ARN") or secret.get("Name")
+            if not secret_id:
+                continue
+
+            details = self.secretsmanager_client.describe_secret(
+                SecretId=secret_id,
+            )
+            resource_policy = None
+            try:
+                policy_response = self.secretsmanager_client.get_resource_policy(
+                    SecretId=secret_id,
+                )
+                policy_document = policy_response.get("ResourcePolicy")
+                if isinstance(policy_document, str):
+                    try:
+                        resource_policy = json.loads(policy_document)
+                    except json.JSONDecodeError:
+                        resource_policy = None
+                elif isinstance(policy_document, dict):
+                    resource_policy = policy_document
+            except ClientError as error:
+                error_code = error.response.get("Error", {}).get("Code")
+                if error_code not in {"ResourceNotFoundException", "ResourceNotFound"}:
+                    raise
+
+            name = details.get("Name") or secret.get("Name") or secret_id
+            attributes = {
+                "arn": details.get("ARN") or secret.get("ARN"),
+                "name": name,
+                "rotation_enabled": details.get("RotationEnabled"),
+                "kms_key_id": details.get("KmsKeyId") or secret.get("KmsKeyId"),
+                "owning_service": details.get("OwningService") or secret.get("OwningService"),
+                "resource_policy": resource_policy,
+            }
+            resources.append(
+                Resource(
+                    resource_type="aws_secretsmanager_secret",
+                    resource_id=name,
+                    attributes=attributes,
+                    source="aws",
+                    region=self.region,
+                )
+            )
+
+        return resources
 
     def discover_lambda_functions(self) -> list[Resource]:
         """Discover Lambda functions, URL authentication and resource policies."""
