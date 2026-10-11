@@ -67,6 +67,12 @@ class FixtureProvider:
         
         if data["resource_type"] == "aws_flow_log":
             return data["flow_log_id"]
+
+        if data["resource_type"] == "aws_cloudtrail_trail":
+            return data.get("trail_arn") or data["trail_name"]
+
+        if data["resource_type"] == "aws_kms_key":
+            return data.get("arn") or data["key_id"]
         
         raise ValueError(
             f"Unsupported fixture resource type: {data['resource_type']}"
