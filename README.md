@@ -2,11 +2,11 @@
 
 A Python-based, read-only cloud security posture assessment tool for AWS resources and Terraform JSON. The project is being built as a practical cloud-security engineering portfolio, with reusable rules, evidence-based findings, deterministic tests and CI-friendly output.
 
-> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS and Lambda resources. Live-account validation has not yet been completed.
+> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda and Secrets Manager resources. Live-account validation has not yet been completed.
 
 ## At a glance
 
-- **59 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS and 2 Lambda checks.
+- **61 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda and 2 Secrets Manager checks.
 - **Latest test status:** Lambda feature tests are being validated in CI; see the Actions checks on the pull request.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
@@ -28,7 +28,7 @@ terraform show -json > terraform.json
 
 The Terraform provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging and bucket-policy configuration. Direct HCL parsing is not currently implemented.
 
-**AWS APIs** are accessed through boto3 in read-only mode. The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances and Lambda functions. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation.
+**AWS APIs** are accessed through boto3 in read-only mode. The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions and Secrets Manager secret metadata. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
 
 ### Security checks
 
@@ -40,7 +40,7 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |\n| CloudTrail | Trail logging status, multi-region coverage and log-file validation |\n| KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |\n| Lambda | Function URLs configured with unauthenticated access and unconditional wildcard-principal invocation policies |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 59 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS and 2 Lambda). Three existing IAM checks (privilege escalation, sensitive IAM actions on all resources, and broad role trust) were added to the central registry in this branch. Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 61 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda and 2 Secrets Manager). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
