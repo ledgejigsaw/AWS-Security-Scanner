@@ -178,6 +178,10 @@ def discover_resources(
             provider.discover_rds_instances()
         )
 
+        resources.extend(
+            provider.discover_lambda_functions()
+        )
+
         return resources
 
 
