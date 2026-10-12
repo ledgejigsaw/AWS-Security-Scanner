@@ -10,6 +10,7 @@ This documentation is version-controlled with the scanner and should be updated 
 - [Security rule specification template](rule-template.md)
 - [Contributor guide](../CONTRIBUTING.md)
 - [Testing and validation](testing-and-validation.md)
+- [Baseline history and suppression governance](baseline-history.md)
 
 ## Project status
 
