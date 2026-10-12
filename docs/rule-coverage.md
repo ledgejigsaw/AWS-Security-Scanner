@@ -13,7 +13,7 @@ This page describes the service-level coverage currently registered in `rules/re
 | CloudTrail | 3 | Trail logging, multi-region and log-file validation baselines. Deeper account-wide coverage remains planned. |
 | KMS | 3 | Rotation, pending deletion and wildcard key-policy access. |
 | RDS | 4 | Encryption, public accessibility, backup retention and deletion protection. |
-| Lambda | 2 | Function URL authentication and wildcard invocation policies. Runtime lifecycle checking is tracked separately. |
+| Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
 | Secrets Manager | 2 | Explicitly disabled rotation and unconditional wildcard-principal resource policies. Secret values must never be retrieved. |
 | ECR | 2 | Mutable image tags and explicitly disabled scan-on-push. |
 | DynamoDB | 3 | Point-in-time recovery, explicit server-side encryption state and deletion protection. |
