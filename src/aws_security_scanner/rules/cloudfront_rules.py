@@ -32,7 +32,8 @@ def check_cloudfront_http_viewer_access(resource: Resource) -> list[Finding]:
     policies = resource.attributes.get("viewer_protocol_policies")
     if not isinstance(policies, list) or not policies:
         return []
-    insecure = [policy for policy in policies if policy not in {"redirect-to-https", "https-only"}]
+    # Only flag explicit allow-all mode; unknown values are not proof of HTTP exposure.
+    insecure = [policy for policy in policies if policy == "allow-all"]
     if not insecure:
         return []
     return [Finding.from_rule(
