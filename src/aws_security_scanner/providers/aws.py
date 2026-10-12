@@ -231,6 +231,8 @@ class AWSProvider:
                             [],
                         )
                     ],
+                    "monitoring_state": instance.get("Monitoring", {}).get("State"),
+                    "instance_profile_arn": instance.get("IamInstanceProfile", {}).get("Arn"),
                 }
 
                 resources.append(
@@ -243,6 +245,80 @@ class AWSProvider:
                     )
                 )
 
+        return resources
+
+
+    def discover_ebs_volumes(self) -> list[Resource]:
+        """Discover EBS volume encryption and attachment metadata."""
+        volumes = self._collect_pages(self.ec2_client.describe_volumes, "Volumes")
+        resources = []
+        for volume in volumes:
+            volume_id = volume.get("VolumeId")
+            if not volume_id:
+                continue
+            resources.append(Resource(
+                resource_type="aws_ebs_volume",
+                resource_id=volume_id,
+                attributes={
+                    "encrypted": volume.get("Encrypted"),
+                    "kms_key_id": volume.get("KmsKeyId"),
+                    "state": volume.get("State"),
+                    "volume_type": volume.get("VolumeType"),
+                    "size_gib": volume.get("Size"),
+                    "attached_instance_ids": [
+                        attachment.get("InstanceId")
+                        for attachment in volume.get("Attachments", [])
+                        if attachment.get("InstanceId")
+                    ],
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
+
+    def discover_ebs_snapshots(self) -> list[Resource]:
+        """Discover owned EBS snapshots and public create-volume permissions."""
+        snapshots = self._collect_pages(
+            self.ec2_client.describe_snapshots,
+            "Snapshots",
+            OwnerIds=["self"],
+        )
+        resources = []
+        for snapshot in snapshots:
+            snapshot_id = snapshot.get("SnapshotId")
+            if not snapshot_id:
+                continue
+            public = None
+            try:
+                permissions = self._collect_pages(
+                    self.ec2_client.describe_snapshot_attribute,
+                    "CreateVolumePermissions",
+                    SnapshotId=snapshot_id,
+                    Attribute="createVolumePermission",
+                )
+                public = any(
+                    permission.get("Group") == "all"
+                    for permission in permissions
+                    if isinstance(permission, dict)
+                )
+            except ClientError as error:
+                code = error.response.get("Error", {}).get("Code", "")
+                if code not in {"UnauthorizedOperation", "AccessDenied", "AccessDeniedException"}:
+                    raise
+            resources.append(Resource(
+                resource_type="aws_ebs_snapshot",
+                resource_id=snapshot_id,
+                attributes={
+                    "encrypted": snapshot.get("Encrypted"),
+                    "kms_key_id": snapshot.get("KmsKeyId"),
+                    "state": snapshot.get("State"),
+                    "volume_id": snapshot.get("VolumeId"),
+                    "public": public,
+                    "owner_id": snapshot.get("OwnerId"),
+                },
+                source="aws",
+                region=self.region,
+            ))
         return resources
 
     def discover_iam_policies(self) -> list[Resource]:
