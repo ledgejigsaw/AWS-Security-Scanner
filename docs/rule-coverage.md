@@ -13,15 +13,16 @@ This page describes the service-level coverage currently registered in `rules/re
 | CloudTrail | 3 | Trail logging, multi-region and log-file validation baselines. Deeper account-wide coverage remains planned. |
 | KMS | 3 | Rotation, pending deletion and wildcard key-policy access. |
 | RDS | 4 | Encryption, public accessibility, backup retention and deletion protection. |
-| Lambda | 2 | Function URL authentication and wildcard invocation policies. Runtime lifecycle checking is tracked separately. |
+| Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
 | Secrets Manager | 2 | Explicitly disabled rotation and unconditional wildcard-principal resource policies. Secret values must never be retrieved. |
 | ECR | 2 | Mutable image tags and explicitly disabled scan-on-push. |
 | DynamoDB | 3 | Point-in-time recovery, explicit server-side encryption state and deletion protection. |
 | SQS | 2 | Sensitive wildcard access and explicit encryption state. Queue messages are never read. |
 | SNS | 2 | Sensitive wildcard access and explicit encryption state. Messages are never published or consumed. |
 | API Gateway REST APIs | 2 | Method authorization and stage access logging. HTTP APIs v2 are not yet covered. |
-| ECS/Fargate | 5 | Privileged mode, host networking, explicit root user, writable root filesystem and public-IP assignment. Public IP assignment does not prove internet reachability. |
-| **Total** | **77** | Baseline registry count observed in the current README. Reconcile this table against the live registry before release. |
+| ECS/Fargate | 6 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment and shared task/execution role review signal. Public IP assignment does not prove internet reachability; role sharing is informational. |
+| CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
+| **Total** | **83** | Registry count for this branch including CloudFront checks; reconcile against `get_all_rules()` and CI before release. |
 
 ## Registry contract enforced by tests
 
