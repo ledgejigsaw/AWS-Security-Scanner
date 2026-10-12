@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **79 registered security rules after the planned ECS-006 and LAMBDA-003 additions are merged:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway and 6 ECS checks.
+- **83 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS and 4 CloudFront checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
@@ -234,7 +234,8 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] ECS task-definition and service discovery, with baseline container-hardening and public-IP checks
 - [ ] Additional CloudTrail/KMS account-wide coverage
 - [x] Initial maintained Lambda runtime lifecycle snapshot and deprecated-runtime check (refresh against AWS before release)
-- [x] Initial CloudFront distribution checks (review scope and false positives before release)\n- [ ] WAF, AWS security-service posture, multi-account scanning and compliance mapping (tracked in GitHub issues)
+- [x] Initial CloudFront distribution checks (review scope and false positives before release)
+- [ ] WAF, AWS security-service posture, multi-account scanning and compliance mapping (tracked in GitHub issues)
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
 - [ ] Automated code-scanning upload and CI/CD scanning examples
 - [ ] Architecture visualisation
