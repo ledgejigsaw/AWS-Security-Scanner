@@ -42,6 +42,8 @@ from aws_security_scanner.rules.ec2_rules import (
     check_unrestricted_ipv6_ingress,
     check_broad_port_range,
     check_unrestricted_ipv6_egress,
+    check_instance_detailed_monitoring_disabled,
+    check_instance_without_profile,
 )
 
 from aws_security_scanner.rules.cloudtrail_rules import (
@@ -130,6 +132,12 @@ from aws_security_scanner.rules.vpc_rules import (
 )
 
 
+from aws_security_scanner.rules.ebs_rules import (
+    check_ebs_volume_encryption,
+    check_ebs_snapshot_encryption,
+    check_public_ebs_snapshot,
+)
+
 def get_all_rules():
     """Return all registered security rules."""
 
@@ -171,6 +179,11 @@ def get_all_rules():
         check_unrestricted_ipv6_ingress,
         check_broad_port_range,
         check_unrestricted_ipv6_egress,
+        check_instance_detailed_monitoring_disabled,
+        check_instance_without_profile,
+        check_ebs_volume_encryption,
+        check_ebs_snapshot_encryption,
+        check_public_ebs_snapshot,
         check_cloudtrail_logging,
         check_cloudtrail_multi_region,
         check_cloudtrail_log_file_validation,

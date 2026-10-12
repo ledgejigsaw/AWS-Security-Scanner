@@ -464,3 +464,46 @@ def check_unrestricted_ipv6_egress(
             break
 
     return findings
+
+@rule_for(
+    "aws_instance",
+    check_id="EC2-011",
+    service="EC2",
+    severity=Severity.INFO,
+    category="Monitoring",
+    title="EC2 detailed monitoring is disabled",
+    description="Detailed CloudWatch monitoring is explicitly disabled. Whether the additional metrics are required depends on operational and detection requirements.",
+    remediation="Review monitoring requirements and enable detailed monitoring for workloads that need one-minute instance metrics or faster operational detection.",
+)
+def check_instance_detailed_monitoring_disabled(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("monitoring_state") != "disabled":
+        return []
+    return [Finding.from_rule(
+        check_instance_detailed_monitoring_disabled,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="Monitoring.State=disabled",
+    )]
+
+
+@rule_for(
+    "aws_instance",
+    check_id="EC2-012",
+    service="EC2",
+    severity=Severity.INFO,
+    category="Identity and Access",
+    title="EC2 instance has no instance profile association",
+    description="No IAM instance profile association was observed. This is a review signal only; not every instance needs an instance role.",
+    remediation="Confirm the workload's access requirements. Where AWS API access is needed, prefer a narrowly scoped instance role over static credentials.",
+)
+def check_instance_without_profile(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("instance_profile_arn") is not None:
+        return []
+    if "instance_profile_arn" not in resource.attributes:
+        return []
+    return [Finding.from_rule(
+        check_instance_without_profile,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="IamInstanceProfile is absent",
+    )]
