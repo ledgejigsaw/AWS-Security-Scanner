@@ -84,3 +84,15 @@ def test_malformed_and_unknown_version_baselines_are_rejected(tmp_path):
     path.write_text('{"version": 2, "findings": "not-a-list"}', encoding="utf-8")
     with pytest.raises(ValueError, match="Invalid findings"):
         load_baseline_records(path)
+
+
+def test_diff_reports_suppression_reason_expiry_and_active_state(tmp_path):
+    item = finding()
+    fingerprint = finding_fingerprint(item)
+    path = tmp_path / "baseline.json"
+    write_baseline([item], path, {fingerprint: {"reason": "risk accepted", "owner": "security", "expires_on": "2026-01-01"}})
+    records = load_baseline_records(path)
+    result = diff_findings([item], records)
+    assert result["unchanged"][0]["suppression"]["reason"] == "risk accepted"
+    assert result["unchanged"][0]["suppression"]["expires_on"] == "2026-01-01"
+    assert result["unchanged"][0]["suppression_active"] is False
