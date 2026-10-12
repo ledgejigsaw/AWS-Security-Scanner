@@ -206,6 +206,14 @@ def discover_resources(
             provider.discover_api_gateway_rest_apis()
         )
 
+        resources.extend(
+            provider.discover_ecs_task_definitions()
+        )
+
+        resources.extend(
+            provider.discover_ecs_services()
+        )
+
         return resources
 
 
