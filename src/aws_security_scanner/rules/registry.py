@@ -106,7 +106,7 @@ from aws_security_scanner.rules.ecs_rules import (
     check_ecs_task_and_execution_roles_shared,
 )
 
-from aws_security_scanner.rules.vpc_rules import (
+from aws_security_scanner.rules.cloudfront_rules import (\n    check_cloudfront_http_viewer_access,\n    check_cloudfront_weak_tls_policy,\n    check_cloudfront_logging_disabled,\n    check_cloudfront_missing_waf,\n)\n\nfrom aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
     check_unrestricted_ipv6_route,
