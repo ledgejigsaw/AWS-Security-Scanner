@@ -8,7 +8,7 @@ This page describes the service-level coverage currently registered in `rules/re
 |---|---:|---|
 | S3 | 10 | Public exposure, encryption, versioning, Block Public Access, logging and selected bucket-policy risks. No object-content inspection. |
 | IAM | 17 | Permissions, trust, MFA, credential hygiene, root-account and unused-role signals. Not a complete IAM policy simulator. |
-| EC2 | 10 | Public IPv4, metadata options, sensitive ports and broad ingress/egress. EBS/snapshot coverage is not yet complete. |
+| EC2 | 12 | Public IPv4, metadata options, sensitive ports and broad ingress/egress. Detailed monitoring and missing instance-profile checks are informational review signals, not universal requirements. |\n| EBS | 3 | Explicit unencrypted volume/snapshot states and observed public snapshot create-volume permissions. Permission-denied public-access checks remain unknown; AMI sharing and snapshot lifecycle are not covered. |
 | VPC/network | 10 | Subnets, routes and network ACL baselines. Not a complete reachability or network-path analyser. |
 | CloudTrail | 3 | Trail logging, multi-region and log-file validation baselines. Deeper account-wide coverage remains planned. |
 | KMS | 3 | Rotation, pending deletion and wildcard key-policy access. |
@@ -22,7 +22,7 @@ This page describes the service-level coverage currently registered in `rules/re
 | API Gateway REST APIs | 2 | Method authorization and stage access logging. HTTP APIs v2 are not yet covered. |
 | ECS/Fargate | 6 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment and shared task/execution role review signal. Public IP assignment does not prove internet reachability; role sharing is informational. |
 | CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
-| **Total** | **83** | Registry count for this branch including CloudFront checks; reconcile against `get_all_rules()` and CI before release. |
+| **Total** | **88** | Registry count for this branch including CloudFront and new EBS/EC2 checks; reconcile against `get_all_rules()` and CI before release. |
 
 ## Registry contract enforced by tests
 
