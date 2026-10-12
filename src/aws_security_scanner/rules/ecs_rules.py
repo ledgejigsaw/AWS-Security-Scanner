@@ -172,3 +172,43 @@ def check_ecs_service_public_ip(resource: Resource) -> list[Finding]:
         region=resource.region,
         evidence="assign_public_ip=ENABLED",
     )]
+
+
+
+@rule_for(
+    "aws_ecs_task_definition",
+    check_id="ECS-006",
+    service="ECS",
+    severity=Severity.INFO,
+    category="IAM Least Privilege",
+    title="ECS task and execution roles are identical",
+    description=(
+        "The task definition explicitly uses the same IAM role for application task "
+        "permissions and ECS task-execution operations. Sharing a role can combine "
+        "permissions with different trust and usage requirements; this is a review "
+        "signal, not proof of exploitable access."
+    ),
+    remediation=(
+        "Review the task role and execution role separately. Where practical, use a "
+        "least-privilege task role for application API calls and a separate execution "
+        "role for image pulls, log delivery and other ECS-managed startup operations."
+    ),
+)
+def check_ecs_task_and_execution_roles_shared(resource: Resource) -> list[Finding]:
+    """Report only when discovery explicitly confirms both role ARNs are identical."""
+    task_role = resource.attributes.get("task_role_arn")
+    execution_role = resource.attributes.get("execution_role_arn")
+    if not isinstance(task_role, str) or not task_role.strip():
+        return []
+    if not isinstance(execution_role, str) or not execution_role.strip():
+        return []
+    if task_role != execution_role:
+        return []
+    return [
+        Finding.from_rule(
+            check_ecs_task_and_execution_roles_shared,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=f"task_role_arn={task_role}; execution_role_arn={execution_role}",
+        )
+    ]

@@ -31,7 +31,7 @@ Fixtures / Terraform JSON / AWS APIs
 - `providers/fixture.py`: deterministic fixture input for offline testing.
 - `providers/terraform.py` and `normalization/terraform.py`: Terraform JSON loading and conversion into the normalised resource model.
 - `models/resource.py`: source-neutral resource data, including resource type, ID, attributes, source, region and optional relationships.
-- `rules/`: service-specific security checks and central rule registry.
+- `rules/`: service-specific security checks and central rule registry. ECS includes an informational review signal when a task definition explicitly reuses the same IAM role for task and execution permissions; this is not treated as proof of a vulnerability.
 - `engine.py`: executes rules against compatible resources and applies policy settings.
 - `policy.py`: YAML policy loading, check enablement and severity overrides.
 - `reporting/`: JSON, HTML, SARIF and severity-summary output.
