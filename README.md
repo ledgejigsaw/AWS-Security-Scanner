@@ -168,7 +168,7 @@ pip install -e .
 pytest -q
 ```
 
-The latest local test run reported by the maintainer passed 356 tests on 2026-10-12. This count is a point-in-time result and may change as tests evolve; use the latest GitHub Actions run as the authoritative CI result. GitHub Actions runs the suite on Python 3.11 and 3.13. Test results confirm mocked/fixture behaviour, not live-account correctness.
+The latest pull-request CI runs passed on Python 3.11 and 3.13 after the registry and Lambda lifecycle changes. Test counts change as tests evolve; use the latest GitHub Actions run as the authoritative result. Test results confirm mocked/fixture behaviour, not live-account correctness.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
 
