@@ -160,6 +160,14 @@ def discover_resources(
         )
 
         resources.extend(
+            provider.discover_ebs_volumes()
+        )
+
+        resources.extend(
+            provider.discover_ebs_snapshots()
+        )
+
+        resources.extend(
             provider.discover_security_groups()
         )
 

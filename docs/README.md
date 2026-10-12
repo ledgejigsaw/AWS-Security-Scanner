@@ -12,6 +12,8 @@ This documentation is version-controlled with the scanner and should be updated 
 - [Testing and validation](testing-and-validation.md)
 - [Baseline history and suppression governance](baseline-history.md)
 - [WAF and application-edge posture](waf-application-edge.md)
+- [CloudTrail and KMS coverage expansion](cloudtrail-kms-coverage.md)
+- [EBS snapshot protection](ebs-snapshot-protection.md)
 - [Container build and runtime usage](../README.md#container-usage)
 
 ## Project status

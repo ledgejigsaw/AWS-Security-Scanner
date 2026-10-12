@@ -42,18 +42,23 @@ from aws_security_scanner.rules.ec2_rules import (
     check_unrestricted_ipv6_ingress,
     check_broad_port_range,
     check_unrestricted_ipv6_egress,
+    check_instance_detailed_monitoring_disabled,
+    check_instance_without_profile,
 )
 
 from aws_security_scanner.rules.cloudtrail_rules import (
     check_cloudtrail_logging,
     check_cloudtrail_multi_region,
     check_cloudtrail_log_file_validation,
+    check_cloudtrail_cloudwatch_logs_integration,
+    check_cloudtrail_delivery_error,
 )
 
 from aws_security_scanner.rules.kms_rules import (
     check_kms_key_rotation,
     check_kms_key_pending_deletion,
     check_kms_key_policy_wildcard_access,
+    check_kms_cross_account_access,
 )
 
 from aws_security_scanner.rules.rds_rules import (
@@ -131,6 +136,11 @@ from aws_security_scanner.rules.waf_rules import (
     check_waf_no_managed_rule_groups,
     check_waf_no_rate_based_rule,
     check_alb_missing_waf_association,
+  
+from aws_security_scanner.rules.ebs_rules import (
+    check_ebs_volume_encryption,
+    check_ebs_snapshot_encryption,
+    check_public_ebs_snapshot,
 )
 
 def get_all_rules():
@@ -174,12 +184,20 @@ def get_all_rules():
         check_unrestricted_ipv6_ingress,
         check_broad_port_range,
         check_unrestricted_ipv6_egress,
+        check_instance_detailed_monitoring_disabled,
+        check_instance_without_profile,
+        check_ebs_volume_encryption,
+        check_ebs_snapshot_encryption,
+        check_public_ebs_snapshot,
         check_cloudtrail_logging,
         check_cloudtrail_multi_region,
         check_cloudtrail_log_file_validation,
+        check_cloudtrail_cloudwatch_logs_integration,
+        check_cloudtrail_delivery_error,
         check_kms_key_rotation,
         check_kms_key_pending_deletion,
         check_kms_key_policy_wildcard_access,
+        check_kms_cross_account_access,
         check_rds_storage_encryption,
         check_rds_public_accessibility,
         check_rds_backup_retention,

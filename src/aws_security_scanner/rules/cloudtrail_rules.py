@@ -97,3 +97,49 @@ def check_cloudtrail_log_file_validation(resource: Resource) -> list[Finding]:
             evidence="log_file_validation_enabled=false",
         )
     ]
+
+
+
+@rule_for(
+    "aws_cloudtrail_trail",
+    check_id="CT-004",
+    service="CloudTrail",
+    severity=Severity.INFO,
+    category="Logging & Monitoring",
+    title="CloudTrail trail has no CloudWatch Logs integration",
+    description="No CloudWatch Logs log-group integration was observed for this trail. This is a monitoring integration review signal, not proof that trail events are not being delivered to S3.",
+    remediation="Review whether near-real-time alerting requires CloudWatch Logs integration. If needed, configure a protected log group and an appropriately scoped delivery role.",
+)
+def check_cloudtrail_cloudwatch_logs_integration(resource: Resource) -> list[Finding]:
+    if "cloudwatch_logs_log_group_arn" not in resource.attributes:
+        return []
+    if resource.attributes.get("cloudwatch_logs_log_group_arn"):
+        return []
+    return [Finding.from_rule(
+        check_cloudtrail_cloudwatch_logs_integration,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="CloudWatchLogsLogGroupArn is absent from discovered trail metadata",
+    )]
+
+
+@rule_for(
+    "aws_cloudtrail_trail",
+    check_id="CT-005",
+    service="CloudTrail",
+    severity=Severity.MEDIUM,
+    category="Logging & Monitoring",
+    title="CloudTrail reports a recent delivery error",
+    description="CloudTrail reports a delivery error in its trail status. Log delivery should be investigated because recent activity may not have reached the configured destination.",
+    remediation="Investigate the reported delivery error, validate destination permissions and KMS/S3 configuration, and confirm successful delivery resumes.",
+)
+def check_cloudtrail_delivery_error(resource: Resource) -> list[Finding]:
+    error = resource.attributes.get("latest_delivery_error")
+    if not isinstance(error, str) or not error.strip():
+        return []
+    return [Finding.from_rule(
+        check_cloudtrail_delivery_error,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence=f"LatestDeliveryError={error.strip()[:240]}",
+    )]
