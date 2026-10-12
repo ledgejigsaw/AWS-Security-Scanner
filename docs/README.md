@@ -11,6 +11,7 @@ This documentation is version-controlled with the scanner and should be updated 
 - [Contributor guide](../CONTRIBUTING.md)
 - [Testing and validation](testing-and-validation.md)
 - [Baseline history and suppression governance](baseline-history.md)
+- [Container build and runtime usage](../README.md#container-usage)
 
 ## Project status
 

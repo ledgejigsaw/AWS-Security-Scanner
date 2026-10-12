@@ -141,6 +141,31 @@ aws-security-scan --source aws --region eu-west-2 --format json --output reports
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
 
+## Container usage
+
+Build the image locally:
+
+```bash
+docker build --pull -t aws-security-scanner:local .
+```
+
+Run a Terraform JSON scan with the input mounted read-only:
+
+```bash
+docker run --rm \
+  --volume "$PWD/tests/fixtures/terraform:/fixtures:ro" \
+  aws-security-scanner:local \
+  --source terraform \
+  --file /fixtures/realistic_s3.json \
+  --format json
+```
+
+The image runs as UID/GID `10001:10001`, contains only the application package and runtime dependencies, and excludes local AWS configuration, environment files, tests, Git metadata and generated reports. The example uses Terraform JSON and requires no AWS credentials.
+
+For AWS-source scans, provide credentials through the standard AWS credential chain at runtime (for example, a short-lived environment or web-identity credential flow, or a read-only mounted credentials file). Never pass credentials as Docker build arguments or bake them into the image. If mounting an AWS credentials directory, mount it read-only and set `AWS_PROFILE` / `AWS_REGION` as needed. Do not mount a developer's full home directory into an untrusted container.
+
+The CI job builds the image and performs an offline smoke scan. It does not validate a live AWS account. For release images, publish immutable version tags and record the image digest; periodically rebuild the base image and review dependency updates and vulnerability scan results. The Python base tag and package dependency ranges are intentionally updated through reviewed pull requests rather than silently changing application code.
+
 ## Project documentation
 
 The [project documentation](docs/README.md) provides deeper notes on architecture, rule development, testing and validation. These pages are maintained alongside the code as the project evolves.
