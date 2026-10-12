@@ -145,3 +145,80 @@ def check_kms_key_policy_wildcard_access(resource: Resource) -> list[Finding]:
             ]
 
     return []
+
+
+
+def _statement_actions(statement: dict) -> list[str]:
+    value = statement.get("Action", [])
+    if isinstance(value, str):
+        return [value.lower()]
+    if isinstance(value, list):
+        return [item.lower() for item in value if isinstance(item, str)]
+    return []
+
+
+def _aws_principal_values(principal) -> list[str]:
+    if isinstance(principal, str):
+        return [principal]
+    if isinstance(principal, list):
+        return [item for item in principal if isinstance(item, str)]
+    if isinstance(principal, dict):
+        value = principal.get("AWS")
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, str)]
+    return []
+
+
+@rule_for(
+    "aws_kms_key",
+    check_id="KMS-004",
+    service="KMS",
+    severity=Severity.MEDIUM,
+    category="Access Control",
+    title="KMS key policy grants broad cross-account access",
+    description="A key policy contains an unconditional Allow for a principal whose AWS account differs from the key-owning account and grants broad or data-access KMS actions. Cross-account use may be legitimate, so this is a review signal rather than a definitive vulnerability.",
+    remediation="Confirm the external account and workload are approved. Narrow actions to the minimum required, add appropriate conditions where supported, and review the external account's IAM permissions and key usage.",
+)
+def check_kms_cross_account_access(resource: Resource) -> list[Finding]:
+    policy = resource.attributes.get("key_policy")
+    key_arn = resource.attributes.get("arn") or resource.resource_id
+    if not isinstance(policy, dict) or not isinstance(key_arn, str):
+        return []
+    arn_parts = key_arn.split(":")
+    key_account = arn_parts[4] if len(arn_parts) > 4 and arn_parts[0] == "arn" else None
+    if not key_account:
+        return []
+    statements = policy.get("Statement", [])
+    if isinstance(statements, dict):
+        statements = [statements]
+    if not isinstance(statements, list):
+        return []
+    risky = []
+    sensitive_actions = {
+        "kms:*", "*", "kms:decrypt", "kms:encrypt", "kms:generatedatakey",
+        "kms:reencrypt*", "kms:creategrant", "kms:putkeypolicy",
+    }
+    for statement in statements:
+        if not isinstance(statement, dict) or str(statement.get("Effect", "")).lower() != "allow":
+            continue
+        if statement.get("Condition"):
+            continue
+        actions = _statement_actions(statement)
+        if not any(action in sensitive_actions or (action.startswith("kms:") and action.endswith(":*")) for action in actions):
+            continue
+        for principal in _aws_principal_values(statement.get("Principal")):
+            principal_parts = principal.split(":")
+            if len(principal_parts) > 4 and principal_parts[0] == "arn" and principal_parts[4].isdigit() and principal_parts[4] != key_account:
+                risky.append(f"{principal} actions={','.join(actions)}")
+            elif principal.isdigit() and principal != key_account:
+                risky.append(f"account:{principal} actions={','.join(actions)}")
+    if not risky:
+        return []
+    return [Finding.from_rule(
+        check_kms_cross_account_access,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="Unconditional cross-account Allow: " + "; ".join(risky[:5]),
+    )]

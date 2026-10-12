@@ -1517,6 +1517,8 @@ class AWSProvider:
                         "home_region": trail.get("HomeRegion"),
                         "is_logging": status.get("IsLogging"),
                         "latest_delivery_error": status.get("LatestDeliveryError"),
+                        "cloudwatch_logs_log_group_arn": trail.get("CloudWatchLogsLogGroupArn"),
+                        "cloudwatch_logs_role_arn": trail.get("CloudWatchLogsRoleArn"),
                     },
                     source="aws",
                     region=trail.get("HomeRegion") or self.region,
