@@ -2,11 +2,11 @@
 
 A Python-based, read-only cloud security posture assessment tool for AWS resources and Terraform JSON. The project is being built as a practical cloud-security engineering portfolio, with reusable rules, evidence-based findings, deterministic tests and CI-friendly output.
 
-> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS and SNS resources. Live-account validation has not yet been completed.
+> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS, SNS and API Gateway REST API stages. Live-account validation has not yet been completed.
 
 ## At a glance
 
-- **70 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS and 2 SNS checks.
+- **72 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS and 2 API Gateway checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
@@ -28,7 +28,7 @@ terraform show -json > terraform.json
 
 The Terraform provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging and bucket-policy configuration. Direct HCL parsing is not currently implemented.
 
-**AWS APIs** are accessed through boto3 in read-only mode. The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes and SNS topic attributes. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
+**AWS APIs** are accessed through boto3 in read-only mode. The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes, SNS topic attributes and API Gateway REST API stages, including method authorization metadata and stage access-log settings. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
 
 ### Security checks
 
@@ -47,8 +47,9 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | DynamoDB | Point-in-time recovery, explicit server-side encryption status and deletion protection |
 | SQS | Unconditional wildcard-principal access to sensitive queue actions and explicit encryption status |
 | SNS | Unconditional wildcard-principal access to publish/subscribe actions and explicit encryption status |
+| API Gateway (REST APIs) | Methods configured with no authorization when no API resource policy is present; stage access logging not configured |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 70 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS and 2 SNS). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 72 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS and 2 API Gateway). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -162,7 +163,7 @@ pip install -e .
 pytest -q
 ```
 
-The latest confirmed local baseline on `main` before this SQS/SNS change was 339 passing tests. The current branch's test results are reported by GitHub Actions; do not treat the baseline as validation of unmerged changes.
+The latest confirmed local baseline on `main` before this API Gateway change was 351 passing tests. The current branch's test results are reported by GitHub Actions; do not treat the baseline as validation of unmerged changes.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
 
@@ -178,7 +179,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] Terraform relationship resolution and S3 resource aggregation
 - [x] S3 checks S3-001 through S3-010
 - [x] IAM, EC2 and VPC/network rule modules
-- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS and SNS resources
+- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS, SNS and API Gateway REST API stages
 - [x] CloudTrail logging, multi-region and log-file validation checks
 - [x] KMS automatic-rotation, pending-deletion and broad wildcard key-policy checks
 - [x] YAML policy loading, per-rule enable/disable and severity overrides
@@ -201,11 +202,18 @@ Roadmap status is based on the current repository code and tests, not on the pre
 
 ### Next feature batches
 
-1. **Additional AWS coverage:** API Gateway and ECS/Fargate checks with mocked discovery and tests.
+1. **Additional AWS coverage:** ECS/Fargate checks with mocked discovery and tests.
 2. **Lifecycle and data quality:** maintained Lambda runtime lifecycle data, then broaden CloudTrail/KMS account-wide coverage.
 3. **Triage and reporting:** finding deduplication, baseline comparison/diffs and more explicit suppression controls.
 4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
 5. **Delivery workflow and engineering:** contributor guide, rule metadata validation, packaging checks and CI/CD scanning examples.
+
+### API Gateway scope and limitations
+
+- The initial implementation covers API Gateway **REST APIs (v1)** only; API Gateway HTTP APIs (v2) are not yet discovered.
+- A method configured with `authorizationType=NONE` is flagged only when the API has no resource policy. Public endpoint presence alone is not considered a vulnerability.
+- Stage access logging is assessed from the stage's `accessLogSettings` destination and format. Missing stages, methods or incomplete settings are not treated as proof of a separate weakness.
+- Discovery uses metadata APIs only and does not invoke API endpoints or change configuration.
 
 ### Not yet verified or implemented
 
@@ -217,6 +225,7 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] ECR repository discovery and two baseline security checks
 - [x] DynamoDB table discovery and three baseline security checks
 - [x] SQS queue and SNS topic discovery with access-policy and encryption checks
+- [x] API Gateway REST API stage discovery, method-authorization and access-logging checks
 - [ ] Additional CloudTrail/KMS account-wide coverage and maintained Lambda runtime lifecycle data
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
 - [ ] Automated code-scanning upload and CI/CD scanning examples

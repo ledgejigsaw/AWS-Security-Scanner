@@ -91,6 +91,11 @@ from aws_security_scanner.rules.messaging_rules import (
     check_sns_encryption_disabled,
 )
 
+from aws_security_scanner.rules.api_gateway_rules import (
+    check_api_gateway_unauthenticated_methods,
+    check_api_gateway_access_logging_disabled,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -169,6 +174,8 @@ def get_all_rules():
         check_sqs_encryption_disabled,
         check_sns_public_access_policy,
         check_sns_encryption_disabled,
+        check_api_gateway_unauthenticated_methods,
+        check_api_gateway_access_logging_disabled,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,

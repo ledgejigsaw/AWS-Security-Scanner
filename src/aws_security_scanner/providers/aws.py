@@ -32,6 +32,7 @@ class AWSProvider:
         dynamodb_client: Any | None = None,
         sqs_client: Any | None = None,
         sns_client: Any | None = None,
+        apigateway_client: Any | None = None,
     ):
         self.region = region
 
@@ -83,6 +84,10 @@ class AWSProvider:
         )
         self.sns_client = sns_client or boto3.client(
             "sns",
+            region_name=region,
+        )
+        self.apigateway_client = apigateway_client or boto3.client(
+            "apigateway",
             region_name=region,
         )
 
@@ -1139,6 +1144,92 @@ class AWSProvider:
                     "kms_master_key_id": kms_key,
                 }, source="aws", region=self.region,
             ))
+        return resources
+
+    def discover_api_gateway_rest_apis(self) -> list[Resource]:
+        """Discover API Gateway REST APIs, method auth and stage access logging.
+
+        HTTP APIs (API Gateway v2) are intentionally out of scope for this initial
+        implementation. No API requests are invoked and no configuration is changed.
+        """
+        apis = self._collect_pages(
+            self.apigateway_client.get_rest_apis,
+            "items",
+            request_token="position",
+            response_token="position",
+        )
+        resources: list[Resource] = []
+        for api in apis:
+            api_id = api.get("id")
+            if not api_id:
+                continue
+            api_name = api.get("name") or api_id
+            policy = api.get("policy")
+            api_resources = self._collect_pages(
+                self.apigateway_client.get_resources,
+                "items",
+                request_token="position",
+                response_token="position",
+                restApiId=api_id,
+            )
+            methods: list[dict[str, Any]] = []
+            for api_resource in api_resources:
+                path = api_resource.get("path")
+                resource_methods = api_resource.get("resourceMethods", {})
+                if not isinstance(resource_methods, dict):
+                    continue
+                for http_method in resource_methods:
+                    method_response = self.apigateway_client.get_method(
+                        restApiId=api_id,
+                        resourceId=api_resource.get("id"),
+                        httpMethod=http_method,
+                    )
+                    methods.append({
+                        "path": path,
+                        "http_method": http_method,
+                        "authorization_type": method_response.get("authorizationType"),
+                        "authorizer_id": method_response.get("authorizerId"),
+                        "api_key_required": method_response.get("apiKeyRequired"),
+                    })
+
+            stages_response = self.apigateway_client.get_stages(restApiId=api_id)
+            stages = stages_response.get("item", [])
+            if not isinstance(stages, list):
+                stages = []
+            for stage in stages:
+                stage_name = stage.get("stageName")
+                if not stage_name:
+                    continue
+                access_log_settings = stage.get("accessLogSettings")
+                if not isinstance(access_log_settings, dict):
+                    access_log_settings = {}
+                resources.append(Resource(
+                    resource_type="aws_api_gateway_stage",
+                    resource_id=f"{api_id}:{stage_name}",
+                    attributes={
+                        "api_id": api_id,
+                        "api_name": api_name,
+                        "stage_name": stage_name,
+                        "endpoint_configuration": api.get("endpointConfiguration", {}),
+                        "resource_policy": policy,
+                        "methods": methods,
+                        "access_log_destination_arn": access_log_settings.get("destinationArn"),
+                        "access_log_format": access_log_settings.get("format"),
+                        "access_logging_enabled": bool(
+                            access_log_settings.get("destinationArn")
+                            and access_log_settings.get("format")
+                        ),
+                        "method_settings": stage.get("methodSettings", {}),
+                        "stage_logging_level": (
+                            stage.get("methodSettings", {}).get("*/*", {}).get("loggingLevel")
+                            if isinstance(stage.get("methodSettings", {}), dict)
+                            and isinstance(stage.get("methodSettings", {}).get("*/*", {}), dict)
+                            else None
+                        ),
+                    },
+                    source="aws",
+                    region=self.region,
+                ))
         return resources
 
     def discover_dynamodb_tables(self) -> list[Resource]:

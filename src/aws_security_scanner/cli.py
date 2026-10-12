@@ -202,6 +202,10 @@ def discover_resources(
             provider.discover_sns_topics()
         )
 
+        resources.extend(
+            provider.discover_api_gateway_rest_apis()
+        )
+
         return resources
 
 
