@@ -5,6 +5,7 @@ This documentation is version-controlled with the scanner and should be updated 
 ## Pages
 
 - [Architecture and data flow](architecture.md)
+- [Service and rule coverage matrix](rule-coverage.md)
 - [Developing a security rule](rule-development.md)
 - [Security rule specification template](rule-template.md)
 - [Contributor guide](../CONTRIBUTING.md)
