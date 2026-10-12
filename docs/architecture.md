@@ -27,7 +27,7 @@ Fixtures / Terraform JSON / AWS APIs
 
 ## Main modules
 
-- `providers/aws.py`: read-only AWS resource discovery and metadata collection.
+- `providers/aws.py`: read-only AWS resource discovery and metadata collection, including ECS task definitions and services.
 - `providers/fixture.py`: deterministic fixture input for offline testing.
 - `providers/terraform.py` and `normalization/terraform.py`: Terraform JSON loading and conversion into the normalised resource model.
 - `models/resource.py`: source-neutral resource data, including resource type, ID, attributes, source, region and optional relationships.
