@@ -127,3 +127,48 @@ def check_lambda_wildcard_invoke_policy(resource: Resource) -> list[Finding]:
             evidence="resource_policy allows wildcard principal to invoke function without a condition",
         )
     ]
+
+
+
+@rule_for(
+    "aws_lambda_function",
+    check_id="LAMBDA-003",
+    service="Lambda",
+    severity=Severity.HIGH,
+    category="Lifecycle Management",
+    title="Lambda function uses a deprecated runtime",
+    description=(
+        "The configured Lambda runtime appears in the versioned AWS runtime "
+        "lifecycle snapshot as deprecated. Deprecated managed runtimes may no "
+        "longer receive language-runtime security updates or technical support."
+    ),
+    remediation=(
+        "Plan and test an upgrade to a currently supported runtime. Confirm the "
+        "runtime lifecycle status against the linked official AWS table before "
+        "making production changes."
+    ),
+)
+def check_lambda_deprecated_runtime(resource: Resource) -> list[Finding]:
+    """Flag only known runtimes whose recorded AWS deprecation date has passed."""
+    from aws_security_scanner.rules.lambda_runtime_lifecycle import (
+        LAMBDA_RUNTIME_DATA_REVIEWED_ON,
+        LAMBDA_RUNTIME_DATA_SOURCE,
+        deprecated_runtime_date,
+    )
+
+    runtime = resource.attributes.get("runtime")
+    deprecation_date = deprecated_runtime_date(runtime)
+    if deprecation_date is None:
+        return []
+    return [
+        Finding.from_rule(
+            check_lambda_deprecated_runtime,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=(
+                f"runtime={runtime}; deprecation_date={deprecation_date.isoformat()}; "
+                f"lifecycle_data_reviewed_on={LAMBDA_RUNTIME_DATA_REVIEWED_ON.isoformat()}; "
+                f"source={LAMBDA_RUNTIME_DATA_SOURCE}"
+            ),
+        )
+    ]
