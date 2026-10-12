@@ -133,17 +133,28 @@ def write_baseline(
 
 
 def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    """Classify findings by identity, not evidence, with deterministic output order."""
+    """Classify findings by identity and expose suppression state deterministically."""
     current_by_id = {finding_fingerprint(item): item for item in current}
     baseline_ids = set(baseline_records)
+    active_ids = active_baseline_fingerprints(baseline_records)
     result: dict[str, list[dict[str, Any]]] = {"new": [], "resolved": [], "unchanged": []}
     for fingerprint in sorted(set(current_by_id) - baseline_ids):
         item = current_by_id[fingerprint]
         result["new"].append({"fingerprint": fingerprint, "check_id": item.check_id, "service": item.service, "resource": item.resource, "region": item.region, "severity": item.severity.value, "title": item.title})
     for fingerprint in sorted(baseline_ids - set(current_by_id)):
         record = baseline_records[fingerprint]
-        result["resolved"].append({key: record.get(key) for key in ("fingerprint", "check_id", "service", "resource", "region", "severity", "title")})
+        result["resolved"].append({
+            **{key: record.get(key) for key in ("fingerprint", "check_id", "service", "resource", "region", "severity", "title")},
+            "suppression": record.get("suppression"),
+            "suppression_active": fingerprint in active_ids,
+        })
     for fingerprint in sorted(baseline_ids & set(current_by_id)):
         item = current_by_id[fingerprint]
-        result["unchanged"].append({"fingerprint": fingerprint, "check_id": item.check_id, "service": item.service, "resource": item.resource, "region": item.region, "severity": item.severity.value, "title": item.title})
+        record = baseline_records[fingerprint]
+        result["unchanged"].append({
+            "fingerprint": fingerprint, "check_id": item.check_id, "service": item.service,
+            "resource": item.resource, "region": item.region, "severity": item.severity.value,
+            "title": item.title, "suppression": record.get("suppression"),
+            "suppression_active": fingerprint in active_ids,
+        })
     return result
