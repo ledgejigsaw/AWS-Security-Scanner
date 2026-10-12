@@ -10,6 +10,7 @@ This documentation is version-controlled with the scanner and should be updated 
 - [Security rule specification template](rule-template.md)
 - [Contributor guide](../CONTRIBUTING.md)
 - [Testing and validation](testing-and-validation.md)
+- [Container build and runtime usage](../README.md#container-usage)
 
 ## Project status
 
