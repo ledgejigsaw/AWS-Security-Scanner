@@ -189,6 +189,8 @@ def test_run_scan_uses_aws_provider():
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
         mock_provider.return_value.discover_ecr_repositories.return_value = []
+        mock_provider.return_value.discover_sqs_queues.return_value = []
+        mock_provider.return_value.discover_sns_topics.return_value = []
         mock_provider.return_value.discover_dynamodb_tables.return_value = []
         mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_secrets_manager_secrets.return_value = [secret_resource]
@@ -276,6 +278,8 @@ def test_aws_scan_can_write_json_report(tmp_path):
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
         mock_provider.return_value.discover_ecr_repositories.return_value = []
+        mock_provider.return_value.discover_sqs_queues.return_value = []
+        mock_provider.return_value.discover_sns_topics.return_value = []
         mock_provider.return_value.discover_dynamodb_tables.return_value = []
         mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_rds_instances.return_value = []
@@ -425,6 +429,8 @@ def test_run_scan_uses_s3_and_iam_resources():
         "aws_security_scanner.cli.AWSProvider"
     ) as mock_provider:
         mock_provider.return_value.discover_ecr_repositories.return_value = []
+        mock_provider.return_value.discover_sqs_queues.return_value = []
+        mock_provider.return_value.discover_sns_topics.return_value = []
         mock_provider.return_value.discover_dynamodb_tables.return_value = []
         mock_provider.return_value.discover_lambda_functions.return_value = []
         mock_provider.return_value.discover_secrets_manager_secrets.return_value = [secret_resource]
@@ -492,6 +498,8 @@ def test_aws_scan_includes_iam_user_and_account_findings():
 
     with patch("aws_security_scanner.cli.AWSProvider") as mock_provider:
         mock_provider.return_value.discover_ecr_repositories.return_value = []
+        mock_provider.return_value.discover_sqs_queues.return_value = []
+        mock_provider.return_value.discover_sns_topics.return_value = []
         mock_provider.return_value.discover_dynamodb_tables.return_value = []
         provider = mock_provider.return_value
         provider.discover_s3_buckets.return_value = []
