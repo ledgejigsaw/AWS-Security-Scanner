@@ -40,7 +40,7 @@ def test_http_viewer_access_does_not_flag_https_or_unknown_values():
     assert check_cloudfront_http_viewer_access(resource(
         viewer_protocol_policies=["unrecognised-value"],
     )) == []
-    assert check_cloudfront_http_viewer_access(resource({})) == []
+    assert check_cloudfront_http_viewer_access(resource()) == []
 
 
 @pytest.mark.parametrize("policy", ["SSLv3", "TLSv1", "TLSv1_2016", "TLSv1.1_2016"])
@@ -69,7 +69,7 @@ def test_explicitly_disabled_logging_is_flagged_but_unknown_is_not():
     assert findings[0].severity == Severity.MEDIUM
     assert check_cloudfront_logging_disabled(resource(logging_enabled=True)) == []
     assert check_cloudfront_logging_disabled(resource(logging_enabled=None)) == []
-    assert check_cloudfront_logging_disabled(resource({})) == []
+    assert check_cloudfront_logging_disabled(resource()) == []
 
 
 def test_missing_waf_is_review_signal_only_when_field_was_discovered():
@@ -78,7 +78,7 @@ def test_missing_waf_is_review_signal_only_when_field_was_discovered():
     assert findings[0].check_id == "CLOUDFRONT-004"
     assert findings[0].severity == Severity.INFO
     assert check_cloudfront_missing_waf(resource(web_acl_id="arn:aws:wafv2:global:123:webacl/example")) == []
-    assert check_cloudfront_missing_waf(resource({})) == []
+    assert check_cloudfront_missing_waf(resource()) == []
 
 
 def test_cloudfront_provider_normalises_pagination_and_distribution_metadata(monkeypatch):
