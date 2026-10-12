@@ -527,8 +527,8 @@ def test_aws_scan_includes_iam_user_and_account_findings():
         provider.discover_network_acls.return_value = []
         provider.discover_flow_logs.return_value = []
         provider.discover_api_gateway_rest_apis.return_value = []
-    provider.discover_ecs_task_definitions.return_value = []
-    provider.discover_ecs_services.return_value = []
+        provider.discover_ecs_task_definitions.return_value = []
+        provider.discover_ecs_services.return_value = []
         provider.discover_cloudtrail_trails.return_value = []
         provider.discover_kms_keys.return_value = []
 
