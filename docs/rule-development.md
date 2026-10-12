@@ -37,3 +37,10 @@ The rule must be imported and added to `get_all_rules()` in `rules/registry.py`;
 - [ ] Update README service coverage and registered-rule counts when applicable.
 - [ ] Update this documentation if the shared rule-development process changes.
 - [ ] Run `pytest -q` and review GitHub Actions before merging.
+
+
+## Lambda runtime lifecycle data
+
+The `LAMBDA-003` check uses a versioned snapshot in `rules/lambda_runtime_lifecycle.py`, sourced from the [official AWS Lambda runtime lifecycle table](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html). The snapshot records a review date and the deprecation dates published by AWS at that time. Evidence includes both the date and source so that reviewers can judge freshness.
+
+The data is deliberately not fetched at scan time: tests remain offline and deterministic. Unknown/custom runtimes and runtimes with no recorded deprecation date do not produce a finding. A scheduled future deprecation is not reported as already deprecated. Maintainers must review the official AWS page and update the snapshot and review date in a dedicated change; the snapshot must not be described as a live feed.
