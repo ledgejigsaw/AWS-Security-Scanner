@@ -15,7 +15,11 @@ dist/
 
 # Testing
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Generated reports
 reports/*.json
 reports/*.html
+reports/*.sarif
