@@ -156,7 +156,7 @@ The CI job builds the image and performs an offline smoke scan. It does not vali
 
 ## Project documentation
 
-The [project documentation](docs/README.md) provides deeper notes on architecture, rule development, testing and validation. These pages are maintained alongside the code as the project evolves.
+The [project documentation](docs/README.md) provides deeper notes on architecture, rule development, testing and validation, including [CI/CD scanning](docs/ci-cd-scanning.md). These pages are maintained alongside the code as the project evolves.
 
 ## Design
 
