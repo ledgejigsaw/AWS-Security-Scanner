@@ -35,3 +35,8 @@ Version 2 entries may include `suppression` metadata:
 The reason is mandatory; owner and expiry are optional. Expiry must use ISO `YYYY-MM-DD`. An expired suppression is no longer active and therefore no longer suppresses the matching finding. Expiry dates are inclusive: a suppression remains active through its expiry date and becomes inactive the following day. Baseline membership and suppression are separate concepts: `--compare-baseline` never suppresses findings, and `--baseline` only filters findings with active baseline identities.
 
 Version 1 fingerprints have no suppression metadata and retain legacy baseline-suppression behaviour. Keep baseline files under review, version them where appropriate, and review new findings before refreshing a baseline.
+
+
+## Operational note
+
+A baseline is a comparison reference, not proof that a resource is safe. Review newly introduced findings and any suppression expiry as part of normal change review; do not automatically rewrite the baseline in CI.
