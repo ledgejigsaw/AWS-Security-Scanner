@@ -194,6 +194,14 @@ def discover_resources(
             provider.discover_dynamodb_tables()
         )
 
+        resources.extend(
+            provider.discover_sqs_queues()
+        )
+
+        resources.extend(
+            provider.discover_sns_topics()
+        )
+
         return resources
 
 

@@ -4,7 +4,7 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 66
+    assert len(rules) == 70
 
 
 def test_rule_registry_contains_iam_rules():
@@ -77,3 +77,11 @@ def test_rule_registry_contains_dynamodb_rules():
     assert "check_dynamodb_pitr_disabled" in rule_names
     assert "check_dynamodb_sse_disabled" in rule_names
     assert "check_dynamodb_deletion_protection_disabled" in rule_names
+
+
+def test_rule_registry_contains_sqs_sns_rules():
+    rule_names = [rule.__name__ for rule in get_all_rules()]
+    assert "check_sqs_public_access_policy" in rule_names
+    assert "check_sqs_encryption_disabled" in rule_names
+    assert "check_sns_public_access_policy" in rule_names
+    assert "check_sns_encryption_disabled" in rule_names

@@ -30,6 +30,8 @@ class AWSProvider:
         secretsmanager_client: Any | None = None,
         ecr_client: Any | None = None,
         dynamodb_client: Any | None = None,
+        sqs_client: Any | None = None,
+        sns_client: Any | None = None,
     ):
         self.region = region
 
@@ -73,6 +75,14 @@ class AWSProvider:
         )
         self.dynamodb_client = dynamodb_client or boto3.client(
             "dynamodb",
+            region_name=region,
+        )
+        self.sqs_client = sqs_client or boto3.client(
+            "sqs",
+            region_name=region,
+        )
+        self.sns_client = sns_client or boto3.client(
+            "sns",
             region_name=region,
         )
 
@@ -1037,6 +1047,98 @@ class AWSProvider:
                 )
             )
 
+        return resources
+
+    def discover_sqs_queues(self) -> list[Resource]:
+        """Discover SQS queue metadata and access/encryption configuration."""
+        queue_urls = self._collect_pages(
+            self.sqs_client.list_queues, "QueueUrls",
+            request_token="NextToken", response_token="NextToken",
+        )
+        resources = []
+        for queue_url in queue_urls:
+            if not isinstance(queue_url, str) or not queue_url:
+                continue
+            response = self.sqs_client.get_queue_attributes(
+                QueueUrl=queue_url, AttributeNames=["All"],
+            )
+            attributes = response.get("Attributes", {})
+            if not isinstance(attributes, dict):
+                attributes = {}
+            queue_name = queue_url.rstrip("/").rsplit("/", 1)[-1]
+            kms_key = attributes.get("KmsMasterKeyId")
+            sqs_managed = attributes.get("SqsManagedSseEnabled")
+            if kms_key or str(sqs_managed).lower() == "true":
+                encryption_enabled = True
+            elif attributes.get("QueueArn"):
+                encryption_enabled = False
+            else:
+                encryption_enabled = None
+            resources.append(Resource(
+                resource_type="aws_sqs_queue", resource_id=queue_name,
+                attributes={
+                    "arn": attributes.get("QueueArn"), "url": queue_url,
+                    "name": queue_name, "policy": attributes.get("Policy"),
+                    "encryption_enabled": encryption_enabled,
+                    "kms_key_id": kms_key,
+                    "sqs_managed_sse_enabled": (
+                        str(sqs_managed).lower() == "true"
+                        if sqs_managed is not None else None
+                    ),
+                    "dead_letter_target_arn": self._queue_dead_letter_target(
+                        attributes.get("RedrivePolicy")
+                    ),
+                }, source="aws", region=self.region,
+            ))
+        return resources
+
+    @staticmethod
+    def _queue_dead_letter_target(value: Any) -> str | None:
+        """Extract the dead-letter target ARN from an SQS redrive policy."""
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                return None
+        if not isinstance(value, dict):
+            return None
+        target = value.get("deadLetterTargetArn")
+        return target if isinstance(target, str) else None
+
+    def discover_sns_topics(self) -> list[Resource]:
+        """Discover SNS topic attributes without publishing or subscribing."""
+        topics = self._collect_pages(
+            self.sns_client.list_topics, "Topics",
+            request_token="NextToken", response_token="NextToken",
+        )
+        resources = []
+        for topic in topics:
+            if not isinstance(topic, dict):
+                continue
+            topic_arn = topic.get("TopicArn")
+            if not isinstance(topic_arn, str) or not topic_arn:
+                continue
+            response = self.sns_client.get_topic_attributes(TopicArn=topic_arn)
+            attributes = response.get("Attributes", {})
+            if not isinstance(attributes, dict):
+                attributes = {}
+            topic_name = topic_arn.rsplit(":", 1)[-1]
+            kms_key = attributes.get("KmsMasterKeyId")
+            if kms_key:
+                encryption_enabled = True
+            elif attributes.get("TopicArn"):
+                encryption_enabled = False
+            else:
+                encryption_enabled = None
+            resources.append(Resource(
+                resource_type="aws_sns_topic", resource_id=topic_name,
+                attributes={
+                    "arn": topic_arn, "name": topic_name,
+                    "policy": attributes.get("Policy"),
+                    "encryption_enabled": encryption_enabled,
+                    "kms_master_key_id": kms_key,
+                }, source="aws", region=self.region,
+            ))
         return resources
 
     def discover_dynamodb_tables(self) -> list[Resource]:

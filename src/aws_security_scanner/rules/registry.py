@@ -84,6 +84,13 @@ from aws_security_scanner.rules.dynamodb_rules import (
     check_dynamodb_deletion_protection_disabled,
 )
 
+from aws_security_scanner.rules.messaging_rules import (
+    check_sqs_public_access_policy,
+    check_sqs_encryption_disabled,
+    check_sns_public_access_policy,
+    check_sns_encryption_disabled,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -158,6 +165,10 @@ def get_all_rules():
         check_dynamodb_pitr_disabled,
         check_dynamodb_sse_disabled,
         check_dynamodb_deletion_protection_disabled,
+        check_sqs_public_access_policy,
+        check_sqs_encryption_disabled,
+        check_sns_public_access_policy,
+        check_sns_encryption_disabled,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,
