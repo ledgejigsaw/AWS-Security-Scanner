@@ -48,12 +48,15 @@ from aws_security_scanner.rules.cloudtrail_rules import (
     check_cloudtrail_logging,
     check_cloudtrail_multi_region,
     check_cloudtrail_log_file_validation,
+    check_cloudtrail_cloudwatch_logs_integration,
+    check_cloudtrail_delivery_error,
 )
 
 from aws_security_scanner.rules.kms_rules import (
     check_kms_key_rotation,
     check_kms_key_pending_deletion,
     check_kms_key_policy_wildcard_access,
+    check_kms_cross_account_access,
 )
 
 from aws_security_scanner.rules.rds_rules import (
@@ -171,9 +174,12 @@ def get_all_rules():
         check_cloudtrail_logging,
         check_cloudtrail_multi_region,
         check_cloudtrail_log_file_validation,
+        check_cloudtrail_cloudwatch_logs_integration,
+        check_cloudtrail_delivery_error,
         check_kms_key_rotation,
         check_kms_key_pending_deletion,
         check_kms_key_policy_wildcard_access,
+        check_kms_cross_account_access,
         check_rds_storage_encryption,
         check_rds_public_accessibility,
         check_rds_backup_retention,
