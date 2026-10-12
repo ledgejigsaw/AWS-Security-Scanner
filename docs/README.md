@@ -6,6 +6,8 @@ This documentation is version-controlled with the scanner and should be updated 
 
 - [Architecture and data flow](architecture.md)
 - [Developing a security rule](rule-development.md)
+- [Security rule specification template](rule-template.md)
+- [Contributor guide](../CONTRIBUTING.md)
 - [Testing and validation](testing-and-validation.md)
 
 ## Project status
