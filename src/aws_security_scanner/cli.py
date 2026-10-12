@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 from aws_security_scanner.engine import RuleEngine
@@ -12,6 +13,12 @@ from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
 from aws_security_scanner.models.finding import Severity
+from aws_security_scanner.baseline_history import (
+    active_baseline_fingerprints,
+    diff_findings,
+    load_baseline_records,
+    write_baseline as write_history_baseline,
+)
 from aws_security_scanner.triage import (
     exclude_baselined_findings,
     filter_by_minimum_severity,
@@ -82,7 +89,17 @@ def build_parser() -> argparse.ArgumentParser:
     baseline_group.add_argument(
         "--write-baseline",
         type=Path,
-        help="Write current finding identities to a baseline JSON file.",
+        help="Write current finding identities to a version 2 baseline JSON file.",
+    )
+    parser.add_argument(
+        "--compare-baseline",
+        type=Path,
+        help="Compare current findings with a version 1 or 2 baseline without suppressing findings.",
+    )
+    parser.add_argument(
+        "--diff-output",
+        type=Path,
+        help="Path for the JSON baseline diff (requires --compare-baseline).",
     )
 
     return parser
@@ -249,6 +266,9 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    if args.diff_output and not args.compare_baseline:
+        parser.error("--diff-output requires --compare-baseline")
+
     findings = run_scan(
         args.source,
         args.file,
@@ -257,12 +277,25 @@ def main() -> None:
     )
 
     if args.write_baseline:
-        write_baseline(findings, args.write_baseline)
+        write_history_baseline(findings, args.write_baseline)
+
+    if args.compare_baseline:
+        records = load_baseline_records(args.compare_baseline)
+        diff = diff_findings(findings, records)
+        diff_path = args.diff_output or Path("reports/baseline-diff.json")
+        diff_path.parent.mkdir(parents=True, exist_ok=True)
+        diff_path.write_text(json.dumps(diff, indent=2) + "\n", encoding="utf-8")
+        print(
+            "Baseline comparison complete. "
+            f"New: {len(diff['new'])}, resolved: {len(diff['resolved'])}, "
+            f"unchanged: {len(diff['unchanged'])}. Diff written to {diff_path}"
+        )
 
     if args.baseline:
+        records = load_baseline_records(args.baseline)
         findings = exclude_baselined_findings(
             findings,
-            load_baseline(args.baseline),
+            active_baseline_fingerprints(records),
         )
 
     findings = filter_by_minimum_severity(findings, args.min_severity)
