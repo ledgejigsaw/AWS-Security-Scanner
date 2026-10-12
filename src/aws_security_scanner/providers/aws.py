@@ -1735,3 +1735,99 @@ class AWSProvider:
                 region=None,
             ))
         return resources
+
+
+    def discover_waf_web_acls(self, scope: str = "REGIONAL") -> list[Resource]:
+        """Discover WAFv2 ACLs and normalise managed/rate-based rule coverage."""
+        if scope not in {"REGIONAL", "CLOUDFRONT"}:
+            raise ValueError("WAF scope must be REGIONAL or CLOUDFRONT.")
+        client = self.wafv2_global_client if scope == "CLOUDFRONT" else self.wafv2_client
+        summaries = self._collect_pages(
+            client.list_web_acls,
+            "WebACLs",
+            request_token="NextMarker",
+            response_token="NextMarker",
+            Scope=scope,
+            Limit=100,
+        )
+        resources: list[Resource] = []
+        for summary in summaries:
+            name = summary.get("Name")
+            acl_id = summary.get("Id")
+            if not isinstance(name, str) or not name or not isinstance(acl_id, str) or not acl_id:
+                continue
+            response = client.get_web_acl(Name=name, Scope=scope, Id=acl_id)
+            acl = response.get("WebACL", {})
+            if not isinstance(acl, dict):
+                continue
+            rules = acl.get("Rules", [])
+            if not isinstance(rules, list):
+                rules = []
+            managed_count = 0
+            rate_based_count = 0
+            for rule in rules:
+                if not isinstance(rule, dict):
+                    continue
+                statement = rule.get("Statement", {})
+                if not isinstance(statement, dict):
+                    continue
+                if "ManagedRuleGroupStatement" in statement:
+                    managed_count += 1
+                if "RateBasedStatement" in statement:
+                    rate_based_count += 1
+            default_action = acl.get("DefaultAction", {})
+            if not isinstance(default_action, dict):
+                default_action = {}
+            resources.append(Resource(
+                resource_type="aws_wafv2_web_acl",
+                resource_id=acl.get("ARN") or acl_id,
+                attributes={
+                    "name": name,
+                    "id": acl_id,
+                    "arn": acl.get("ARN"),
+                    "scope": scope,
+                    "rule_count": len(rules),
+                    "managed_rule_group_count": managed_count,
+                    "rate_based_rule_count": rate_based_count,
+                    "default_action": "allow" if "Allow" in default_action else (
+                        "block" if "Block" in default_action else None
+                    ),
+                },
+                source="aws",
+                region=None if scope == "CLOUDFRONT" else self.region,
+            ))
+        return resources
+
+    def discover_application_load_balancers(self) -> list[Resource]:
+        """Discover ALBs and observed WAF association state without changing resources."""
+        load_balancers = self._collect_pages(
+            self.elbv2_client.describe_load_balancers,
+            "LoadBalancers",
+        )
+        resources: list[Resource] = []
+        for load_balancer in load_balancers:
+            if load_balancer.get("Type") != "application":
+                continue
+            arn = load_balancer.get("LoadBalancerArn")
+            if not isinstance(arn, str) or not arn:
+                continue
+            association = self.wafv2_client.get_web_acl_for_resource(ResourceArn=arn)
+            web_acl = association.get("WebACL") if isinstance(association, dict) else None
+            web_acl_id = web_acl.get("Id") if isinstance(web_acl, dict) else None
+            resources.append(Resource(
+                resource_type="aws_lb",
+                resource_id=arn,
+                attributes={
+                    "name": load_balancer.get("LoadBalancerName"),
+                    "arn": arn,
+                    "scheme": load_balancer.get("Scheme"),
+                    "state": load_balancer.get("State", {}).get("Code"),
+                    "vpc_id": load_balancer.get("VpcId"),
+                    "security_group_ids": load_balancer.get("SecurityGroups", []),
+                    "web_acl_id": web_acl_id,
+                    "waf_association_state": "associated" if web_acl_id else "not_associated",
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
