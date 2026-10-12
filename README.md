@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **77 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway and 5 ECS checks.
+- **78 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway and 5 ECS checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
@@ -41,7 +41,7 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | CloudTrail | Trail logging status, multi-region coverage and log-file validation |
 | KMS | Automatic rotation, pending deletion and broad wildcard key-policy access |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
-| Lambda | Function URLs configured with unauthenticated access and unconditional wildcard-principal invocation policies |
+| Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies and runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot |
 | Secrets Manager | Explicitly disabled automatic rotation and unconditional wildcard-principal access in resource policies |
 | ECR | Mutable image tags and disabled image scanning on push (where the API explicitly reports the setting) |
 | DynamoDB | Point-in-time recovery, explicit server-side encryption status and deletion protection |
@@ -50,7 +50,7 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 | API Gateway (REST APIs) | Methods configured with no authorization when no API resource policy is present; stage access logging not configured |
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 77 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway and 5 ECS). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 78 rules (10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 2 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway and 5 ECS). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -168,7 +168,7 @@ pip install -e .
 pytest -q
 ```
 
-The current `main` branch has **359 passing tests** following the API Gateway REST API checks. GitHub Actions runs the suite on Python 3.11 and 3.13. Test results confirm mocked/fixture behaviour, not live-account correctness.
+The latest local test run reported by the maintainer passed 356 tests on 2026-10-12. This count is a point-in-time result and may change as tests evolve; use the latest GitHub Actions run as the authoritative CI result. GitHub Actions runs the suite on Python 3.11 and 3.13. Test results confirm mocked/fixture behaviour, not live-account correctness.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
 
@@ -232,7 +232,8 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [x] SQS queue and SNS topic discovery with access-policy and encryption checks
 - [x] API Gateway REST API stage discovery, method-authorization and access-logging checks
 - [x] ECS task-definition and service discovery, with baseline container-hardening and public-IP checks
-- [ ] Additional CloudTrail/KMS account-wide coverage and maintained Lambda runtime lifecycle data
+- [ ] Additional CloudTrail/KMS account-wide coverage
+- [x] Initial maintained Lambda runtime lifecycle snapshot and deprecated-runtime check (refresh against AWS before release)
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
 - [ ] Automated code-scanning upload and CI/CD scanning examples
 - [ ] Architecture visualisation
