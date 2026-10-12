@@ -127,6 +127,12 @@ from aws_security_scanner.rules.vpc_rules import (
 )
 
 
+from aws_security_scanner.rules.waf_rules import (
+    check_waf_no_managed_rule_groups,
+    check_waf_no_rate_based_rule,
+    check_alb_missing_waf_association,
+)
+
 def get_all_rules():
     """Return all registered security rules."""
 
@@ -210,4 +216,7 @@ def get_all_rules():
         check_default_nacl_ingress,
         check_default_nacl_egress,
         check_associated_public_route,
+        check_waf_no_managed_rule_groups,
+        check_waf_no_rate_based_rule,
+        check_alb_missing_waf_association,
     ]
