@@ -136,7 +136,8 @@ from aws_security_scanner.rules.waf_rules import (
     check_waf_no_managed_rule_groups,
     check_waf_no_rate_based_rule,
     check_alb_missing_waf_association,
-  
+)
+
 from aws_security_scanner.rules.ebs_rules import (
     check_ebs_volume_encryption,
     check_ebs_snapshot_encryption,
@@ -237,4 +238,8 @@ def get_all_rules():
         check_waf_no_managed_rule_groups,
         check_waf_no_rate_based_rule,
         check_alb_missing_waf_association,
+        check_cloudfront_http_viewer_access,
+        check_cloudfront_weak_tls_policy,
+        check_cloudfront_logging_disabled,
+        check_cloudfront_missing_waf,
     ]
