@@ -34,6 +34,7 @@ class AWSProvider:
         sns_client: Any | None = None,
         apigateway_client: Any | None = None,
         ecs_client: Any | None = None,
+        cloudfront_client: Any | None = None,
     ):
         self.region = region
 
@@ -95,6 +96,8 @@ class AWSProvider:
             "ecs",
             region_name=region,
         )
+        # CloudFront is a global service; do not bind discovery to the scan region.
+        self.cloudfront_client = cloudfront_client or boto3.client("cloudfront")
 
     def _collect_pages(
         self,
@@ -1624,4 +1627,105 @@ class AWSProvider:
                         source="aws",
                         region=self.region,
                     ))
+        return resources
+
+
+    def discover_cloudfront_distributions(self) -> list[Resource]:
+        """Discover CloudFront distribution security metadata without contacting origins."""
+        distributions: list[dict[str, Any]] = []
+        marker: str | None = None
+        while True:
+            request = {"Marker": marker} if marker else {}
+            response = self.cloudfront_client.list_distributions(**request)
+            distribution_list = response.get("DistributionList", {})
+            if not isinstance(distribution_list, dict):
+                break
+            items = distribution_list.get("Items", [])
+            if isinstance(items, list):
+                distributions.extend(item for item in items if isinstance(item, dict))
+            if not distribution_list.get("IsTruncated"):
+                break
+            next_marker = distribution_list.get("NextMarker")
+            if not isinstance(next_marker, str) or not next_marker:
+                raise RuntimeError(
+                    "CloudFront reported truncated results without a NextMarker."
+                )
+            if next_marker == marker:
+                raise RuntimeError("CloudFront returned a repeated pagination marker.")
+            marker = next_marker
+
+        resources: list[Resource] = []
+        for distribution in distributions:
+            distribution_id = distribution.get("Id")
+            if not isinstance(distribution_id, str) or not distribution_id:
+                continue
+            default_behavior = distribution.get("DefaultCacheBehavior", {})
+            if not isinstance(default_behavior, dict):
+                default_behavior = {}
+            cache_behaviors = distribution.get("CacheBehaviors", {})
+            if not isinstance(cache_behaviors, dict):
+                cache_behaviors = {}
+            behavior_items = cache_behaviors.get("Items", [])
+            if not isinstance(behavior_items, list):
+                behavior_items = []
+            behaviors = [default_behavior]
+            behaviors.extend(item for item in behavior_items if isinstance(item, dict))
+
+            origins_container = distribution.get("Origins", {})
+            if not isinstance(origins_container, dict):
+                origins_container = {}
+            origins_items = origins_container.get("Items", [])
+            if not isinstance(origins_items, list):
+                origins_items = []
+            origins = []
+            for origin in origins_items:
+                if not isinstance(origin, dict):
+                    continue
+                s3_origin_config = origin.get("S3OriginConfig", {})
+                if not isinstance(s3_origin_config, dict):
+                    s3_origin_config = {}
+                origin_access_control_id = origin.get("OriginAccessControlId")
+                origin_access_identity = s3_origin_config.get("OriginAccessIdentity")
+                origins.append({
+                    "id": origin.get("Id"),
+                    "domain_name": origin.get("DomainName"),
+                    "origin_type": (
+                        "s3"
+                        if isinstance(origin.get("DomainName"), str)
+                        and ".s3" in origin.get("DomainName", "").lower()
+                        else "custom"
+                    ),
+                    "origin_access_control_id": origin_access_control_id or None,
+                    "origin_access_identity_configured": bool(origin_access_identity),
+                })
+
+            viewer_protocol_policies = [
+                item.get("ViewerProtocolPolicy")
+                for item in behaviors
+                if isinstance(item.get("ViewerProtocolPolicy"), str)
+            ]
+            viewer_certificate = distribution.get("ViewerCertificate", {})
+            if not isinstance(viewer_certificate, dict):
+                viewer_certificate = {}
+            logging = distribution.get("Logging", {})
+            if not isinstance(logging, dict):
+                logging = {}
+
+            resources.append(Resource(
+                resource_type="aws_cloudfront_distribution",
+                resource_id=distribution_id,
+                attributes={
+                    "arn": distribution.get("ARN"),
+                    "domain_name": distribution.get("DomainName"),
+                    "enabled": distribution.get("Enabled"),
+                    "status": distribution.get("Status"),
+                    "web_acl_id": distribution.get("WebACLId") or None,
+                    "viewer_protocol_policies": viewer_protocol_policies,
+                    "minimum_protocol_version": viewer_certificate.get("MinimumProtocolVersion"),
+                    "logging_enabled": logging.get("Enabled") if "Enabled" in logging else None,
+                    "origins": origins,
+                },
+                source="aws",
+                region=None,
+            ))
         return resources
