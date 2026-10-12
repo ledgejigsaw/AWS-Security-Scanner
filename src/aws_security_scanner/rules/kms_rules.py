@@ -198,11 +198,8 @@ def check_kms_cross_account_access(resource: Resource) -> list[Finding]:
     risky = []
     sensitive_actions = {
         "kms:*", "*", "kms:decrypt", "kms:encrypt", "kms:generatedatakey",
-        "kms:reencrypt*", "kms:createg rant", "kms:putkeypolicy",
+        "kms:reencrypt*", "kms:creategrant", "kms:putkeypolicy",
     }
-    # Normalise the CreateGrant action spelling separately to avoid broad substring matching.
-    sensitive_actions.discard("kms:createg rant")
-    sensitive_actions.add("kms:creategrant")
     for statement in statements:
         if not isinstance(statement, dict) or str(statement.get("Effect", "")).lower() != "allow":
             continue
