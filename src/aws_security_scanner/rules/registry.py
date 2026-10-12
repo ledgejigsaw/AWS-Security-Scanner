@@ -66,6 +66,7 @@ from aws_security_scanner.rules.rds_rules import (
 from aws_security_scanner.rules.lambda_rules import (
     check_lambda_public_function_url,
     check_lambda_wildcard_invoke_policy,
+    check_lambda_deprecated_runtime,
 )
 
 from aws_security_scanner.rules.secretsmanager_rules import (
@@ -171,6 +172,7 @@ def get_all_rules():
         check_rds_deletion_protection,
         check_lambda_public_function_url,
         check_lambda_wildcard_invoke_policy,
+        check_lambda_deprecated_runtime,
         check_secret_rotation_disabled,
         check_secret_wildcard_resource_policy,
         check_ecr_mutable_image_tags,
