@@ -35,6 +35,9 @@ class AWSProvider:
         apigateway_client: Any | None = None,
         ecs_client: Any | None = None,
         cloudfront_client: Any | None = None,
+        wafv2_client: Any | None = None,
+        wafv2_global_client: Any | None = None,
+        elbv2_client: Any | None = None,
     ):
         self.region = region
 
@@ -96,8 +99,11 @@ class AWSProvider:
             "ecs",
             region_name=region,
         )
-        # CloudFront is a global service; do not bind discovery to the scan region.
+        # CloudFront and CloudFront-scope WAF are global; WAF global APIs use us-east-1.
         self.cloudfront_client = cloudfront_client or boto3.client("cloudfront")
+        self.wafv2_client = wafv2_client or boto3.client("wafv2", region_name=region)
+        self.wafv2_global_client = wafv2_global_client or boto3.client("wafv2", region_name="us-east-1")
+        self.elbv2_client = elbv2_client or boto3.client("elbv2", region_name=region)
 
     def _collect_pages(
         self,
