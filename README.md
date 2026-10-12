@@ -128,6 +128,10 @@ aws-security-scan --source aws --region eu-west-2 --format json --output reports
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
 
+## Project documentation
+
+The [project documentation](docs/README.md) provides deeper notes on architecture, rule development, testing and validation. These pages are maintained alongside the code as the project evolves.
+
 ## Design
 
 The current processing path is:
@@ -163,7 +167,7 @@ pip install -e .
 pytest -q
 ```
 
-The latest confirmed local baseline on `main` before this API Gateway change was 351 passing tests. The current branch's test results are reported by GitHub Actions; do not treat the baseline as validation of unmerged changes.
+The current `main` branch has **359 passing tests** following the API Gateway REST API checks. GitHub Actions runs the suite on Python 3.11 and 3.13. Test results confirm mocked/fixture behaviour, not live-account correctness.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
 
