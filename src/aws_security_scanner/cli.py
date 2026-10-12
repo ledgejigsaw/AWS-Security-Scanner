@@ -231,6 +231,22 @@ def discover_resources(
             provider.discover_ecs_services()
         )
 
+        resources.extend(
+            provider.discover_cloudfront_distributions()
+        )
+
+        resources.extend(
+            provider.discover_waf_web_acls("CLOUDFRONT")
+        )
+
+        resources.extend(
+            provider.discover_waf_web_acls("REGIONAL")
+        )
+
+        resources.extend(
+            provider.discover_application_load_balancers()
+        )
+
         return resources
 
 
