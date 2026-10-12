@@ -33,6 +33,7 @@ class AWSProvider:
         sqs_client: Any | None = None,
         sns_client: Any | None = None,
         apigateway_client: Any | None = None,
+        ecs_client: Any | None = None,
     ):
         self.region = region
 
@@ -88,6 +89,10 @@ class AWSProvider:
         )
         self.apigateway_client = apigateway_client or boto3.client(
             "apigateway",
+            region_name=region,
+        )
+        self.ecs_client = ecs_client or boto3.client(
+            "ecs",
             region_name=region,
         )
 
@@ -1512,4 +1517,111 @@ class AWSProvider:
                 )
             )
 
+        return resources
+
+
+    def discover_ecs_task_definitions(self) -> list[Resource]:
+        """Discover active ECS task-definition security settings."""
+        task_definition_arns = self._collect_pages(
+            self.ecs_client.list_task_definitions,
+            "taskDefinitionArns",
+            request_token="nextToken",
+            response_token="nextToken",
+            status="ACTIVE",
+            sort="DESC",
+        )
+        resources: list[Resource] = []
+        for task_definition_arn in task_definition_arns:
+            if not isinstance(task_definition_arn, str) or not task_definition_arn:
+                continue
+            response = self.ecs_client.describe_task_definition(taskDefinition=task_definition_arn)
+            task_definition = response.get("taskDefinition", {})
+            if not isinstance(task_definition, dict):
+                continue
+            definition_arn = task_definition.get("taskDefinitionArn") or task_definition_arn
+            containers = task_definition.get("containerDefinitions", [])
+            if not isinstance(containers, list):
+                containers = []
+            normalized_containers = []
+            for container in containers:
+                if not isinstance(container, dict):
+                    continue
+                normalized_containers.append({
+                    "name": container.get("name"),
+                    "privileged": container.get("privileged"),
+                    "user": container.get("user"),
+                    "readonly_root_filesystem": container.get("readonlyRootFilesystem"),
+                    "essential": container.get("essential"),
+                })
+            resources.append(Resource(
+                resource_type="aws_ecs_task_definition",
+                resource_id=definition_arn,
+                attributes={
+                    "arn": definition_arn,
+                    "family": task_definition.get("family"),
+                    "revision": task_definition.get("revision"),
+                    "status": task_definition.get("status"),
+                    "network_mode": task_definition.get("networkMode"),
+                    "requires_compatibilities": task_definition.get("requiresCompatibilities", []),
+                    "task_role_arn": task_definition.get("taskRoleArn"),
+                    "execution_role_arn": task_definition.get("executionRoleArn"),
+                    "containers": normalized_containers,
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
+
+    def discover_ecs_services(self) -> list[Resource]:
+        """Discover ECS service deployment and public-IP assignment metadata."""
+        cluster_arns = self._collect_pages(
+            self.ecs_client.list_clusters,
+            "clusterArns",
+            request_token="nextToken",
+            response_token="nextToken",
+        )
+        resources: list[Resource] = []
+        for cluster_arn in cluster_arns:
+            if not isinstance(cluster_arn, str) or not cluster_arn:
+                continue
+            service_arns = self._collect_pages(
+                self.ecs_client.list_services,
+                "serviceArns",
+                request_token="nextToken",
+                response_token="nextToken",
+                cluster=cluster_arn,
+            )
+            for offset in range(0, len(service_arns), 10):
+                batch = service_arns[offset:offset + 10]
+                response = self.ecs_client.describe_services(cluster=cluster_arn, services=batch)
+                for service in response.get("services", []):
+                    if not isinstance(service, dict):
+                        continue
+                    service_arn = service.get("serviceArn")
+                    if not service_arn:
+                        continue
+                    network_configuration = service.get("networkConfiguration", {})
+                    if not isinstance(network_configuration, dict):
+                        network_configuration = {}
+                    awsvpc_configuration = network_configuration.get("awsvpcConfiguration", {})
+                    if not isinstance(awsvpc_configuration, dict):
+                        awsvpc_configuration = {}
+                    resources.append(Resource(
+                        resource_type="aws_ecs_service",
+                        resource_id=service_arn,
+                        attributes={
+                            "arn": service_arn,
+                            "name": service.get("serviceName"),
+                            "cluster_arn": service.get("clusterArn") or cluster_arn,
+                            "status": service.get("status"),
+                            "launch_type": service.get("launchType"),
+                            "task_definition": service.get("taskDefinition"),
+                            "desired_count": service.get("desiredCount"),
+                            "assign_public_ip": awsvpc_configuration.get("assignPublicIp"),
+                            "subnets": awsvpc_configuration.get("subnets", []),
+                            "security_groups": awsvpc_configuration.get("securityGroups", []),
+                        },
+                        source="aws",
+                        region=self.region,
+                    ))
         return resources

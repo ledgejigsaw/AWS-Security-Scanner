@@ -4,7 +4,7 @@ from aws_security_scanner.rules.registry import get_all_rules
 def test_rule_registry_contains_all_rules():
     rules = get_all_rules()
 
-    assert len(rules) == 72
+    assert len(rules) == 77
 
 
 def test_rule_registry_contains_iam_rules():
@@ -91,3 +91,12 @@ def test_rule_registry_contains_api_gateway_rules():
     rule_names = [rule.__name__ for rule in get_all_rules()]
     assert "check_api_gateway_unauthenticated_methods" in rule_names
     assert "check_api_gateway_access_logging_disabled" in rule_names
+
+
+def test_rule_registry_contains_ecs_rules():
+    rule_names = [rule.__name__ for rule in get_all_rules()]
+    assert "check_ecs_privileged_container" in rule_names
+    assert "check_ecs_host_network_mode" in rule_names
+    assert "check_ecs_root_user" in rule_names
+    assert "check_ecs_root_filesystem_writable" in rule_names
+    assert "check_ecs_service_public_ip" in rule_names
