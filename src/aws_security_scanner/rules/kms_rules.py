@@ -206,7 +206,7 @@ def check_kms_cross_account_access(resource: Resource) -> list[Finding]:
         if statement.get("Condition"):
             continue
         actions = _statement_actions(statement)
-        if not any(action in sensitive_actions or action.endswith(":*") for action in actions):
+        if not any(action in sensitive_actions or (action.startswith("kms:") and action.endswith(":*")) for action in actions):
             continue
         for principal in _aws_principal_values(statement.get("Principal")):
             principal_parts = principal.split(":")
