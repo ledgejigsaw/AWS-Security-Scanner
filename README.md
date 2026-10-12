@@ -9,7 +9,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 - **83 registered security rules:** 10 S3, 17 IAM, 10 EC2, 10 VPC/network, 3 CloudTrail, 3 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS and 4 CloudFront checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
-- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering and baseline suppression.
+- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
 Automated tests use mocks and fixtures; they do not replace validation against a real AWS account. Live scans remain unverified.
@@ -107,7 +107,19 @@ aws-security-scan \
   --min-severity HIGH
 ```
 
-The baseline uses a stable fingerprint derived from check ID, service, resource and region; changing evidence text does not create a new finding identity. A baseline suppresses matching findings from the report—it does not disable checks or alter the underlying rules. Use `--write-baseline` to explicitly replace/update the known-findings baseline after reviewing the current findings. The two baseline options are mutually exclusive.
+New baseline files use schema version 2 and retain selected finding metadata, not raw configuration or secret values. Version 1 fingerprint-only files remain readable. Finding identity is derived from check ID, service, resource and region; changing evidence text does not create a new finding identity. A baseline suppresses matching findings from the report—it does not disable checks or alter the underlying rules. Version 2 entries can carry suppression reason, owner and ISO expiry date; expired suppressions stop suppressing. See [baseline history and suppression governance](docs/baseline-history.md) for semantics and examples.
+
+Compare current results with a previous baseline without suppressing findings:
+
+```bash
+aws-security-scan \
+  --source terraform \
+  --file tests/fixtures/terraform/realistic_s3.json \
+  --compare-baseline reports/baseline.json \
+  --diff-output reports/baseline-diff.json
+```
+
+The diff deterministically separates `new`, `resolved` and `unchanged` findings. `--diff-output` requires `--compare-baseline`; its default is `reports/baseline-diff.json`. The baseline-writing and suppression options remain mutually exclusive.
 
 Generate SARIF for CI/code-scanning ingestion:
 
