@@ -96,6 +96,14 @@ from aws_security_scanner.rules.api_gateway_rules import (
     check_api_gateway_access_logging_disabled,
 )
 
+from aws_security_scanner.rules.ecs_rules import (
+    check_ecs_privileged_container,
+    check_ecs_host_network_mode,
+    check_ecs_root_user,
+    check_ecs_root_filesystem_writable,
+    check_ecs_service_public_ip,
+)
+
 from aws_security_scanner.rules.vpc_rules import (
     check_public_subnet,
     check_unrestricted_ipv4_route,
@@ -176,6 +184,11 @@ def get_all_rules():
         check_sns_encryption_disabled,
         check_api_gateway_unauthenticated_methods,
         check_api_gateway_access_logging_disabled,
+        check_ecs_privileged_container,
+        check_ecs_host_network_mode,
+        check_ecs_root_user,
+        check_ecs_root_filesystem_writable,
+        check_ecs_service_public_ip,
         check_public_subnet,
         check_unrestricted_ipv4_route,
         check_unrestricted_ipv6_route,
