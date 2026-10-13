@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "framework": {
+    "name": "NIST SP 800-53 Rev. 5",
+    "version": "Rev. 5"
+  },
+  "mapping_notice": "Mappings are indicative relationships between scanner checks and control objectives. They are not a compliance determination and do not cover the full assessment procedures for any control.",
+  "controls": [
+    {
+      "control_id": "AC-6",
+      "title": "Least Privilege",
+      "check_ids": ["IAM-001"],
+      "confidence": "direct",
+      "rationale": "IAM-001 detects a policy granting all actions on all resources, which directly conflicts with least-privilege access design. The check does not assess every AC-6 requirement."
+    },
+    {
+      "control_id": "AC-6",
+      "title": "Least Privilege",
+      "check_ids": ["IAM-002"],
+      "confidence": "partial",
+      "rationale": "IAM-002 identifies broad wildcard permissions that may exceed required access. A wildcard is not always impermissible, so this check is only a partial signal for least-privilege implementation."
+    },
+    {
+      "control_id": "AC-3",
+      "title": "Access Enforcement",
+      "check_ids": ["IAM-004"],
+      "confidence": "partial",
+      "rationale": "IAM-004 flags wildcard principals in IAM role trust policies, which may weaken enforcement of intended role-assumption boundaries. It does not evaluate all access-enforcement mechanisms."
+    },
+    {
+      "control_id": "SC-7",
+      "title": "Boundary Protection",
+      "check_ids": ["EC2-001"],
+      "confidence": "partial",
+      "rationale": "EC2-001 identifies SSH exposure to the public Internet. This is one network-boundary signal and does not establish that all boundary-protection requirements are satisfied or violated."
+    },
+    {
+      "control_id": "SC-28",
+      "title": "Protection of Information at Rest",
+      "check_ids": ["S3-002"],
+      "confidence": "partial",
+      "rationale": "S3-002 checks S3 bucket encryption configuration. Encryption configuration alone does not establish that all information-at-rest protection requirements, key-management requirements, or data-handling obligations are met."
+    }
+  ]
+}
