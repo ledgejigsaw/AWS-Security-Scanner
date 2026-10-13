@@ -184,6 +184,14 @@ def discover_resources(
         )
 
         resources.extend(
+            provider.discover_security_hub()
+        )
+
+        resources.extend(
+            provider.discover_guardduty()
+        )
+
+        resources.extend(
             provider.discover_vpcs()
         )
 
