@@ -120,3 +120,35 @@ def load_mapping_file(
         ) from exc
 
     return validate_mapping_document(document, registered_check_ids)
+
+
+
+def mappings_for_check(document: dict | None, check_id: str) -> list[dict[str, str]]:
+    """Return framework mappings for a check ID, preserving source rationale."""
+    if document is None:
+        return []
+    mappings = []
+    for control in document["controls"]:
+        if check_id in control["check_ids"]:
+            mappings.append({
+                "control_id": control["control_id"],
+                "title": control["title"],
+                "confidence": control["confidence"],
+                "rationale": control["rationale"],
+            })
+    return mappings
+
+
+def framework_metadata(document: dict | None) -> dict | None:
+    """Return the framework identity and limitation notice for report metadata."""
+    if document is None:
+        return None
+    framework = document["framework"]
+    return {
+        "name": framework["name"],
+        "version": framework["version"],
+        "notice": document.get(
+            "mapping_notice",
+            "Mappings are indicative only and do not establish compliance.",
+        ),
+    }
