@@ -144,6 +144,11 @@ from aws_security_scanner.rules.ebs_rules import (
     check_public_ebs_snapshot,
 )
 
+from aws_security_scanner.rules.security_services_rules import (
+    check_security_hub_disabled,
+    check_guardduty_disabled,
+)
+
 def get_all_rules():
     """Return all registered security rules."""
 
@@ -242,4 +247,6 @@ def get_all_rules():
         check_waf_no_managed_rule_groups,
         check_waf_no_rate_based_rule,
         check_alb_missing_waf_association,
+        check_security_hub_disabled,
+        check_guardduty_disabled,
     ]
