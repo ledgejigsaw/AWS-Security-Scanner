@@ -38,6 +38,8 @@ class AWSProvider:
         wafv2_client: Any | None = None,
         wafv2_global_client: Any | None = None,
         elbv2_client: Any | None = None,
+        securityhub_client: Any | None = None,
+        guardduty_client: Any | None = None,
     ):
         self.region = region
 
@@ -104,6 +106,8 @@ class AWSProvider:
         self.wafv2_client = wafv2_client or boto3.client("wafv2", region_name=region)
         self.wafv2_global_client = wafv2_global_client or boto3.client("wafv2", region_name="us-east-1")
         self.elbv2_client = elbv2_client or boto3.client("elbv2", region_name=region)
+        self.securityhub_client = securityhub_client or boto3.client("securityhub", region_name=region)
+        self.guardduty_client = guardduty_client or boto3.client("guardduty", region_name=region)
 
     def _collect_pages(
         self,
@@ -1908,4 +1912,91 @@ class AWSProvider:
                 source="aws",
                 region=self.region,
             ))
+        return resources
+
+
+    def discover_security_hub(self) -> list[Resource]:
+        """Discover regional Security Hub enablement without importing findings.
+
+        ResourceNotFoundException from DescribeHub means Security Hub is not
+        enabled in this region. Permission and unexpected API errors propagate
+        rather than being interpreted as a disabled service.
+        """
+        try:
+            response = self.securityhub_client.describe_hub()
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code != "ResourceNotFoundException":
+                raise
+            return [
+                Resource(
+                    resource_type="aws_securityhub_hub",
+                    resource_id="securityhub",
+                    attributes={
+                        "enabled": False,
+                        "status": "NOT_ENABLED",
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            ]
+
+        return [
+            Resource(
+                resource_type="aws_securityhub_hub",
+                resource_id=response.get("HubArn", "securityhub"),
+                attributes={
+                    "enabled": True,
+                    "status": "ENABLED",
+                    "hub_arn": response.get("HubArn"),
+                    "subscribed_at": response.get("SubscribedAt"),
+                    "auto_enable_controls": response.get("AutoEnableControls"),
+                },
+                source="aws",
+                region=self.region,
+            )
+        ]
+
+    def discover_guardduty(self) -> list[Resource]:
+        """Discover regional GuardDuty detector state without fetching findings."""
+        detector_ids = self._collect_pages(
+            self.guardduty_client.list_detectors,
+            "DetectorIds",
+            request_token="NextToken",
+            response_token="NextToken",
+        )
+        if not detector_ids:
+            return [
+                Resource(
+                    resource_type="aws_guardduty_detector",
+                    resource_id="guardduty",
+                    attributes={
+                        "enabled": False,
+                        "status": "NOT_ENABLED",
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            ]
+
+        resources: list[Resource] = []
+        for detector_id in detector_ids:
+            response = self.guardduty_client.get_detector(DetectorId=detector_id)
+            status = response.get("Status")
+            resources.append(
+                Resource(
+                    resource_type="aws_guardduty_detector",
+                    resource_id=detector_id,
+                    attributes={
+                        "enabled": status == "ENABLED" if status is not None else None,
+                        "status": status,
+                        "finding_publishing_frequency": response.get(
+                            "FindingPublishingFrequency"
+                        ),
+                        "service_role_arn": response.get("ServiceRole"),
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            )
         return resources
