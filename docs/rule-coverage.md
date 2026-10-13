@@ -24,7 +24,7 @@ This page describes the service-level coverage currently registered in `rules/re
 | Application Load Balancers | 1 | Missing WAF association as an informational review signal. Network Load Balancers are not included. | 
 | ECS/Fargate | 6 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment and shared task/execution role review signal. Public IP assignment does not prove internet reachability; role sharing is informational. |
 | CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
-| **Total** | **94** | Verified against the registered rule list after CloudFront, EBS, CloudTrail/KMS, WAF and ALB additions. Re-run registry and CI checks when rules change. |
+| **Total** | **96** | Includes one regional Security Hub posture check and one regional GuardDuty posture check; re-run registry and CI checks when rules change. Re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
