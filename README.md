@@ -58,7 +58,7 @@ Rules are registered centrally and receive the normalised `Resource` model. The 
 
 ### Policy and reporting
 
-YAML policy files can enable/disable individual checks and override their severity. JSON reports include a summary and structured findings with check ID, severity, resource, description, remediation, region and evidence where available. HTML reports provide a self-contained table for human review. SARIF 2.1.0 output maps scanner severities to SARIF levels and includes resource/evidence metadata for code-scanning ingestion.
+YAML policy files can enable/disable individual checks and override their severity. JSON reports include a summary and structured findings with check ID, severity, resource, description, remediation, region and evidence where available. An optional versioned compliance mapping file annotates JSON, HTML and SARIF reports with framework/version, control references, mapping confidence and rationale; mappings do not establish compliance. HTML reports provide a self-contained table for human review. SARIF 2.1.0 output maps scanner severities to SARIF levels and includes resource/evidence metadata for code-scanning ingestion.
 
 Example fixture/Terraform scan:
 
