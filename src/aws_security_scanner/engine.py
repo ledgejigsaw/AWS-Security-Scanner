@@ -63,6 +63,8 @@ class RuleEngine:
                 rule_findings = rule(resource)
 
                 for finding in rule_findings:
+                    if finding.account_id is None:
+                        finding.account_id = resource.account_id
                     findings.append(
                         self._apply_policy(finding)
                     )
