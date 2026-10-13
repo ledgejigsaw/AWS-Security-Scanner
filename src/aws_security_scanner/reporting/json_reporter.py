@@ -3,14 +3,18 @@ from pathlib import Path
 
 from aws_security_scanner.models.finding import Finding
 from aws_security_scanner.reporting.summary import build_summary
+from aws_security_scanner.compliance import framework_metadata, mappings_for_check
 
 
-def build_json_report(findings: list[Finding]) -> dict:
+def build_json_report(
+    findings: list[Finding],
+    compliance_mapping: dict | None = None,
+) -> dict:
     """Build a JSON-serialisable security scan report."""
 
     summary = build_summary(findings)
 
-    return {
+    report = {
         "summary": {
             "total_findings": summary.total_findings,
             "by_severity": summary.by_severity,
@@ -30,15 +34,24 @@ def build_json_report(findings: list[Finding]) -> dict:
             for finding in findings
         ],
     }
+    metadata = framework_metadata(compliance_mapping)
+    if metadata is not None:
+        report["compliance_framework"] = metadata
+        for item in report["findings"]:
+            item["compliance_mappings"] = mappings_for_check(
+                compliance_mapping, item["check_id"]
+            )
+    return report
 
 
 def write_json_report(
     findings: list[Finding],
     output_path: str | Path,
+    compliance_mapping: dict | None = None,
 ) -> None:
     """Write a security scan report to a JSON file."""
 
-    report = build_json_report(findings)
+    report = build_json_report(findings, compliance_mapping)
     output_path = Path(output_path)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
