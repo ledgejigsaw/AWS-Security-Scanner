@@ -22,3 +22,21 @@ Validation rejects unsupported schema versions, malformed required fields, inval
 ## Important limitation
 
 A mapping means that a check may provide evidence relevant to a control objective. It does **not** mean the scanner evaluates the entire control, that absence of findings proves compliance, or that an organisation is certified. Mapping rationale and confidence must be reviewed whenever rules or framework versions change.
+
+
+## Annotate a report
+
+Pass a mapping file explicitly. Without this option, report output remains unchanged.
+
+```bash
+aws-security-scan \
+  --source aws \
+  --region eu-west-2 \
+  --compliance-mapping mappings/nist-sp-800-53-rev5.json \
+  --format json \
+  --output reports/scan-with-mappings.json
+```
+
+The option is also supported for fixture and Terraform JSON scans. The CLI validates all referenced check IDs against the current rule registry before scanning. When enabled, JSON reports include top-level framework identity and per-finding mappings; HTML reports display the framework notice and mapped control rationale; SARIF reports include equivalent framework and result properties. Findings without a mapping are marked as not mapped in HTML and receive an empty mapping list in JSON/SARIF.
+
+Mappings are attached only when the option is selected. They do not affect rule execution, severity, baseline identity, suppression, or whether a finding is emitted. A missing mapping is not a passed control.
