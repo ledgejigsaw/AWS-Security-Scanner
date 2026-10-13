@@ -25,6 +25,10 @@ def finding_fingerprint(finding: Finding) -> str:
         "resource": finding.resource,
         "region": finding.region,
     }
+    # Preserve legacy fingerprints for single-account findings. Account ID
+    # becomes part of identity only when a scan explicitly supplies it.
+    if finding.account_id is not None:
+        identity["account_id"] = finding.account_id
     raw = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -125,6 +129,8 @@ def write_baseline(
             "title": finding.title,
             "suppression": suppression,
         }
+        if finding.account_id is not None:
+            entry["account_id"] = finding.account_id
         entries.append(entry)
     entries.sort(key=lambda item: item["fingerprint"])
     target = Path(path)
@@ -140,14 +146,19 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
     result: dict[str, list[dict[str, Any]]] = {"new": [], "resolved": [], "unchanged": []}
     for fingerprint in sorted(set(current_by_id) - baseline_ids):
         item = current_by_id[fingerprint]
-        result["new"].append({"fingerprint": fingerprint, "check_id": item.check_id, "service": item.service, "resource": item.resource, "region": item.region, "severity": item.severity.value, "title": item.title})
+        entry = {"fingerprint": fingerprint, "check_id": item.check_id, "service": item.service, "resource": item.resource, "region": item.region, "severity": item.severity.value, "title": item.title}
+        if item.account_id is not None:
+            entry["account_id"] = item.account_id
+        result["new"].append(entry)
     for fingerprint in sorted(baseline_ids - set(current_by_id)):
         record = baseline_records[fingerprint]
         result["resolved"].append({
             **{key: record.get(key) for key in ("fingerprint", "check_id", "service", "resource", "region", "severity", "title")},
             "suppression": record.get("suppression"),
             "suppression_active": fingerprint in active_ids,
-        })
+        }
+        if record.get("account_id") is not None:
+            result["resolved"][-1]["account_id"] = record["account_id"]
     for fingerprint in sorted(baseline_ids & set(current_by_id)):
         item = current_by_id[fingerprint]
         record = baseline_records[fingerprint]
@@ -156,5 +167,7 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
             "resource": item.resource, "region": item.region, "severity": item.severity.value,
             "title": item.title, "suppression": record.get("suppression"),
             "suppression_active": fingerprint in active_ids,
-        })
+        }
+        if item.account_id is not None:
+            result["unchanged"][-1]["account_id"] = item.account_id
     return result
