@@ -38,7 +38,8 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | --- | --- |
 | S3 | Public exposure, encryption, versioning, Block Public Access, server-access logging, risky bucket-policy principals/actions/resources, TLS enforcement and public write access |
 | IAM | Unrestricted and broad permissions, high-risk administrative actions, role trust policies, MFA, access-key state/age/inactivity, password/console credential hygiene and unused roles |
-| EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules; detailed monitoring and missing instance-profile checks are informational review signals |\n| EBS | Explicitly unencrypted volumes/snapshots and snapshots with an observed public create-volume permission; denied permission discovery remains unknown |
+| EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules; detailed monitoring and missing instance-profile checks are informational review signals |
+| EBS | Explicitly unencrypted volumes/snapshots and snapshots with an observed public create-volume permission; denied permission discovery remains unknown |
 | VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |
 | CloudTrail | Trail logging status, multi-region coverage, log-file validation, CloudWatch Logs integration review and recent delivery errors |
 | Security Hub | Regional hub enablement posture only; native findings and standards/control evaluation are not imported |
