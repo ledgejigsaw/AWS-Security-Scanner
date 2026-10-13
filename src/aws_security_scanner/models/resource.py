@@ -10,3 +10,4 @@ class Resource:
     source: str
     region: str | None = None
     relationships: dict[str, str] | None = None
+    account_id: str | None = None

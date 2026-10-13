@@ -21,6 +21,7 @@ class Finding:
     remediation: str
     region: str | None = None
     evidence: str | None = None
+    account_id: str | None = None
 
     @classmethod
     def from_rule(
