@@ -19,6 +19,7 @@ from aws_security_scanner.baseline_history import (
     load_baseline_records,
     write_baseline as write_history_baseline,
 )
+from aws_security_scanner.compliance import ComplianceMappingError, load_mapping_file
 from aws_security_scanner.triage import (
     exclude_baselined_findings,
     filter_by_minimum_severity,
@@ -72,6 +73,12 @@ def build_parser() -> argparse.ArgumentParser:
     type=Path,
     help="Path to a YAML security policy file.",
 )
+
+    parser.add_argument(
+        "--compliance-mapping",
+        type=Path,
+        help="Optional versioned JSON control-mapping file to annotate reports.",
+    )
 
     parser.add_argument(
         "--min-severity",
@@ -289,6 +296,18 @@ def main() -> None:
     if args.diff_output and not args.compare_baseline:
         parser.error("--diff-output requires --compare-baseline")
 
+    compliance_mapping = None
+    if args.compliance_mapping:
+        registered_check_ids = {
+            rule.metadata.check_id for rule in get_all_rules()
+        }
+        try:
+            compliance_mapping = load_mapping_file(
+                args.compliance_mapping, registered_check_ids
+            )
+        except ComplianceMappingError as exc:
+            parser.error(str(exc))
+
     findings = run_scan(
         args.source,
         args.file,
@@ -329,11 +348,11 @@ def main() -> None:
     )
 
     if args.format == "json":
-        write_json_report(findings, output_path)
+        write_json_report(findings, output_path, compliance_mapping)
     elif args.format == "html":
-        write_html_report(findings, output_path)
+        write_html_report(findings, output_path, compliance_mapping)
     else:
-        write_sarif_report(findings, output_path)
+        write_sarif_report(findings, output_path, compliance_mapping)
 
     print(
         f"Security scan complete. "
