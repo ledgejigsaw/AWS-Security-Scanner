@@ -152,22 +152,24 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
         result["new"].append(entry)
     for fingerprint in sorted(baseline_ids - set(current_by_id)):
         record = baseline_records[fingerprint]
-        result["resolved"].append({
+        entry = {
             **{key: record.get(key) for key in ("fingerprint", "check_id", "service", "resource", "region", "severity", "title")},
             "suppression": record.get("suppression"),
             "suppression_active": fingerprint in active_ids,
         }
         if record.get("account_id") is not None:
-            result["resolved"][-1]["account_id"] = record["account_id"]
+            entry["account_id"] = record["account_id"]
+        result["resolved"].append(entry)
     for fingerprint in sorted(baseline_ids & set(current_by_id)):
         item = current_by_id[fingerprint]
         record = baseline_records[fingerprint]
-        result["unchanged"].append({
+        entry = {
             "fingerprint": fingerprint, "check_id": item.check_id, "service": item.service,
             "resource": item.resource, "region": item.region, "severity": item.severity.value,
             "title": item.title, "suppression": record.get("suppression"),
             "suppression_active": fingerprint in active_ids,
         }
         if item.account_id is not None:
-            result["unchanged"][-1]["account_id"] = item.account_id
+            entry["account_id"] = item.account_id
+        result["unchanged"].append(entry)
     return result
