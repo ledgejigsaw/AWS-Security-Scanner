@@ -8,6 +8,7 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
+from aws_security_scanner.multi_account import run_multi_account_scan
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
@@ -48,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--file",
         type=Path,
         help="Fixture directory or Terraform JSON file.",
+    )
+    parser.add_argument(
+        "--accounts-file",
+        type=Path,
+        help="Opt-in JSON list of account IDs and cross-account audit role ARNs (AWS source only).",
     )
 
     parser.add_argument(
@@ -129,6 +135,8 @@ def discover_resources(
     source: str,
     source_path: Path | None = None,
     region: str | None = None,
+    aws_session=None,
+    account_id: str | None = None,
 ):
     """Discover resources from the selected source."""
 
@@ -152,7 +160,7 @@ def discover_resources(
         return aggregate_s3_resources(resources)
 
     if source == "aws":
-        provider = AWSProvider(region=region)
+        provider = AWSProvider(region=region, session=aws_session)
 
         resources = []
 
@@ -279,6 +287,10 @@ def discover_resources(
             provider.discover_ecs_services()
         )
 
+        if account_id is not None:
+            for resource in resources:
+                resource.account_id = account_id
+
         return resources
 
 
@@ -289,6 +301,8 @@ def run_scan(
     region: str | None = None,
     include_native_findings: bool = False,
     native_findings_limit: int = 100,
+    aws_session=None,
+    expected_account_id: str | None = None,
 ) -> list:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -303,6 +317,8 @@ def run_scan(
         source,
         source_path,
         region,
+        aws_session,
+        expected_account_id,
     )
 
     policy = (
@@ -321,7 +337,7 @@ def run_scan(
     if include_native_findings:
         # Keep native finding ingestion opt-in. A separate provider instance
         # avoids changing the existing discovery call contract for normal scans.
-        native_provider = AWSProvider(region=region)
+        native_provider = AWSProvider(region=region, session=aws_session)
         native_items = native_provider.get_securityhub_findings(limit=native_findings_limit)
         findings.extend(
             converted
@@ -342,6 +358,10 @@ def main() -> None:
         parser.error("--diff-output requires --compare-baseline")
     if args.include_native_findings and args.source != "aws":
         parser.error("--include-native-findings can only be used with --source aws")
+    if args.accounts_file and args.source != "aws":
+        parser.error("--accounts-file can only be used with --source aws")
+    if args.accounts_file and args.file:
+        parser.error("--accounts-file cannot be combined with --file")
     if not 1 <= args.native_findings_limit <= 1000:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
@@ -359,19 +379,44 @@ def main() -> None:
         except ComplianceMappingError as exc:
             parser.error(str(exc))
 
-    findings = run_scan(
-        args.source,
-        args.file,
-        args.policy,
-        args.region,
-        args.include_native_findings,
-        args.native_findings_limit,
-    )
+    assessment_metadata = None
+    if args.accounts_file:
+        findings, assessment_metadata = run_multi_account_scan(
+            args.accounts_file,
+            region=args.region,
+            scan_function=run_scan,
+            policy_path=args.policy,
+            include_native_findings=args.include_native_findings,
+            native_findings_limit=args.native_findings_limit,
+        )
+    else:
+        findings = run_scan(
+            args.source,
+            args.file,
+            args.policy,
+            args.region,
+            args.include_native_findings,
+            args.native_findings_limit,
+        )
 
-    if args.write_baseline:
+    baseline_action_requested = bool(
+        args.write_baseline or args.compare_baseline or args.baseline
+    )
+    baseline_actions_skipped = bool(
+        assessment_metadata
+        and assessment_metadata["summary"]["failed_accounts"] > 0
+        and baseline_action_requested
+    )
+    if baseline_actions_skipped:
+        print(
+            "Warning: baseline write/compare/suppression skipped because one or more "
+            "accounts failed; partial results must not mark unseen findings as resolved."
+        )
+
+    if args.write_baseline and not baseline_actions_skipped:
         write_history_baseline(findings, args.write_baseline)
 
-    if args.compare_baseline:
+    if args.compare_baseline and not baseline_actions_skipped:
         records = load_baseline_records(args.compare_baseline)
         diff = diff_findings(findings, records)
         diff_path = args.diff_output or Path("reports/baseline-diff.json")
@@ -383,7 +428,7 @@ def main() -> None:
             f"unchanged: {len(diff['unchanged'])}. Diff written to {diff_path}"
         )
 
-    if args.baseline:
+    if args.baseline and not baseline_actions_skipped:
         records = load_baseline_records(args.baseline)
         findings = exclude_baselined_findings(
             findings,
@@ -401,16 +446,18 @@ def main() -> None:
     )
 
     if args.format == "json":
-        write_json_report(findings, output_path, compliance_mapping)
+        write_json_report(findings, output_path, compliance_mapping, assessment_metadata)
     elif args.format == "html":
-        write_html_report(findings, output_path, compliance_mapping)
+        write_html_report(findings, output_path, compliance_mapping, assessment_metadata)
     else:
-        write_sarif_report(findings, output_path, compliance_mapping)
+        write_sarif_report(findings, output_path, compliance_mapping, assessment_metadata)
 
     print(
         f"Security scan complete. "
         f"{len(findings)} findings written to {output_path}"
     )
+    if baseline_actions_skipped:
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
