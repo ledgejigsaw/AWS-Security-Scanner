@@ -160,7 +160,11 @@ def discover_resources(
         return aggregate_s3_resources(resources)
 
     if source == "aws":
-        provider = AWSProvider(region=region, session=aws_session)
+        provider = (
+            AWSProvider(region=region, session=aws_session)
+            if aws_session is not None
+            else AWSProvider(region=region)
+        )
 
         resources = []
 
@@ -313,13 +317,16 @@ def run_scan(
     ):
         raise ValueError("--native-findings-limit must be between 1 and 1000.")
 
-    resources = discover_resources(
-        source,
-        source_path,
-        region,
-        aws_session,
-        expected_account_id,
-    )
+    if aws_session is None and expected_account_id is None:
+        resources = discover_resources(source, source_path, region)
+    else:
+        resources = discover_resources(
+            source,
+            source_path,
+            region,
+            aws_session,
+            expected_account_id,
+        )
 
     policy = (
         SecurityPolicy.from_yaml(policy_path)
@@ -337,7 +344,11 @@ def run_scan(
     if include_native_findings:
         # Keep native finding ingestion opt-in. A separate provider instance
         # avoids changing the existing discovery call contract for normal scans.
-        native_provider = AWSProvider(region=region, session=aws_session)
+        native_provider = (
+            AWSProvider(region=region, session=aws_session)
+            if aws_session is not None
+            else AWSProvider(region=region)
+        )
         native_items = native_provider.get_securityhub_findings(limit=native_findings_limit)
         findings.extend(
             converted
