@@ -163,6 +163,8 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
             entry["source_type"] = item.source_type
             entry["source_id"] = item.source_id
             entry["source_product"] = item.source_product
+            entry["first_observed_at"] = item.first_observed_at
+            entry["last_observed_at"] = item.last_observed_at
         result["new"].append(entry)
     for fingerprint in sorted(baseline_ids - set(current_by_id)):
         record = baseline_records[fingerprint]
@@ -192,5 +194,7 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
             entry["source_type"] = item.source_type
             entry["source_id"] = item.source_id
             entry["source_product"] = item.source_product
+            entry["first_observed_at"] = item.first_observed_at
+            entry["last_observed_at"] = item.last_observed_at
         result["unchanged"].append(entry)
     return result
