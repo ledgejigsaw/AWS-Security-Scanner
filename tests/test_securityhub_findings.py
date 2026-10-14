@@ -1,8 +1,14 @@
+import json
 from unittest.mock import Mock
 
 import pytest
 
-from aws_security_scanner.baseline_history import finding_fingerprint
+from aws_security_scanner.baseline_history import (
+    diff_findings,
+    finding_fingerprint,
+    load_baseline_records,
+    write_baseline,
+)
 from aws_security_scanner.cli import build_parser
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.models.finding import Finding, Severity
@@ -154,3 +160,28 @@ def test_cli_accepts_opt_in_native_findings_and_limit():
     ])
     assert args.include_native_findings is True
     assert args.native_findings_limit == 250
+
+
+def test_native_finding_source_metadata_survives_baseline_and_diff(tmp_path):
+    finding = securityhub_to_finding(securityhub_item())
+    assert finding is not None
+    path = tmp_path / "native-baseline.json"
+
+    write_baseline([finding], path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    entry = payload["findings"][0]
+    assert entry["source_type"] == "security_hub"
+    assert entry["source_id"] == finding.source_id
+    assert entry["first_observed_at"] == finding.first_observed_at
+    assert entry["last_observed_at"] == finding.last_observed_at
+
+    records = load_baseline_records(path)
+    unchanged = diff_findings([finding], records)["unchanged"][0]
+    assert unchanged["source_id"] == finding.source_id
+    assert unchanged["first_observed_at"] == finding.first_observed_at
+    assert unchanged["last_observed_at"] == finding.last_observed_at
+
+    resolved = diff_findings([], records)["resolved"][0]
+    assert resolved["source_id"] == finding.source_id
+    assert resolved["first_observed_at"] == finding.first_observed_at
+    assert resolved["last_observed_at"] == finding.last_observed_at
