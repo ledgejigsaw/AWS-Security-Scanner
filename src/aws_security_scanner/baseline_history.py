@@ -29,6 +29,10 @@ def finding_fingerprint(finding: Finding) -> str:
     # becomes part of identity only when a scan explicitly supplies it.
     if finding.account_id is not None:
         identity["account_id"] = finding.account_id
+    if finding.source_type != "scanner":
+        identity["source_type"] = finding.source_type
+        identity["source_id"] = finding.source_id
+        identity["source_product"] = finding.source_product
     raw = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -131,6 +135,12 @@ def write_baseline(
         }
         if finding.account_id is not None:
             entry["account_id"] = finding.account_id
+        if finding.source_type != "scanner":
+            entry["source_type"] = finding.source_type
+            entry["source_id"] = finding.source_id
+            entry["source_product"] = finding.source_product
+            entry["first_observed_at"] = finding.first_observed_at
+            entry["last_observed_at"] = finding.last_observed_at
         entries.append(entry)
     entries.sort(key=lambda item: item["fingerprint"])
     target = Path(path)
@@ -149,6 +159,10 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
         entry = {"fingerprint": fingerprint, "check_id": item.check_id, "service": item.service, "resource": item.resource, "region": item.region, "severity": item.severity.value, "title": item.title}
         if item.account_id is not None:
             entry["account_id"] = item.account_id
+        if item.source_type != "scanner":
+            entry["source_type"] = item.source_type
+            entry["source_id"] = item.source_id
+            entry["source_product"] = item.source_product
         result["new"].append(entry)
     for fingerprint in sorted(baseline_ids - set(current_by_id)):
         record = baseline_records[fingerprint]
@@ -171,5 +185,9 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
         }
         if item.account_id is not None:
             entry["account_id"] = item.account_id
+        if item.source_type != "scanner":
+            entry["source_type"] = item.source_type
+            entry["source_id"] = item.source_id
+            entry["source_product"] = item.source_product
         result["unchanged"].append(entry)
     return result
