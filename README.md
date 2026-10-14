@@ -152,6 +152,30 @@ Opt in to import native AWS Security Hub findings from the selected region:
 aws-security-scan --source aws --region eu-west-2 --include-native-findings --native-findings-limit 100 --format json --output reports/aws-scan-with-native-findings.json
 ```
 
+### Opt-in multi-account assessment
+
+Prepare an explicit JSON target list; each role ARN must belong to its declared account:
+
+```json
+{
+  "accounts": [
+    {
+      "account_id": "123456789012",
+      "role_arn": "arn:aws:iam::123456789012:role/SecurityAudit",
+      "external_id": "optional-third-party-external-id"
+    }
+  ]
+}
+```
+
+Run sequentially through the configured cross-account audit roles:
+
+```bash
+aws-security-scan --source aws --accounts-file accounts.json --region eu-west-2 --format json --output reports/multi-account-scan.json
+```
+
+The caller's credential chain must be allowed to call STS `AssumeRole`; each target role trust policy must trust that caller and grant the documented read-only discovery permissions. The scanner validates the assumed account with STS `GetCallerIdentity` before scanning and keeps short-lived credentials in memory only. Account lists are capped at 100, scans are sequential, and no Organizations-wide discovery is required. The JSON, HTML and SARIF report includes per-account success/failure and error details. If any account fails, the CLI exits non-zero after writing the report. Baseline write/compare/suppression is skipped on partial multi-account scans so an inaccessible account is not misreported as resolved.
+
 Native finding import is disabled by default and requires permission for the Security Hub `GetFindings` API in the selected region. The default cap is 100 findings; the supported limit is 1–1,000. The scanner follows pagination up to that cap, deduplicates repeated source IDs within the result set, and lets API errors propagate rather than reporting an empty result. Imported entries use the `AWS-SHUB-NATIVE` check ID and include `source_type`, source finding ID, product ARN, account ID and observation timestamps where available. JSON, HTML and SARIF distinguish native findings from scanner-generated checks. Native source identity is included in baseline fingerprints so multiple findings on one resource do not collapse together.
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
