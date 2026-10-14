@@ -40,74 +40,78 @@ class AWSProvider:
         elbv2_client: Any | None = None,
         securityhub_client: Any | None = None,
         guardduty_client: Any | None = None,
+        session: Any | None = None,
     ):
         self.region = region
+        # Preserve the existing boto3.client path for single-account scans;
+        # cross-account scans supply an in-memory session with assumed-role credentials.
+        self._client = session.client if session is not None else boto3.client
 
-        self.s3_client = s3_client or boto3.client(
+        self.s3_client = s3_client or self._client(
             "s3",
             region_name=region,
     )
 
-        self.iam_client = iam_client or boto3.client(
+        self.iam_client = iam_client or self._client(
             "iam",
             region_name=region,
     )
 
-        self.ec2_client = ec2_client or boto3.client(
+        self.ec2_client = ec2_client or self._client(
             "ec2",
             region_name=region,
         )
-        self.cloudtrail_client = cloudtrail_client or boto3.client(
+        self.cloudtrail_client = cloudtrail_client or self._client(
             "cloudtrail",
             region_name=region,
         )
-        self.kms_client = kms_client or boto3.client(
+        self.kms_client = kms_client or self._client(
             "kms",
             region_name=region,
         )
-        self.rds_client = rds_client or boto3.client(
+        self.rds_client = rds_client or self._client(
             "rds",
             region_name=region,
         )
-        self.lambda_client = lambda_client or boto3.client(
+        self.lambda_client = lambda_client or self._client(
             "lambda",
             region_name=region,
         )
-        self.secretsmanager_client = secretsmanager_client or boto3.client(
+        self.secretsmanager_client = secretsmanager_client or self._client(
             "secretsmanager",
             region_name=region,
         )
-        self.ecr_client = ecr_client or boto3.client(
+        self.ecr_client = ecr_client or self._client(
             "ecr",
             region_name=region,
         )
-        self.dynamodb_client = dynamodb_client or boto3.client(
+        self.dynamodb_client = dynamodb_client or self._client(
             "dynamodb",
             region_name=region,
         )
-        self.sqs_client = sqs_client or boto3.client(
+        self.sqs_client = sqs_client or self._client(
             "sqs",
             region_name=region,
         )
-        self.sns_client = sns_client or boto3.client(
+        self.sns_client = sns_client or self._client(
             "sns",
             region_name=region,
         )
-        self.apigateway_client = apigateway_client or boto3.client(
+        self.apigateway_client = apigateway_client or self._client(
             "apigateway",
             region_name=region,
         )
-        self.ecs_client = ecs_client or boto3.client(
+        self.ecs_client = ecs_client or self._client(
             "ecs",
             region_name=region,
         )
         # CloudFront and CloudFront-scope WAF are global; WAF global APIs use us-east-1.
-        self.cloudfront_client = cloudfront_client or boto3.client("cloudfront")
-        self.wafv2_client = wafv2_client or boto3.client("wafv2", region_name=region)
-        self.wafv2_global_client = wafv2_global_client or boto3.client("wafv2", region_name="us-east-1")
-        self.elbv2_client = elbv2_client or boto3.client("elbv2", region_name=region)
-        self.securityhub_client = securityhub_client or boto3.client("securityhub", region_name=region)
-        self.guardduty_client = guardduty_client or boto3.client("guardduty", region_name=region)
+        self.cloudfront_client = cloudfront_client or self._client("cloudfront")
+        self.wafv2_client = wafv2_client or self._client("wafv2", region_name=region)
+        self.wafv2_global_client = wafv2_global_client or self._client("wafv2", region_name="us-east-1")
+        self.elbv2_client = elbv2_client or self._client("elbv2", region_name=region)
+        self.securityhub_client = securityhub_client or self._client("securityhub", region_name=region)
+        self.guardduty_client = guardduty_client or self._client("guardduty", region_name=region)
 
     def _collect_pages(
         self,
