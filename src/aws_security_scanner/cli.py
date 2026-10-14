@@ -7,6 +7,7 @@ from aws_security_scanner.normalization.terraform import aggregate_s3_resources
 from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.aws import AWSProvider
+from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
@@ -52,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--region",
         help="AWS region to scan.",
+    )
+
+    parser.add_argument(
+        "--include-native-findings",
+        action="store_true",
+        help="Import a bounded set of native AWS Security Hub findings (AWS source only).",
+    )
+    parser.add_argument(
+        "--native-findings-limit",
+        type=int,
+        default=100,
+        help="Maximum number of Security Hub findings to import (1-1000; default: 100).",
     )
 
     parser.add_argument(
@@ -274,6 +287,8 @@ def run_scan(
     source_path: Path | None = None,
     policy_path: Path | None = None,
     region: str | None = None,
+    include_native_findings: bool = False,
+    native_findings_limit: int = 100,
 ) -> list:
     resources = discover_resources(
         source,
@@ -292,7 +307,24 @@ def run_scan(
         policy=policy,
     )
 
-    return engine.scan(resources)
+    findings = engine.scan(resources)
+
+    if include_native_findings:
+        if source != "aws":
+            raise ValueError("--include-native-findings can only be used with --source aws.")
+        if isinstance(native_findings_limit, bool) or not isinstance(native_findings_limit, int) or not 1 <= native_findings_limit <= 1000:
+            raise ValueError("--native-findings-limit must be between 1 and 1000.")
+        # Keep native finding ingestion opt-in. A separate provider instance
+        # avoids changing the existing discovery call contract for normal scans.
+        native_provider = AWSProvider(region=region)
+        native_items = native_provider.get_securityhub_findings(limit=native_findings_limit)
+        findings.extend(
+            converted
+            for item in native_items
+            if (converted := securityhub_to_finding(item, fallback_region=region)) is not None
+        )
+
+    return findings
 
 
 def main() -> None:
@@ -303,6 +335,12 @@ def main() -> None:
 
     if args.diff_output and not args.compare_baseline:
         parser.error("--diff-output requires --compare-baseline")
+    if args.include_native_findings and args.source != "aws":
+        parser.error("--include-native-findings can only be used with --source aws")
+    if not 1 <= args.native_findings_limit <= 1000:
+        parser.error("--native-findings-limit must be between 1 and 1000")
+    if args.native_findings_limit != 100 and not args.include_native_findings:
+        parser.error("--native-findings-limit requires --include-native-findings")
 
     compliance_mapping = None
     if args.compliance_mapping:
@@ -320,7 +358,9 @@ def main() -> None:
         args.source,
         args.file,
         args.policy,
-        args.region
+        args.region,
+        args.include_native_findings,
+        args.native_findings_limit,
     )
 
     if args.write_baseline:
