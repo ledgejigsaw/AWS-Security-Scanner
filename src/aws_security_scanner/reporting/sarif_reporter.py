@@ -47,6 +47,14 @@ def build_sarif_report(
         }
         if finding.evidence is not None:
             properties["evidence"] = finding.evidence
+        if finding.account_id is not None:
+            properties["accountId"] = finding.account_id
+        if finding.source_type != "scanner":
+            properties["sourceType"] = finding.source_type
+            properties["sourceId"] = finding.source_id
+            properties["sourceProduct"] = finding.source_product
+            properties["firstObservedAt"] = finding.first_observed_at
+            properties["lastObservedAt"] = finding.last_observed_at
         if compliance_mapping is not None:
             properties["complianceMappings"] = mappings_for_check(
                 compliance_mapping, finding.check_id
