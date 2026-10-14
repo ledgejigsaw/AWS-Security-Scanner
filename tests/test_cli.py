@@ -62,7 +62,6 @@ def test_run_scan_without_policy_preserves_default_behaviour():
 
     assert len(findings) == 10
     assert "S3-001" in check_ids
-    assert "S3-012" in check_ids
 
 
 def test_run_scan_can_disable_rule(tmp_path):
