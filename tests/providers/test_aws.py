@@ -1452,3 +1452,71 @@ def test_aws_provider_discovers_kms_key_policy():
         KeyId="customer-key",
         PolicyName="default",
     )
+
+
+def test_aws_provider_discovers_s3_acl_ownership_and_mfa_delete():
+    s3_client = Mock()
+    s3_client.list_buckets.return_value = {
+        "Buckets": [{"Name": "company-data"}]
+    }
+    s3_client.get_bucket_encryption.return_value = {
+        "ServerSideEncryptionConfiguration": {"Rules": []}
+    }
+    s3_client.get_bucket_versioning.return_value = {
+        "Status": "Enabled",
+        "MFADelete": "Disabled",
+    }
+    s3_client.get_public_access_block.return_value = {
+        "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": True,
+            "IgnorePublicAcls": True,
+            "BlockPublicPolicy": True,
+            "RestrictPublicBuckets": True,
+        }
+    }
+    s3_client.get_bucket_logging.return_value = {"LoggingEnabled": {"TargetBucket": "logs"}}
+    s3_client.get_bucket_policy.side_effect = ClientError(
+        {"Error": {"Code": "NoSuchBucketPolicy", "Message": "No policy"}},
+        "GetBucketPolicy",
+    )
+    s3_client.get_bucket_acl.return_value = {
+        "Grants": [{
+            "Grantee": {
+                "Type": "Group",
+                "URI": "http://acs.amazonaws.com/groups/global/AllUsers",
+            },
+            "Permission": "READ",
+        }]
+    }
+    s3_client.get_bucket_ownership_controls.return_value = {
+        "OwnershipControls": {
+            "Rules": [{"ObjectOwnership": "BucketOwnerPreferred"}]
+        }
+    }
+
+    provider = AWSProvider(s3_client=s3_client)
+    resource = provider.discover_s3_buckets()[0]
+
+    assert resource.attributes["acl"]["grants"][0]["grantee"]["uri"].endswith("/AllUsers")
+    assert resource.attributes["object_ownership"] == "BucketOwnerPreferred"
+    assert resource.attributes["versioning_configuration"] == {
+        "status": "Enabled",
+        "mfa_delete": "Disabled",
+    }
+
+
+def test_aws_provider_keeps_extended_s3_metadata_unknown_on_access_denied():
+    s3_client = Mock()
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.s3_client = s3_client
+    denied = ClientError(
+        {"Error": {"Code": "AccessDenied", "Message": "denied"}},
+        "GetBucketAcl",
+    )
+    s3_client.get_bucket_acl.side_effect = denied
+    s3_client.get_bucket_ownership_controls.side_effect = denied
+    s3_client.get_bucket_versioning.side_effect = denied
+
+    assert provider._get_bucket_acl("company-data") is None
+    assert provider._get_bucket_object_ownership("company-data") is None
+    assert provider._get_bucket_versioning_configuration("company-data") is None
