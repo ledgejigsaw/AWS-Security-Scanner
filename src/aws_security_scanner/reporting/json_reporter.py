@@ -14,25 +14,35 @@ def build_json_report(
 
     summary = build_summary(findings)
 
+    finding_items = []
+    for finding in findings:
+        item = {
+            "check_id": finding.check_id,
+            "severity": finding.severity.value,
+            "service": finding.service,
+            "resource": finding.resource,
+            "title": finding.title,
+            "description": finding.description,
+            "remediation": finding.remediation,
+            "region": finding.region,
+            "evidence": finding.evidence,
+        }
+        if finding.account_id is not None:
+            item["account_id"] = finding.account_id
+        if finding.source_type != "scanner":
+            item["source_type"] = finding.source_type
+            item["source_id"] = finding.source_id
+            item["source_product"] = finding.source_product
+            item["first_observed_at"] = finding.first_observed_at
+            item["last_observed_at"] = finding.last_observed_at
+        finding_items.append(item)
+
     report = {
         "summary": {
             "total_findings": summary.total_findings,
             "by_severity": summary.by_severity,
         },
-        "findings": [
-            {
-                "check_id": finding.check_id,
-                "severity": finding.severity.value,
-                "service": finding.service,
-                "resource": finding.resource,
-                "title": finding.title,
-                "description": finding.description,
-                "remediation": finding.remediation,
-                "region": finding.region,
-                "evidence": finding.evidence,
-            }
-            for finding in findings
-        ],
+        "findings": finding_items,
     }
     metadata = framework_metadata(compliance_mapping)
     if metadata is not None:
