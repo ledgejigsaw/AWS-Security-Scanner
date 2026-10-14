@@ -187,6 +187,13 @@ class AWSProvider:
             attributes["bucket_policy"] = (
                 self._get_bucket_policy(bucket_name)
             )
+            attributes["acl"] = self._get_bucket_acl(bucket_name)
+            attributes["object_ownership"] = self._get_bucket_object_ownership(
+                bucket_name
+            )
+            attributes["versioning_configuration"] = (
+                self._get_bucket_versioning_configuration(bucket_name)
+            )
 
             resources.append(
                 Resource(
@@ -558,6 +565,71 @@ class AWSProvider:
 
         return json.loads(policy)
 
+    def _get_bucket_acl(self, bucket_name: str) -> dict | None:
+        """Return normalised bucket ACL grants, or None when not observable."""
+        try:
+            response = self.s3_client.get_bucket_acl(Bucket=bucket_name)
+        except ClientError:
+            return None
+
+        raw_grants = response.get("Grants", [])
+        if not isinstance(raw_grants, list):
+            return None
+
+        grants = []
+        for grant in raw_grants:
+            if not isinstance(grant, dict):
+                continue
+            grantee = grant.get("Grantee", {})
+            if not isinstance(grantee, dict):
+                grantee = {}
+            grants.append({
+                "grantee": {
+                    "type": grantee.get("Type"),
+                    "uri": grantee.get("URI"),
+                    "id": grantee.get("ID"),
+                },
+                "permission": grant.get("Permission"),
+            })
+        return {"grants": grants}
+
+    def _get_bucket_object_ownership(self, bucket_name: str) -> str | None:
+        """Return the configured Object Ownership mode when observable."""
+        try:
+            response = self.s3_client.get_bucket_ownership_controls(
+                Bucket=bucket_name
+            )
+        except ClientError:
+            return None
+
+        controls = response.get("OwnershipControls", {})
+        if not isinstance(controls, dict):
+            return None
+        rules = controls.get("Rules", [])
+        if not isinstance(rules, list) or not rules or not isinstance(rules[0], dict):
+            return None
+        ownership = rules[0].get("ObjectOwnership")
+        return ownership if isinstance(ownership, str) else None
+
+    def _get_bucket_versioning_configuration(
+        self, bucket_name: str
+    ) -> dict | None:
+        """Return versioning and MFA Delete status without changing the bucket."""
+        try:
+            response = self.s3_client.get_bucket_versioning(Bucket=bucket_name)
+        except ClientError:
+            return None
+
+        status = response.get("Status")
+        if status not in {"Enabled", "Suspended"}:
+            return None
+        mfa_delete = response.get("MFADelete", "Disabled")
+        if mfa_delete not in {"Enabled", "Disabled"}:
+            mfa_delete = None
+        return {
+            "status": status,
+            "mfa_delete": mfa_delete,
+        }
 
     def discover_security_groups(self) -> list[Resource]:
         """Discover EC2 security groups and normalise network rules."""

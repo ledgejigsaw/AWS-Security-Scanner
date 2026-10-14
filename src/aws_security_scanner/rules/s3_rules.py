@@ -541,7 +541,7 @@ def check_insecure_transport(resource: Resource) -> list[Finding]:
 
 @rule_for(
     "aws_s3_bucket",
-    check_id="S3-009",
+    check_id="S3-011",
     service="S3",
     severity=Severity.HIGH,
     category="Access Control",
@@ -559,6 +559,11 @@ def check_public_acl(resource: Resource) -> list[Finding]:
 
     findings = []
 
+    # Fully enabled bucket-level Block Public Access prevents public ACL grants
+    # from taking effect. Account-level settings are not discovered here.
+    if resource.attributes.get("block_public_access") is True:
+        return findings
+
     acl = resource.attributes.get("acl")
 
     if not acl:
@@ -574,7 +579,7 @@ def check_public_acl(resource: Resource) -> list[Finding]:
 
         uri = grantee.get("uri", "")
 
-        if uri.endswith("/AllUsers"):
+        if uri.endswith("/AllUsers") or uri.endswith("/AuthenticatedUsers"):
             findings.append(
                 Finding.from_rule(
                     check_public_acl,
@@ -592,11 +597,11 @@ def check_public_acl(resource: Resource) -> list[Finding]:
 
 @rule_for(
     "aws_s3_bucket",
-    check_id="S3-010",
+    check_id="S3-012",
     service="S3",
-    severity=Severity.HIGH,
+    severity=Severity.MEDIUM,
     category="Access Control",
-    title="S3 bucket ACL object ownership is not hardened",
+    title="S3 bucket allows ACL-based access control",
     description=(
         "The S3 bucket uses an Object Ownership setting that "
         "still permits ACL-based access control."
@@ -634,11 +639,11 @@ def check_acl_object_ownership(resource: Resource) -> list[Finding]:
 
 @rule_for(
     "aws_s3_bucket",
-    check_id="S3-011",
+    check_id="S3-013",
     service="S3",
-    severity=Severity.MEDIUM,
+    severity=Severity.INFO,
     category="Data Protection",
-    title="S3 bucket MFA Delete is disabled",
+    title="S3 bucket MFA Delete is not enabled (review signal)",
     description=(
         "MFA Delete is not enabled for an S3 bucket with "
         "versioning enabled."

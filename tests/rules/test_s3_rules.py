@@ -1107,7 +1107,7 @@ def test_public_acl_generates_finding():
     findings = check_public_acl(resource)
 
     assert len(findings) == 1
-    assert findings[0].check_id == "S3-009"
+    assert findings[0].check_id == "S3-011"
     assert findings[0].severity == Severity.HIGH
 
 def test_acl_object_ownership_not_hardened_generates_finding():
@@ -1124,8 +1124,8 @@ def test_acl_object_ownership_not_hardened_generates_finding():
     findings = check_acl_object_ownership(resource)
 
     assert len(findings) == 1
-    assert findings[0].check_id == "S3-010"
-    assert findings[0].severity == Severity.HIGH
+    assert findings[0].check_id == "S3-012"
+    assert findings[0].severity == Severity.MEDIUM
 
 def test_acl_object_ownership_hardened_does_not_generate_finding():
     resource = Resource(
@@ -1160,8 +1160,8 @@ def test_mfa_delete_disabled_generates_finding():
     findings = check_mfa_delete(resource)
 
     assert len(findings) == 1
-    assert findings[0].check_id == "S3-011"
-    assert findings[0].severity == Severity.MEDIUM
+    assert findings[0].check_id == "S3-013"
+    assert findings[0].severity == Severity.INFO
 
 def test_mfa_delete_enabled_does_not_generate_finding():
     resource = Resource(
