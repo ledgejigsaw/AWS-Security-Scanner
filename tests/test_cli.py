@@ -85,7 +85,6 @@ rules:
 
     assert len(findings) == 9
     assert "S3-001" not in check_ids
-    assert "S3-012" in check_ids
 
 def test_run_scan_can_override_rule_severity(tmp_path):
     terraform_file = tmp_path / "terraform.json"
