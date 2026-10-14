@@ -572,9 +572,17 @@ class AWSProvider:
         except ClientError:
             return None
 
+        raw_grants = response.get("Grants", [])
+        if not isinstance(raw_grants, list):
+            return None
+
         grants = []
-        for grant in response.get("Grants", []):
+        for grant in raw_grants:
+            if not isinstance(grant, dict):
+                continue
             grantee = grant.get("Grantee", {})
+            if not isinstance(grantee, dict):
+                grantee = {}
             grants.append({
                 "grantee": {
                     "type": grantee.get("Type"),
@@ -594,10 +602,14 @@ class AWSProvider:
         except ClientError:
             return None
 
-        rules = response.get("OwnershipControls", {}).get("Rules", [])
-        if not rules:
+        controls = response.get("OwnershipControls", {})
+        if not isinstance(controls, dict):
             return None
-        return rules[0].get("ObjectOwnership")
+        rules = controls.get("Rules", [])
+        if not isinstance(rules, list) or not rules or not isinstance(rules[0], dict):
+            return None
+        ownership = rules[0].get("ObjectOwnership")
+        return ownership if isinstance(ownership, str) else None
 
     def _get_bucket_versioning_configuration(
         self, bucket_name: str
@@ -609,11 +621,14 @@ class AWSProvider:
             return None
 
         status = response.get("Status")
-        if status is None:
+        if status not in {"Enabled", "Suspended"}:
             return None
+        mfa_delete = response.get("MFADelete", "Disabled")
+        if mfa_delete not in {"Enabled", "Disabled"}:
+            mfa_delete = None
         return {
             "status": status,
-            "mfa_delete": response.get("MFADelete", "Disabled"),
+            "mfa_delete": mfa_delete,
         }
 
     def discover_security_groups(self) -> list[Resource]:
