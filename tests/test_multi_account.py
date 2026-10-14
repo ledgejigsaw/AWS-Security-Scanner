@@ -203,4 +203,4 @@ def test_aws_provider_uses_injected_session_for_client_creation():
     AWSProvider(session=session, region="eu-west-2")
     assert session.client.call_count == 20
     session.client.assert_any_call("s3", region_name="eu-west-2")
-    session.client.assert_any_call("sts", region_name="eu-west-2") is False
+    assert not any(call.args[0] == "sts" for call in session.client.call_args_list)
