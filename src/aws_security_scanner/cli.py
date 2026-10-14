@@ -290,6 +290,15 @@ def run_scan(
     include_native_findings: bool = False,
     native_findings_limit: int = 100,
 ) -> list:
+    if include_native_findings and source != "aws":
+        raise ValueError("--include-native-findings can only be used with --source aws.")
+    if include_native_findings and (
+        isinstance(native_findings_limit, bool)
+        or not isinstance(native_findings_limit, int)
+        or not 1 <= native_findings_limit <= 1000
+    ):
+        raise ValueError("--native-findings-limit must be between 1 and 1000.")
+
     resources = discover_resources(
         source,
         source_path,
@@ -310,10 +319,6 @@ def run_scan(
     findings = engine.scan(resources)
 
     if include_native_findings:
-        if source != "aws":
-            raise ValueError("--include-native-findings can only be used with --source aws.")
-        if isinstance(native_findings_limit, bool) or not isinstance(native_findings_limit, int) or not 1 <= native_findings_limit <= 1000:
-            raise ValueError("--native-findings-limit must be between 1 and 1000.")
         # Keep native finding ingestion opt-in. A separate provider instance
         # avoids changing the existing discovery call contract for normal scans.
         native_provider = AWSProvider(region=region)
