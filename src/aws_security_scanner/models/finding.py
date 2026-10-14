@@ -22,6 +22,11 @@ class Finding:
     region: str | None = None
     evidence: str | None = None
     account_id: str | None = None
+    source_type: str = "scanner"
+    source_id: str | None = None
+    source_product: str | None = None
+    first_observed_at: str | None = None
+    last_observed_at: str | None = None
 
     @classmethod
     def from_rule(
