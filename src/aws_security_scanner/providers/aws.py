@@ -2029,6 +2029,51 @@ class AWSProvider:
             )
         ]
 
+    def get_securityhub_findings(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return a bounded, paginated set of regional Security Hub findings.
+
+        The API is read-only. Access and service errors deliberately propagate;
+        an incomplete or denied query must not be represented as zero findings.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("Security Hub finding limit must be between 1 and 1000.")
+
+        findings: list[dict[str, Any]] = []
+        token: str | None = None
+        seen_tokens: set[str] = set()
+        seen_findings: set[tuple[str, str]] = set()
+
+        while len(findings) < limit:
+            request: dict[str, Any] = {"MaxResults": min(100, limit - len(findings))}
+            if token:
+                request["NextToken"] = token
+            response = self.securityhub_client.get_findings(**request)
+
+            for item in response.get("Findings", []):
+                if not isinstance(item, dict):
+                    continue
+                finding_id = item.get("Id")
+                product_arn = item.get("ProductArn")
+                if not isinstance(finding_id, str) or not finding_id:
+                    continue
+                key = (product_arn if isinstance(product_arn, str) else "", finding_id)
+                if key in seen_findings:
+                    continue
+                seen_findings.add(key)
+                findings.append(item)
+                if len(findings) >= limit:
+                    break
+
+            next_token = response.get("NextToken")
+            if not next_token or len(findings) >= limit:
+                break
+            if not isinstance(next_token, str) or next_token in seen_tokens:
+                raise RuntimeError("Security Hub returned an invalid or repeated NextToken.")
+            seen_tokens.add(next_token)
+            token = next_token
+
+        return findings
+
     def discover_guardduty(self) -> list[Resource]:
         """Discover regional GuardDuty detector state without fetching findings."""
         detector_ids = self._collect_pages(
