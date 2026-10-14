@@ -350,11 +350,12 @@ def run_scan(
             else AWSProvider(region=region)
         )
         native_items = native_provider.get_securityhub_findings(limit=native_findings_limit)
-        findings.extend(
-            converted
-            for item in native_items
-            if (converted := securityhub_to_finding(item, fallback_region=region)) is not None
-        )
+        for item in native_items:
+            converted = securityhub_to_finding(item, fallback_region=region)
+            if converted is not None:
+                if converted.account_id is None:
+                    converted.account_id = expected_account_id
+                findings.append(converted)
 
     return findings
 
@@ -469,6 +470,8 @@ def main() -> None:
     )
     if baseline_actions_skipped:
         raise SystemExit(2)
+    if assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
