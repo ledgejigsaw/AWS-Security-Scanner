@@ -187,6 +187,13 @@ class AWSProvider:
             attributes["bucket_policy"] = (
                 self._get_bucket_policy(bucket_name)
             )
+            attributes["acl"] = self._get_bucket_acl(bucket_name)
+            attributes["object_ownership"] = self._get_bucket_object_ownership(
+                bucket_name
+            )
+            attributes["versioning_configuration"] = (
+                self._get_bucket_versioning_configuration(bucket_name)
+            )
 
             resources.append(
                 Resource(
@@ -558,6 +565,56 @@ class AWSProvider:
 
         return json.loads(policy)
 
+    def _get_bucket_acl(self, bucket_name: str) -> dict | None:
+        """Return normalised bucket ACL grants, or None when not observable."""
+        try:
+            response = self.s3_client.get_bucket_acl(Bucket=bucket_name)
+        except ClientError:
+            return None
+
+        grants = []
+        for grant in response.get("Grants", []):
+            grantee = grant.get("Grantee", {})
+            grants.append({
+                "grantee": {
+                    "type": grantee.get("Type"),
+                    "uri": grantee.get("URI"),
+                    "id": grantee.get("ID"),
+                },
+                "permission": grant.get("Permission"),
+            })
+        return {"grants": grants}
+
+    def _get_bucket_object_ownership(self, bucket_name: str) -> str | None:
+        """Return the configured Object Ownership mode when observable."""
+        try:
+            response = self.s3_client.get_bucket_ownership_controls(
+                Bucket=bucket_name
+            )
+        except ClientError:
+            return None
+
+        rules = response.get("OwnershipControls", {}).get("Rules", [])
+        if not rules:
+            return None
+        return rules[0].get("ObjectOwnership")
+
+    def _get_bucket_versioning_configuration(
+        self, bucket_name: str
+    ) -> dict | None:
+        """Return versioning and MFA Delete status without changing the bucket."""
+        try:
+            response = self.s3_client.get_bucket_versioning(Bucket=bucket_name)
+        except ClientError:
+            return None
+
+        status = response.get("Status")
+        if status is None:
+            return None
+        return {
+            "status": status,
+            "mfa_delete": response.get("MFADelete", "Disabled"),
+        }
 
     def discover_security_groups(self) -> list[Resource]:
         """Discover EC2 security groups and normalise network rules."""
