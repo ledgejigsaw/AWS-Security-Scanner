@@ -14,6 +14,8 @@ def build_html_report(
     summary = build_summary(findings)
     rows = []
 
+    include_source_columns = any(finding.source_type != "scanner" for finding in findings)
+
     for finding in findings:
         values = (
             finding.severity.value,
@@ -26,6 +28,14 @@ def build_html_report(
             finding.region or "",
             finding.evidence or "",
         )
+        if include_source_columns:
+            values += (
+                finding.source_type,
+                finding.source_id or "",
+                finding.source_product or "",
+                finding.first_observed_at or "",
+                finding.last_observed_at or "",
+            )
         cells = "".join(
             f"<td>{html.escape(str(value))}</td>"
             for value in values
@@ -51,12 +61,17 @@ def build_html_report(
         rows.append(f"<tr>{cells}</tr>")
 
     if not rows:
-        colspan = 10 if compliance_mapping is not None else 9
+        colspan = (10 if compliance_mapping is not None else 9) + (5 if include_source_columns else 0)
         rows.append(f'<tr><td colspan="{colspan}">No findings.</td></tr>')
 
     severity_rows = "".join(
         f"<tr><th>{severity}</th><td>{count}</td></tr>"
         for severity, count in summary.by_severity.items()
+    )
+    source_header = (
+        "<th>Source type</th><th>Source finding ID</th><th>Source product</th>"
+        "<th>First observed</th><th>Last observed</th>"
+        if include_source_columns else ""
     )
     mapping_header = (
         "<th>Compliance mappings</th>"
@@ -102,7 +117,7 @@ def build_html_report(
   </table>
   <h2>Findings</h2>
   <table>
-    <thead><tr><th>Severity</th><th>Check</th><th>Service</th><th>Resource</th><th>Title</th><th>Description</th><th>Remediation</th><th>Region</th><th>Evidence</th>{mapping_header}</tr></thead>
+    <thead><tr><th>Severity</th><th>Check</th><th>Service</th><th>Resource</th><th>Title</th><th>Description</th><th>Remediation</th><th>Region</th><th>Evidence</th>{source_header}{mapping_header}</tr></thead>
     <tbody>{"".join(rows)}</tbody>
   </table>
 </body>
