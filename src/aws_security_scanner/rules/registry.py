@@ -9,6 +9,9 @@ from aws_security_scanner.rules.s3_rules import (
     check_excessive_s3_actions,
     check_wildcard_bucket_resource,
     check_public_write_access,
+    check_public_acl,
+    check_acl_object_ownership,
+    check_mfa_delete,
 )
 
 from aws_security_scanner.rules.iam_rules import (
@@ -163,6 +166,9 @@ def get_all_rules():
         check_excessive_s3_actions,
         check_wildcard_bucket_resource,
         check_public_write_access,
+        check_public_acl,
+        check_acl_object_ownership,
+        check_mfa_delete,
         check_overly_permissive_policy,
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
