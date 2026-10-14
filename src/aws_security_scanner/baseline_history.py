@@ -173,6 +173,9 @@ def diff_findings(current: Iterable[Finding], baseline_records: dict[str, dict[s
         }
         if record.get("account_id") is not None:
             entry["account_id"] = record["account_id"]
+        for key in ("source_type", "source_id", "source_product", "first_observed_at", "last_observed_at"):
+            if record.get(key) is not None:
+                entry[key] = record[key]
         result["resolved"].append(entry)
     for fingerprint in sorted(baseline_ids & set(current_by_id)):
         item = current_by_id[fingerprint]
