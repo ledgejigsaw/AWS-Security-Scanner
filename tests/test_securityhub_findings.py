@@ -3,6 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from aws_security_scanner.baseline_history import finding_fingerprint
+from aws_security_scanner.cli import build_parser
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.providers.aws import AWSProvider
@@ -142,3 +143,14 @@ def test_scanner_finding_keeps_legacy_baseline_fingerprint_and_report_shape():
     report_finding = build_json_report([finding])["findings"][0]
     assert "source_type" not in report_finding
     assert "source_id" not in report_finding
+
+
+def test_cli_accepts_opt_in_native_findings_and_limit():
+    args = build_parser().parse_args([
+        "--source", "aws",
+        "--region", "eu-west-2",
+        "--include-native-findings",
+        "--native-findings-limit", "250",
+    ])
+    assert args.include_native_findings is True
+    assert args.native_findings_limit == 250
