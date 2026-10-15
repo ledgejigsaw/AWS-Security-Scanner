@@ -2,6 +2,8 @@
 
 This page describes the service-level coverage currently registered in `rules/registry.py`. It is a baseline inventory, not a statement of full AWS service coverage or compliance.
 
+The optional resource graph export represents only explicitly normalised relationships. It does not perform reachability analysis or infer missing edges; unresolved references are reported as unknown.
+
 ## Current registered baseline
 
 | Service/domain | Registered checks | Scope and important limitations |
