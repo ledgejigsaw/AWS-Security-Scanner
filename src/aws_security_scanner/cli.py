@@ -10,6 +10,7 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
+from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.multi_account import run_multi_account_scan
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
@@ -80,13 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-native-findings",
         action="store_true",
-        help="Import a bounded set of native AWS Security Hub findings (AWS source only).",
+        help="Import bounded native AWS Security Hub and GuardDuty findings (AWS source only).",
     )
     parser.add_argument(
         "--native-findings-limit",
         type=int,
         default=100,
-        help="Maximum number of Security Hub findings to import (1-1000; default: 100).",
+        help="Maximum findings to import per native source (1-1000; default: 100).",
     )
 
     parser.add_argument(
@@ -290,7 +291,23 @@ def run_scan(
         )
         native_items = native_provider.get_securityhub_findings(limit=native_findings_limit)
         for item in native_items:
+            # GuardDuty's direct API below is the canonical source for GuardDuty
+            # findings; avoid importing the same product again through Security Hub.
+            product_name = item.get("ProductName") if isinstance(item, dict) else None
+            product_arn = item.get("ProductArn", "") if isinstance(item, dict) else ""
+            if product_name == "GuardDuty" or (
+                isinstance(product_arn, str) and "/product/aws/guardduty" in product_arn
+            ):
+                continue
             converted = securityhub_to_finding(item, fallback_region=region)
+            if converted is not None:
+                if converted.account_id is None:
+                    converted.account_id = expected_account_id
+                findings.append(converted)
+
+        guardduty_items = native_provider.get_guardduty_findings(limit=native_findings_limit)
+        for item in guardduty_items:
+            converted = guardduty_to_finding(item, fallback_region=region)
             if converted is not None:
                 if converted.account_id is None:
                     converted.account_id = expected_account_id
