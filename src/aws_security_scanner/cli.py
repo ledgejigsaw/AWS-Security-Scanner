@@ -12,6 +12,7 @@ from aws_security_scanner.providers.terraform_hcl import TerraformHCLProvider
 from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
+from aws_security_scanner.integrations.access_analyzer import access_analyzer_to_finding
 from aws_security_scanner.multi_account import run_multi_account_scan
 from aws_security_scanner.graph import write_resource_graph
 from aws_security_scanner.reporting.json_reporter import write_json_report
@@ -355,6 +356,16 @@ def run_scan(
         guardduty_items = native_provider.get_guardduty_findings(limit=native_findings_limit)
         for item in guardduty_items:
             converted = guardduty_to_finding(item, fallback_region=region)
+            if converted is not None:
+                if converted.account_id is None:
+                    converted.account_id = expected_account_id
+                findings.append(converted)
+
+        access_analyzer_items = native_provider.get_access_analyzer_findings(
+            limit=native_findings_limit
+        )
+        for item in access_analyzer_items:
+            converted = access_analyzer_to_finding(item, fallback_region=region)
             if converted is not None:
                 if converted.account_id is None:
                     converted.account_id = expected_account_id
