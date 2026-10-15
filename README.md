@@ -1,12 +1,12 @@
 # AWS Security Scanner
 
-A Python-based, read-only cloud security posture assessment tool for AWS resources and Terraform JSON. The project is being built as a practical cloud-security engineering portfolio, with reusable rules, evidence-based findings, deterministic tests and CI-friendly output.
+A Python-based, read-only cloud security posture assessment tool for AWS resources, Terraform JSON and Terraform HCL. The project is being built as a practical cloud-security engineering portfolio, with reusable rules, evidence-based findings, deterministic tests and CI-friendly output.
 
-> **Current status:** Active development. Fixture and Terraform JSON scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS, SNS, API Gateway REST API stages, ECS task definitions and ECS services, and CloudFront distributions, regional and CloudFront-scope WAFv2 Web ACLs, and Application Load Balancers with WAF association metadata, plus regional Security Hub and GuardDuty posture discovery, with optional bounded import of native Security Hub findings. Live-account validation has not yet been completed.
+> **Current status:** Active development. Fixture, Terraform JSON and partial Terraform HCL scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS, SNS, API Gateway REST API stages, ECS task definitions and ECS services, and CloudFront distributions, regional and CloudFront-scope WAFv2 Web ACLs, and Application Load Balancers with WAF association metadata, plus regional Security Hub, GuardDuty and AWS Config posture discovery, with optional bounded import of native Security Hub and GuardDuty findings. Live-account validation has not yet been completed.
 
 ## At a glance
 
-- **100 registered security rules:** 14 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
+- **103 registered security rules:** 14 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
@@ -42,7 +42,7 @@ aws-security-scan --source hcl --file main.tf --format sarif --output reports/ia
 terraform show -json > terraform.json
 ```
 
-The Terraform provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging, lifecycle and bucket-policy configuration. Direct HCL parsing is not currently implemented.
+The Terraform JSON provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging, lifecycle and bucket-policy configuration. The direct HCL provider uses `python-hcl2` for offline static analysis; it does not evaluate variables/locals, expand modules, or execute Terraform. Unresolved expressions and unexpanded modules produce informational diagnostics. See [rule coverage](docs/rule-coverage.md) for the supported subset.
 
 **AWS APIs** are accessed through boto3 in read-only mode. Use `--profile` to select a profile from the standard AWS shared configuration/credentials files, and repeat `--service` to limit discovery to specific supported service domains. Without `--service`, the scanner runs its full supported discovery scope. For example:
 
@@ -50,9 +50,9 @@ The Terraform provider normalises resource data and resolves/aggregates related 
 aws-security-scan --source aws --profile security-audit --region eu-west-2 --service s3 --service iam --format json --output reports/s3-iam.json
 ```
 
-Supported service selectors are `s3`, `iam`, `ec2`, `ebs`, `vpc`, `cloudtrail`, `kms`, `rds`, `lambda`, `secretsmanager`, `ecr`, `dynamodb`, `sqs`, `sns`, `apigateway`, `ecs`, `cloudfront`, `waf`, `elb`, `securityhub` and `guardduty`. These filters select discovery domains, not individual rule IDs. The profile name is not a credential and no credentials are accepted as command-line arguments. Profile and service options apply only to `--source aws`; the multi-account role-assumption mode uses the caller's default credential chain in this release.
+Supported service selectors are `s3`, `iam`, `ec2`, `ebs`, `vpc`, `cloudtrail`, `kms`, `rds`, `lambda`, `secretsmanager`, `ecr`, `dynamodb`, `sqs`, `sns`, `apigateway`, `ecs`, `cloudfront`, `waf`, `elb`, `securityhub`, `guardduty` and `config`. These filters select discovery domains, not individual rule IDs. The profile name is not a credential and no credentials are accepted as command-line arguments. Profile and service options apply only to `--source aws`; the multi-account role-assumption mode uses the caller's default credential chain in this release.
 
-The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, EBS volumes and owned snapshots, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes, SNS topic attributes and API Gateway REST API stages, including method authorization metadata and stage access-log settings, plus ECS task-definition container settings and ECS service network configuration, and regional Security Hub hub status and GuardDuty detector status. Native Security Hub findings can be imported explicitly with `--include-native-findings`; GuardDuty findings are available through this integration only when surfaced by Security Hub. Direct GuardDuty `GetFindings` ingestion is not yet implemented. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
+The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, EBS volumes and owned snapshots, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes, SNS topic attributes and API Gateway REST API stages, including method authorization metadata and stage access-log settings, plus ECS task-definition container settings and ECS service network configuration, and regional Security Hub hub status, GuardDuty detector status and AWS Config recorder/recording/delivery-channel status. Native Security Hub and GuardDuty findings can be imported explicitly with `--include-native-findings`; imported findings retain source identifiers and timestamps where available. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
 
 WAF/application-edge discovery additionally covers regional and CloudFront-scope WAFv2 Web ACL metadata and Application Load Balancer WAF association state. See [WAF and application-edge posture](docs/waf-application-edge.md) for scope and limitations.
 
@@ -171,7 +171,7 @@ Run a read-only AWS scan (requires credentials with the necessary read permissio
 aws-security-scan --source aws --region eu-west-2 --format json --output reports/aws-scan.json
 ```
 
-Opt in to import native AWS Security Hub findings from the selected region:
+Opt in to import bounded native AWS Security Hub and GuardDuty findings from the selected region:
 
 ```bash
 aws-security-scan --source aws --region eu-west-2 --include-native-findings --native-findings-limit 100 --format json --output reports/aws-scan-with-native-findings.json
@@ -249,7 +249,7 @@ The [project documentation](docs/README.md) provides deeper notes on architectur
 The current processing path is:
 
 ```text
-Fixtures / Terraform JSON / AWS APIs
+Fixtures / Terraform JSON / Terraform HCL / AWS APIs
                  |
                  v
          Resource normalisation
@@ -285,74 +285,27 @@ AWS API calls are mocked in automated tests. These tests establish expected beha
 
 ## Roadmap
 
-Roadmap status is based on the current repository code and tests, not on the previous README's stale checklist.
+Status reflects repository code and automated tests. All provider tests are mocked or fixture-based; **live AWS end-to-end validation has not been performed**.
 
-### Implemented in code
+### Implemented and tested offline
 
-- [x] Python package, CLI, `Resource`, `Finding` and rule models
-- [x] Decorator-based rule registration and rule engine
-- [x] Fixture provider and Terraform JSON provider
-- [x] Terraform relationship resolution and S3 resource aggregation
-- [x] S3 checks S3-001 through S3-013
-- [x] IAM, EC2 and VPC/network rule modules
-- [x] Read-only AWS discovery methods for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS, SNS and API Gateway REST API stages
-- [x] CloudTrail logging, multi-region and log-file validation checks
-- [x] KMS automatic-rotation, pending-deletion and broad wildcard key-policy checks
-- [x] YAML policy loading, per-rule enable/disable and severity overrides
-- [x] JSON, self-contained HTML and SARIF 2.1.0 reporting
-- [x] Mocked provider, rule, CLI and integration tests
-- [x] IAM-006 severity corrected to INFO: an active key alone is not proof of a vulnerability
-- [x] Register IAM-010, IAM-011 and IAM-012 so the existing privilege-escalation, sensitive-action and broad-trust checks execute
-- [x] Wire IAM user and account-level credential-report resources into the AWS CLI scan path
-- [x] Add SARIF output for CI/code-scanning ingestion
-- [x] Add GitHub Actions test workflow for Python 3.11 and 3.13
-- [x] Add minimum-severity filtering after policy overrides
-- [x] Add versioned JSON finding baselines with stable fingerprints and suppression
+- [x] Fixture, Terraform JSON and partial Terraform HCL sources.
+- [x] Read-only AWS discovery across the services listed above, including AWS Config, Security Hub and GuardDuty posture.
+- [x] Native Security Hub and GuardDuty finding import, with source identity and deduplication.
+- [x] Multi-account scans through explicit cross-account audit roles, expected-account validation and partial-failure reporting.
+- [x] JSON, self-contained HTML and SARIF reports; optional compliance mapping.
+- [x] Severity filtering, YAML policy overrides, baseline creation, suppression, diffs and expiry metadata.
+- [x] Deterministic resource graph JSON with conservative relationship provenance.
+- [x] CI on Python 3.11 and 3.13 plus container and offline fixture smoke tests.
 
-### In progress
+### Limitations and next work
 
-- [x] Add continuation-token pagination for S3 bucket listing and EC2 resource discovery
-- [x] Fail explicitly when IAM credential-report data is missing, stale, not ready or incomplete
-- [x] Add regression tests for pagination and unavailable credential-report data
-- [ ] Validate AWS discovery and credential-report edge cases against a non-production account
-
-### Next feature batches
-
-1. **Additional AWS coverage:** WAF/application-edge posture, EC2/EBS/snapshot protection, extended S3 controls and AWS-native security-service integrations.
-2. **Lifecycle and data quality:** refresh the reviewed Lambda runtime lifecycle snapshot before release, then broaden CloudTrail/KMS account-wide coverage.
-3. **Triage and reporting:** finding deduplication, baseline comparison/diffs and more explicit suppression controls.
-4. **Infrastructure-as-code coverage:** additional Terraform resource relationships and direct HCL parsing.
-5. **Delivery workflow and engineering:** contributor guide, rule metadata validation, packaging checks and CI/CD scanning examples.
-
-### API Gateway scope and limitations
-
-- The initial implementation covers API Gateway **REST APIs (v1)** only; API Gateway HTTP APIs (v2) are not yet discovered.
-- A method configured with `authorizationType=NONE` is flagged only when the API has no resource policy. Public endpoint presence alone is not considered a vulnerability.
-- Stage access logging is assessed from the stage's `accessLogSettings` destination and format. Missing stages, methods or incomplete settings are not treated as proof of a separate weakness.
-- Discovery uses metadata APIs only and does not invoke API endpoints or change configuration.
-
-### Not yet verified or implemented
-
-- [ ] End-to-end scan against a real AWS account (not yet performed)
-- [ ] Direct Terraform HCL parsing
-- [x] RDS discovery and four baseline security checks
-- [x] Lambda discovery and two baseline security checks
-- [x] Secrets Manager metadata discovery and two baseline security checks
-- [x] ECR repository discovery and two baseline security checks
-- [x] DynamoDB table discovery and three baseline security checks
-- [x] SQS queue and SNS topic discovery with access-policy and encryption checks
-- [x] API Gateway REST API stage discovery, method-authorization and access-logging checks
-- [x] ECS task-definition and service discovery, with baseline container-hardening and public-IP checks
-- [ ] Additional CloudTrail/KMS account-wide coverage
-- [x] Initial maintained Lambda runtime lifecycle snapshot and deprecated-runtime check (refresh against AWS before release)
-- [x] Initial CloudFront distribution checks (review scope and false positives before release)
-- [x] Initial regional Security Hub and GuardDuty enablement posture checks plus optional native-finding imports
-- [x] AWS Config recorder, recording-state and delivery-channel posture checks
-- [x] Extended S3 ACL, Object Ownership and MFA Delete review checks (metadata-only; MFA Delete is informational)
-- [ ] Multi-account scanning and compliance reporting (tracked in GitHub issues)
-- [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
-- [ ] Automated code-scanning upload and CI/CD scanning examples
-- [ ] Architecture visualisation
+1. **AWS-native integrations:** extend Issue #32 with IAM Access Analyzer findings; assess Macie and Inspector separately before adding their broader APIs.
+2. **S3 access analysis:** continue Issue #36 with condition-aware cross-account bucket-policy analysis and policy-dependent Object Lock signals; do not fetch object contents.
+3. **Explainable risk:** Issue #47 proposes optional, versioned risk scores distinct from severity; scores must not be represented as breach probabilities.
+4. **Multi-cloud architecture:** Issues #58–#60 cover provider-neutral interfaces and future Azure/GCP providers. Azure and GCP are planned, not supported.
+5. **Repository quality:** keep rule inventory, coverage docs, CLI options and examples synchronized with implementation; refresh lifecycle snapshots before releases.
+6. **Live validation:** perform a least-privilege test against a non-production AWS account before claiming end-to-end validation.
 
 ## Project goals
 

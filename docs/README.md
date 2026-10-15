@@ -19,7 +19,7 @@ This documentation is version-controlled with the scanner and should be updated 
 
 ## Project status
 
-The scanner is under active development. It supports fixture-based scans, Terraform JSON normalisation and read-only AWS discovery for the services listed in the main [README](../README.md), including initial CloudFront distribution metadata checks. Automated tests use mocks and fixtures; a live AWS account end-to-end scan has not yet been completed.
+The scanner is under active development. It supports fixture-based scans, Terraform JSON and partial HCL normalisation and read-only AWS discovery for the services listed in the main [README](../README.md), including CloudFront, AWS Config and native Security Hub/GuardDuty finding ingestion. Automated tests use mocks and fixtures; a live AWS account end-to-end scan has not yet been completed.
 
 ## Keeping these pages current
 
