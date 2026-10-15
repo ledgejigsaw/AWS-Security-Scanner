@@ -29,7 +29,7 @@ Fixtures / Terraform JSON / Terraform HCL / AWS APIs
 
 - `providers/aws.py`: read-only AWS resource discovery and metadata collection, including ECS task definitions and services.
 - `providers/fixture.py`: deterministic fixture input for offline testing.
-- `providers/terraform.py` and `normalization/terraform.py`: Terraform JSON loading and conversion into the normalised resource model.\n- `providers/terraform_hcl.py`: offline, partial HCL parsing without Terraform execution, provider downloads or module expansion. Unresolved expressions are surfaced as diagnostics.
+- `providers/terraform.py` and `normalization/terraform.py`: Terraform JSON loading and conversion into the normalised resource model. Resource-reference paths preserve list indices and nested attribute paths so multiple references are not silently overwritten.\n- `providers/terraform_hcl.py`: offline, partial HCL parsing without Terraform execution, provider downloads or module expansion. Unresolved expressions are surfaced as diagnostics.
 - `models/resource.py`: source-neutral resource data, including resource type, ID, attributes, source, region and optional relationships.
 - `rules/`: service-specific security checks and central rule registry. ECS includes an informational review signal when a task definition explicitly reuses the same IAM role for task and execution permissions; this is not treated as proof of a vulnerability.
 - `engine.py`: executes rules against compatible resources and applies policy settings.

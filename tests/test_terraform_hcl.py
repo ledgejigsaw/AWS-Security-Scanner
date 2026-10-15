@@ -110,3 +110,67 @@ def test_terraform_normalisation_preserves_non_s3_resources():
         source="terraform",
     )
     assert aggregate_s3_resources([non_s3]) == [non_s3]
+
+
+
+def test_hcl_provider_preserves_multiple_resource_references_in_lists(tmp_path):
+    source = tmp_path / "network.tf"
+    source.write_text(
+        '''
+resource "aws_subnet" "private" {
+  vpc_id = "vpc-123"
+}
+
+resource "aws_security_group" "web" {
+  name = "web"
+}
+
+resource "aws_security_group" "app" {
+  name = "app"
+}
+
+resource "aws_instance" "application" {
+  subnet_id = aws_subnet.private.id
+  vpc_security_group_ids = [
+    aws_security_group.web.id,
+    aws_security_group.app.id,
+  ]
+}
+''',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(source).discover()
+    instance = next(item for item in resources if item.resource_type == "aws_instance")
+
+    assert instance.relationships == {
+        "subnet_id": "aws_subnet.private",
+        "vpc_security_group_ids[0]": "aws_security_group.web",
+        "vpc_security_group_ids[1]": "aws_security_group.app",
+    }
+
+
+def test_hcl_provider_preserves_nested_relationship_paths(tmp_path):
+    source = tmp_path / "routes.tf"
+    source.write_text(
+        '''
+resource "aws_route_table" "private" {
+  vpc_id = "vpc-123"
+  route {
+    gateway_id = aws_internet_gateway.main.id
+  }
+}
+
+resource "aws_internet_gateway" "main" {
+  vpc_id = "vpc-123"
+}
+''',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(source).discover()
+    route_table = next(item for item in resources if item.resource_type == "aws_route_table")
+
+    assert route_table.relationships == {
+        "route[0].gateway_id": "aws_internet_gateway.main",
+    }
