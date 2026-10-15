@@ -44,10 +44,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Ask guided questions to configure and confirm a scan; cannot be combined with scan options.",
+    )
+
+    parser.add_argument(
         "--source",
         choices=["fixture", "terraform", "hcl", "aws"],
-        required=True,
-        help="Security resource source.",
+        required=False,
+        help="Security resource source (omit only when using --interactive).",
     )
 
     parser.add_argument(
@@ -368,6 +374,24 @@ def main() -> None:
 
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.interactive:
+        supplied_options = [
+            args.source, args.file, args.accounts_file, args.region, args.profile,
+            args.service, args.include_native_findings, args.output, args.graph_output,
+            args.policy, args.compliance_mapping, args.min_severity, args.baseline,
+            args.write_baseline, args.compare_baseline, args.diff_output,
+        ]
+        if any(value not in (None, False, []) for value in supplied_options):
+            parser.error("--interactive cannot be combined with other scan options; answer the guided prompts instead")
+        from aws_security_scanner.interactive import build_interactive_args
+
+        interactive_args = build_interactive_args()
+        if interactive_args is None:
+            return
+        args = parser.parse_args(interactive_args)
+    elif args.source is None:
+        parser.error("--source is required unless --interactive is used")
 
     if args.diff_output and not args.compare_baseline:
         parser.error("--diff-output requires --compare-baseline")
