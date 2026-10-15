@@ -1,4 +1,5 @@
 import html
+import json
 from pathlib import Path
 
 from aws_security_scanner.models.finding import Finding
@@ -16,6 +17,7 @@ def build_html_report(
     rows = []
 
     include_source_columns = any(finding.source_type != "scanner" for finding in findings)
+    include_risk_columns = any(finding.risk_score is not None for finding in findings)
 
     for finding in findings:
         values = (
@@ -36,6 +38,11 @@ def build_html_report(
                 finding.source_product or "",
                 finding.first_observed_at or "",
                 finding.last_observed_at or "",
+            )
+        if include_risk_columns:
+            values += (
+                finding.risk_score if finding.risk_score is not None else "",
+                json.dumps(finding.risk_explanation, sort_keys=True) if finding.risk_explanation else "",
             )
         cells = "".join(
             f"<td>{html.escape(str(value))}</td>"
@@ -62,7 +69,7 @@ def build_html_report(
         rows.append(f"<tr>{cells}</tr>")
 
     if not rows:
-        colspan = (10 if compliance_mapping is not None else 9) + (5 if include_source_columns else 0)
+        colspan = (10 if compliance_mapping is not None else 9) + (5 if include_source_columns else 0) + (2 if include_risk_columns else 0)
         rows.append(f'<tr><td colspan="{colspan}">No findings.</td></tr>')
 
     severity_rows = "".join(
@@ -73,6 +80,10 @@ def build_html_report(
         "<th>Source type</th><th>Source finding ID</th><th>Source product</th>"
         "<th>First observed</th><th>Last observed</th>"
         if include_source_columns else ""
+    )
+    risk_header = (
+        "<th>Risk score (v1)</th><th>Risk factors</th>"
+        if include_risk_columns else ""
     )
     mapping_header = (
         "<th>Compliance mappings</th>"
@@ -149,7 +160,7 @@ def build_html_report(
   </table>
   <h2>Findings</h2>
   <table>
-    <thead><tr><th>Severity</th><th>Check</th><th>Service</th><th>Resource</th><th>Title</th><th>Description</th><th>Remediation</th><th>Region</th><th>Evidence</th>{source_header}{mapping_header}</tr></thead>
+    <thead><tr><th>Severity</th><th>Check</th><th>Service</th><th>Resource</th><th>Title</th><th>Description</th><th>Remediation</th><th>Region</th><th>Evidence</th>{source_header}{risk_header}{mapping_header}</tr></thead>
     <tbody>{"".join(rows)}</tbody>
   </table>
 </body>
