@@ -62,18 +62,28 @@ class TerraformProvider:
 
         if isinstance(value, dict):
             for key, nested_value in value.items():
+                child_name = (
+                    f"{attribute_name}.{key}"
+                    if attribute_name
+                    else key
+                )
                 self._find_references(
                     nested_value,
                     relationships,
-                    attribute_name=key,
+                    attribute_name=child_name,
                 )
 
         elif isinstance(value, list):
-            for item in value:
+            for index, item in enumerate(value):
+                child_name = (
+                    f"{attribute_name}[{index}]"
+                    if attribute_name
+                    else f"[{index}]"
+                )
                 self._find_references(
                     item,
                     relationships,
-                    attribute_name=attribute_name,
+                    attribute_name=child_name,
                 )
 
         elif isinstance(value, str):
