@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **105 registered security rules:** 16 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
+- **106 registered security rules:** 16 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
@@ -50,9 +50,9 @@ The Terraform JSON provider normalises resource data and resolves/aggregates rel
 aws-security-scan --source aws --profile security-audit --region eu-west-2 --service s3 --service iam --format json --output reports/s3-iam.json
 ```
 
-Supported service selectors are `s3`, `iam`, `ec2`, `ebs`, `vpc`, `cloudtrail`, `kms`, `rds`, `lambda`, `secretsmanager`, `ecr`, `dynamodb`, `sqs`, `sns`, `apigateway`, `ecs`, `cloudfront`, `waf`, `elb`, `securityhub`, `guardduty` and `config`. These filters select discovery domains, not individual rule IDs. The profile name is not a credential and no credentials are accepted as command-line arguments. Profile and service options apply only to `--source aws`; the multi-account role-assumption mode uses the caller's default credential chain in this release.
+Supported service selectors are `s3`, `iam`, `ec2`, `ebs`, `vpc`, `cloudtrail`, `kms`, `rds`, `lambda`, `secretsmanager`, `ecr`, `dynamodb`, `sqs`, `sns`, `apigateway`, `ecs`, `cloudfront`, `waf`, `elb`, `securityhub`, `guardduty`, `config` and `macie`. These filters select discovery domains, not individual rule IDs. The profile name is not a credential and no credentials are accepted as command-line arguments. Profile and service options apply only to `--source aws`; the multi-account role-assumption mode uses the caller's default credential chain in this release.
 
-The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, EBS volumes and owned snapshots, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes, SNS topic attributes and API Gateway REST API stages, including method authorization metadata and stage access-log settings, plus ECS task-definition container settings and ECS service network configuration, and regional Security Hub hub status, GuardDuty detector status and AWS Config recorder/recording/delivery-channel status. Native Security Hub and GuardDuty findings can be imported explicitly with `--include-native-findings`; imported findings retain source identifiers and timestamps where available. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
+The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, EBS volumes and owned snapshots, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes, SNS topic attributes and API Gateway REST API stages, including method authorization metadata and stage access-log settings, plus ECS task-definition container settings and ECS service network configuration, and regional Security Hub hub status, GuardDuty detector status and AWS Config recorder/recording/delivery-channel status, and regional Amazon Macie session status. Native Security Hub and GuardDuty findings can be imported explicitly with `--include-native-findings`; imported findings retain source identifiers and timestamps where available. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
 
 WAF/application-edge discovery additionally covers regional and CloudFront-scope WAFv2 Web ACL metadata and Application Load Balancer WAF association state. See [WAF and application-edge posture](docs/waf-application-edge.md) for scope and limitations.
 
@@ -69,6 +69,7 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | Security Hub | Regional hub enablement posture; optional import of up to 100 native findings by default (limit configurable to 1,000), preserving source IDs, product ARNs and observation timestamps |
 | GuardDuty | Regional detector enablement posture and optional bounded native-finding import, preserving source IDs and timestamps |
 | AWS Config | Regional recorder status, recording state and delivery-channel presence; API permission failures are not treated as disabled state |
+| Amazon Macie | Regional session enablement/paused status; does not assess discovery-job coverage or delegated-administrator configuration |
 | KMS | Automatic rotation, pending deletion, broad wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
 | Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies and runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot |
@@ -82,7 +83,7 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | Application Load Balancers | Missing WAF association as an informational review signal; network load balancers are not included | 
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 103 rules (15 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 106 rules (16 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -300,7 +301,7 @@ Status reflects repository code and automated tests. All provider tests are mock
 ### Implemented and tested offline
 
 - [x] Fixture, Terraform JSON and partial Terraform HCL sources.
-- [x] Read-only AWS discovery across the services listed above, including AWS Config, Security Hub and GuardDuty posture.
+- [x] Read-only AWS discovery across the services listed above, including AWS Config, Security Hub, GuardDuty and Amazon Macie posture.
 - [x] Native Security Hub and GuardDuty finding import, with source identity and deduplication.
 - [x] Multi-account scans through explicit cross-account audit roles, expected-account validation and partial-failure reporting.
 - [x] JSON, self-contained HTML and SARIF reports; optional compliance mapping.
