@@ -43,6 +43,7 @@ class AWSProvider:
         config_client: Any | None = None,
         session: Any | None = None,
         accessanalyzer_client: Any | None = None,
+        macie_client: Any | None = None,
     ):
         self.region = region
         # Preserve the existing boto3.client path for single-account scans;
@@ -116,6 +117,7 @@ class AWSProvider:
         self.guardduty_client = guardduty_client or self._client("guardduty", region_name=region)
         self.config_client = config_client or self._client("config", region_name=region)
         self.accessanalyzer_client = accessanalyzer_client or self._client("accessanalyzer", region_name=region)
+        self.macie_client = macie_client or self._client("macie2", region_name=region)
 
     def _collect_pages(
         self,
@@ -2135,6 +2137,51 @@ class AWSProvider:
                     "recorder_configured": bool(recorders),
                     "recording": recording,
                     "delivery_channel_configured": bool(channels),
+                },
+                source="aws",
+                region=self.region,
+            )
+        ]
+
+    def discover_macie_session(self) -> list[Resource]:
+        """Discover regional Amazon Macie session status using a read-only API."""
+        try:
+            response = self.macie_client.get_macie_session()
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code != "ResourceNotFoundException":
+                # Permission and unexpected API errors must not be reported as
+                # a disabled service.
+                raise
+            return [
+                Resource(
+                    resource_type="aws_macie_session",
+                    resource_id="macie-session",
+                    attributes={
+                        "enabled": False,
+                        "status": "NOT_ENABLED",
+                    },
+                    source="aws",
+                    region=self.region,
+                )
+            ]
+
+        status = response.get("status")
+        enabled = True if status == "ENABLED" else (
+            False if status == "PAUSED" else None
+        )
+        return [
+            Resource(
+                resource_type="aws_macie_session",
+                resource_id="macie-session",
+                attributes={
+                    "enabled": enabled,
+                    "status": status if isinstance(status, str) else None,
+                    "finding_publishing_frequency": response.get(
+                        "findingPublishingFrequency"
+                    ),
+                    "created_at": response.get("createdAt"),
+                    "updated_at": response.get("updatedAt"),
                 },
                 source="aws",
                 region=self.region,

@@ -13,9 +13,10 @@ def test_cli_accepts_profile_and_repeated_service_filters():
         "--region", "eu-west-2",
         "--service", "s3",
         "--service", "iam",
+        "--service", "macie",
     ])
     assert args.profile == "security-audit"
-    assert args.service == ["s3", "iam"]
+    assert args.service == ["s3", "iam", "macie"]
 
 
 def test_discovery_only_invokes_selected_service_methods():
@@ -63,3 +64,14 @@ def test_run_scan_rejects_profile_for_non_aws_source(source):
 def test_run_scan_rejects_unknown_service_name():
     with pytest.raises(ValueError, match="Unsupported AWS service selection"):
         run_scan("aws", services=["not-a-service"])
+
+
+
+def test_discovery_invokes_macie_only_when_selected():
+    with patch("aws_security_scanner.cli.AWSProvider") as provider_cls:
+        provider_cls.return_value.discover_macie_session.return_value = ["macie"]
+        resources = discover_resources("aws", region="eu-west-2", services=["macie"])
+
+    assert resources == ["macie"]
+    provider_cls.return_value.discover_macie_session.assert_called_once_with()
+    provider_cls.return_value.discover_s3_buckets.assert_not_called()

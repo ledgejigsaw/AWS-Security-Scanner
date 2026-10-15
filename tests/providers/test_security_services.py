@@ -8,6 +8,7 @@ from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.rules.security_services_rules import (
     check_guardduty_disabled,
     check_security_hub_disabled,
+    check_macie_disabled,
 )
 
 
@@ -97,3 +98,62 @@ def test_unknown_guardduty_state_is_not_treated_as_disabled():
     )
 
     assert check_guardduty_disabled(resource) == []
+
+
+
+def test_macie_enabled_session_is_discovered_regionally():
+    client = Mock()
+    client.get_macie_session.return_value = {
+        "status": "ENABLED",
+        "findingPublishingFrequency": "FIFTEEN_MINUTES",
+        "createdAt": "2026-10-01T00:00:00Z",
+    }
+    provider = AWSProvider(macie_client=client, region="eu-west-2")
+
+    resources = provider.discover_macie_session()
+
+    assert len(resources) == 1
+    assert resources[0].resource_type == "aws_macie_session"
+    assert resources[0].attributes["enabled"] is True
+    assert resources[0].attributes["status"] == "ENABLED"
+    assert resources[0].region == "eu-west-2"
+    assert check_macie_disabled(resources[0]) == []
+    client.get_macie_session.assert_called_once_with()
+
+
+def test_macie_not_found_and_paused_session_are_reported_as_disabled():
+    client = Mock()
+    client.get_macie_session.side_effect = client_error(
+        "ResourceNotFoundException", "GetMacieSession"
+    )
+    provider = AWSProvider(macie_client=client, region="eu-west-2")
+
+    resource = provider.discover_macie_session()[0]
+    assert resource.attributes == {"enabled": False, "status": "NOT_ENABLED"}
+    findings = check_macie_disabled(resource)
+    assert len(findings) == 1
+    assert findings[0].check_id == "MACIE-001"
+    assert findings[0].severity.value == "MEDIUM"
+
+    client.get_macie_session.side_effect = None
+    client.get_macie_session.return_value = {"status": "PAUSED"}
+    paused = provider.discover_macie_session()[0]
+    assert paused.attributes["enabled"] is False
+    assert len(check_macie_disabled(paused)) == 1
+
+
+def test_macie_access_denied_propagates_and_unknown_status_is_not_flagged():
+    client = Mock()
+    client.get_macie_session.side_effect = client_error(
+        "AccessDeniedException", "GetMacieSession"
+    )
+    provider = AWSProvider(macie_client=client, region="eu-west-2")
+
+    with pytest.raises(ClientError):
+        provider.discover_macie_session()
+
+    client.get_macie_session.side_effect = None
+    client.get_macie_session.return_value = {"status": "UNKNOWN_STATUS"}
+    unknown = provider.discover_macie_session()[0]
+    assert unknown.attributes["enabled"] is None
+    assert check_macie_disabled(unknown) == []

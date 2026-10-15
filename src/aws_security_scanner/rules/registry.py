@@ -156,6 +156,7 @@ from aws_security_scanner.rules.security_services_rules import (
     check_config_recorder_missing,
     check_config_recorder_stopped,
     check_config_delivery_channel_missing,
+    check_macie_disabled,
 )
 
 def get_all_rules():
@@ -267,4 +268,5 @@ def get_all_rules():
         check_config_recorder_missing,
         check_config_recorder_stopped,
         check_config_delivery_channel_missing,
+        check_macie_disabled,
     ]

@@ -1,6 +1,6 @@
 # AWS-native security-service posture and findings
 
-The AWS provider includes read-only regional posture discovery for AWS Security Hub, Amazon GuardDuty and AWS Config. Native finding import is opt-in and is enabled with `--include-native-findings`.
+The AWS provider includes read-only regional posture discovery for AWS Security Hub, Amazon GuardDuty, AWS Config and Amazon Macie. Native finding import is opt-in and is enabled with `--include-native-findings`.
 
 ## Current posture checks
 
@@ -9,8 +9,9 @@ The AWS provider includes read-only regional posture discovery for AWS Security 
 - `CONFIG-001`: reports no configuration recorder only when the recorder list is explicitly empty.
 - `CONFIG-002`: reports recording stopped only when status explicitly reports `recording=false`.
 - `CONFIG-003`: reports no delivery channel only when the delivery-channel list is explicitly empty.
+- `MACIE-001`: reports Macie as not enabled only when `GetMacieSession` returns `ResourceNotFoundException` or an explicit `PAUSED` status.
 
-These are regional posture signals. They do not prove that the services' detection coverage or controls are effective.
+These are regional posture signals. Macie discovery does not assess whether discovery jobs, sensitive-data discovery coverage or delegated-administrator settings are sufficient. They do not prove that the services' detection coverage or controls are effective.
 
 ## Native finding sources
 
@@ -33,6 +34,7 @@ The following read-only actions are needed for the relevant optional integration
 - Security Hub posture/findings: `securityhub:DescribeHub`, `securityhub:GetFindings`
 - GuardDuty posture/findings: `guardduty:ListDetectors`, `guardduty:GetDetector`, `guardduty:ListFindings`, `guardduty:GetFindings`
 - AWS Config posture: `config:DescribeConfigurationRecorders`, `config:DescribeConfigurationRecorderStatus`, `config:DescribeDeliveryChannels`
+- Amazon Macie posture: `macie2:GetMacieSession`
 - IAM Access Analyzer findings: `access-analyzer:ListAnalyzers`, `access-analyzer:ListFindingsV2`
 
 The scanner does not enable or configure these services. Access-denied and unexpected API errors propagate; they are not converted into a clean result. The checks do not establish organization-wide coverage, delegated-administrator configuration, standards enablement or control effectiveness. Live AWS end-to-end validation remains outstanding.

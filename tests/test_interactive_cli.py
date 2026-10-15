@@ -125,3 +125,10 @@ def test_interactive_setup_can_enable_risk_scores_with_configuration():
     assert args is not None
     assert "--risk-score" in args
     assert args[args.index("--risk-config") + 1] == "risk.json"
+
+
+
+def test_interactive_supported_service_set_includes_macie():
+    from aws_security_scanner.interactive import AWS_SERVICES
+
+    assert "macie" in AWS_SERVICES

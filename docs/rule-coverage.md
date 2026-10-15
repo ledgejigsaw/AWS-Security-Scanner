@@ -17,6 +17,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | Security Hub | 1 | Regional hub enablement; optional bounded native-finding import preserves source IDs and timestamps. Standards/control evaluation is not imported. |
 | GuardDuty | 1 | Regional detector enablement; optional bounded native-finding import preserves source IDs and timestamps. |
 | AWS Config | 3 | Regional recorder configuration, recording state and delivery-channel presence. Missing status remains unknown; API errors fail discovery. |
+| Amazon Macie | 1 | Regional session enablement/paused status. This does not assess discovery-job coverage or delegated-administrator configuration. |
 | KMS | 4 | Rotation, pending deletion, wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal. This is not a full IAM/KMS policy simulator. |
 | RDS | 4 | Encryption, public accessibility, backup retention and deletion protection. |
 | Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
@@ -30,7 +31,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | Application Load Balancers | 1 | Missing WAF association as an informational review signal. Network Load Balancers are not included. | 
 | ECS/Fargate | 6 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment and shared task/execution role review signal. Public IP assignment does not prove internet reachability; role sharing is informational. |
 | CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
-| **Total** | **105** | Includes Security Hub, GuardDuty and AWS Config posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **106** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
