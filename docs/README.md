@@ -11,6 +11,7 @@ This documentation is version-controlled with the scanner and should be updated 
 - [Contributor guide](../CONTRIBUTING.md)
 - [Testing and validation](testing-and-validation.md)
 - [Baseline history and suppression governance](baseline-history.md)
+- [Explainable finding risk scoring](risk-scoring.md)
 - [WAF and application-edge posture](waf-application-edge.md)
 - [AWS-native security-service posture](security-services.md)
 - [CloudTrail and KMS coverage expansion](cloudtrail-kms-coverage.md)
