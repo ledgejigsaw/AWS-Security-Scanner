@@ -2078,6 +2078,67 @@ class AWSProvider:
 
         return findings
 
+    def get_guardduty_findings(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return a bounded, paginated set of native GuardDuty findings.
+
+        ListFindings is paginated per detector; GetFindings is then called in
+        batches of at most 50 IDs. Permission and service errors propagate.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("GuardDuty finding limit must be between 1 and 1000.")
+
+        detector_ids = self._collect_pages(
+            self.guardduty_client.list_detectors,
+            "DetectorIds",
+            request_token="NextToken",
+            response_token="NextToken",
+        )
+        findings: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for detector_id in detector_ids:
+            finding_ids: list[str] = []
+            token: str | None = None
+            seen_tokens: set[str] = set()
+            while len(findings) + len(finding_ids) < limit:
+                remaining = limit - len(findings) - len(finding_ids)
+                request: dict[str, Any] = {
+                    "DetectorId": detector_id,
+                    "MaxResults": min(50, remaining),
+                }
+                if token:
+                    request["NextToken"] = token
+                response = self.guardduty_client.list_findings(**request)
+                for finding_id in response.get("FindingIds", []):
+                    if isinstance(finding_id, str) and finding_id and finding_id not in seen_ids:
+                        seen_ids.add(finding_id)
+                        finding_ids.append(finding_id)
+                        if len(findings) + len(finding_ids) >= limit:
+                            break
+                next_token = response.get("NextToken")
+                if not next_token or len(findings) + len(finding_ids) >= limit:
+                    break
+                if not isinstance(next_token, str) or next_token in seen_tokens:
+                    raise RuntimeError("GuardDuty returned an invalid or repeated NextToken.")
+                seen_tokens.add(next_token)
+                token = next_token
+
+            for offset in range(0, len(finding_ids), 50):
+                batch = finding_ids[offset:offset + 50]
+                response = self.guardduty_client.get_findings(
+                    DetectorId=detector_id,
+                    FindingIds=batch,
+                )
+                for item in response.get("Findings", []):
+                    if isinstance(item, dict):
+                        findings.append(item)
+                        if len(findings) >= limit:
+                            return findings
+            if len(findings) >= limit:
+                break
+
+        return findings
+
     def discover_guardduty(self) -> list[Resource]:
         """Discover regional GuardDuty detector state without fetching findings."""
         detector_ids = self._collect_pages(
