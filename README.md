@@ -9,7 +9,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 - **100 registered security rules:** 14 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON and AWS APIs.
-- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
+- **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression; optional deterministic resource-graph JSON.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
 Automated tests use mocks and fixtures; they do not replace validation against a real AWS account. Live scans remain unverified.
@@ -187,6 +187,16 @@ The caller's credential chain must be allowed to call STS `AssumeRole`; each tar
 Native finding import is disabled by default. It queries Security Hub and GuardDuty in the selected region and requires `securityhub:GetFindings`, `guardduty:ListDetectors`, `guardduty:ListFindings` and `guardduty:GetFindings`. The default cap is 100 findings per source; the supported limit is 1–1,000 per source. The scanner follows pagination up to each cap, deduplicates repeated source IDs, and lets API errors propagate rather than reporting an empty result. GuardDuty-backed Security Hub products are excluded from the Security Hub import when direct GuardDuty ingestion is enabled to avoid importing the same product through both APIs. Imported entries use `AWS-SHUB-NATIVE` or `AWS-GD-NATIVE` and preserve source type, source finding ID, account ID and observation timestamps where available. JSON, HTML and SARIF distinguish native findings from scanner-generated checks. Native source identity is included in baseline fingerprints so multiple findings on one resource do not collapse together.
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
+
+## Resource graph export
+
+Add `--graph-output` to a single-account scan to write a separate machine-readable resource graph:
+
+```bash
+aws-security-scan --source terraform --file terraform.json --graph-output reports/resource-graph.json
+```
+
+The graph contains safe resource identity metadata, explicit resolved relationships with provenance/confidence, unresolved references marked as unknown, and finding check IDs linked only when the resource match is unambiguous. It deliberately excludes raw resource attributes, policies, secret values and object contents. It does not infer network reachability: an absent edge is not evidence of isolation. Multi-account graph output is not supported in this increment.
 
 ## Container usage
 
