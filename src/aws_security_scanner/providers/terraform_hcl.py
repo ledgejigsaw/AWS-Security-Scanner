@@ -14,6 +14,13 @@ from aws_security_scanner.providers.terraform import TerraformProvider
 _RESOURCE_REFERENCE = re.compile(r"\$\{(aws_[^.]+\.[^.]+)\.[^}]+\}")
 
 
+def _unquote_label(value: str) -> str:
+    """Remove parser-preserved quotes around HCL block labels."""
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        return value[1:-1]
+    return value
+
+
 class TerraformHCLProvider:
     """Parse literal Terraform HCL without running Terraform or loading modules."""
 
@@ -38,7 +45,7 @@ class TerraformHCLProvider:
                 if not isinstance(instances, dict):
                     continue
                 for name, attributes in instances.items():
-                    resources.append(self._make_resource(resource_type, name, attributes))
+                    resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes))
         elif isinstance(blocks, list):
             for block in blocks:
                 if not isinstance(block, dict):
@@ -47,7 +54,7 @@ class TerraformHCLProvider:
                     if not isinstance(instances, dict):
                         continue
                     for name, attributes in instances.items():
-                        resources.append(self._make_resource(resource_type, name, attributes))
+                        resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes))
 
         # Module code is deliberately not loaded or evaluated. Emit a diagnostic
         # placeholder so reports make this analysis limitation visible.
@@ -59,7 +66,7 @@ class TerraformHCLProvider:
                         resources.append(
                             Resource(
                                 resource_type="terraform_hcl_unsupported",
-                                resource_id=f"module.{module_name}",
+                                resource_id=f"module.{_unquote_label(module_name)}",
                                 attributes={
                                     "hcl_diagnostic": "module_not_expanded",
                                     "hcl_unresolved_expressions": [
