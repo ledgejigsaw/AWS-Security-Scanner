@@ -17,6 +17,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_public_acl,
     check_acl_object_ownership,
     check_mfa_delete,
+    check_object_lock_review,
     
 )
 
@@ -1180,3 +1181,72 @@ def test_mfa_delete_enabled_does_not_generate_finding():
     findings = check_mfa_delete(resource)
 
     assert findings == []
+
+
+def test_object_lock_absence_on_versioned_bucket_generates_info_review_signal():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="retention-data",
+        attributes={
+            "versioning_configuration": {"status": "Enabled"},
+            "object_lock_configuration": {
+                "status": "NOT_CONFIGURED",
+                "enabled": False,
+                "default_retention": None,
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_object_lock_review(resource)
+
+    assert len(findings) == 1
+    assert findings[0].check_id == "S3-016"
+    assert findings[0].severity == Severity.INFO
+    assert "policy requirement not evaluated" in findings[0].evidence
+
+
+def test_object_lock_enabled_does_not_generate_review_signal():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="retention-data",
+        attributes={
+            "versioning_configuration": {"status": "Enabled"},
+            "object_lock_configuration": {
+                "status": "CONFIGURED",
+                "enabled": True,
+                "default_retention": {"mode": "COMPLIANCE", "days": 365, "years": None},
+            },
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    assert check_object_lock_review(resource) == []
+
+
+def test_object_lock_unknown_or_unversioned_bucket_does_not_generate_finding():
+    unknown = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="unknown-lock",
+        attributes={
+            "versioning_configuration": {"status": "Enabled"},
+            "object_lock_configuration": {"status": "UNKNOWN", "enabled": None},
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+    unversioned = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="unversioned",
+        attributes={
+            "versioning_configuration": {"status": "Suspended"},
+            "object_lock_configuration": {"status": "NOT_CONFIGURED", "enabled": False},
+        },
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    assert check_object_lock_review(unknown) == []
+    assert check_object_lock_review(unversioned) == []
