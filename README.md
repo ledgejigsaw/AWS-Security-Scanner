@@ -188,6 +188,16 @@ Native finding import is disabled by default. It queries Security Hub and GuardD
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
 
+## Resource graph export
+
+Add `--graph-output` to a single-account scan to write a separate machine-readable resource graph:
+
+```bash
+aws-security-scan --source terraform --file terraform.json --graph-output reports/resource-graph.json
+```
+
+The graph contains safe resource identity metadata, explicit resolved relationships with provenance/confidence, unresolved references marked as unknown, and finding check IDs linked only when the resource match is unambiguous. It deliberately excludes raw resource attributes, policies, secret values and object contents. It does not infer network reachability: an absent edge is not evidence of isolation. Multi-account graph output is not supported in this increment.
+
 ## Container usage
 
 Build the image locally:
