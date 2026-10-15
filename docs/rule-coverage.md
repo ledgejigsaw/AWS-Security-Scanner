@@ -8,7 +8,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 
 | Service/domain | Registered checks | Scope and important limitations |
 |---|---:|---|
-| S3 | 13 | Public exposure, encryption, versioning, Block Public Access, logging, selected bucket-policy risks, public ACL grants, ACL-based ownership and an informational MFA Delete review signal. ACL and ownership findings are only produced when relevant metadata is observable; no object-content inspection. |
+| S3 | 14 | Public exposure, encryption, versioning, Block Public Access, logging, selected bucket-policy risks, public ACL grants, ACL-based ownership, an informational MFA Delete review signal and a policy-dependent noncurrent-version lifecycle review signal. Unknown lifecycle configuration is not reported as missing; no object-content inspection. |
 | IAM | 17 | Permissions, trust, MFA, credential hygiene, root-account and unused-role signals. Not a complete IAM policy simulator. |
 | EC2 | 12 | Public IPv4, metadata options, sensitive ports and broad ingress/egress. Detailed monitoring and missing instance-profile checks are informational review signals, not universal requirements. |
 | EBS | 3 | Explicit unencrypted volume/snapshot states and observed public snapshot create-volume permissions. Permission-denied public-access checks remain unknown; AMI sharing and snapshot lifecycle are not covered. |

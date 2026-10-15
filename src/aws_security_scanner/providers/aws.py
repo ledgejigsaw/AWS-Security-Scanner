@@ -198,6 +198,9 @@ class AWSProvider:
             attributes["versioning_configuration"] = (
                 self._get_bucket_versioning_configuration(bucket_name)
             )
+            attributes["lifecycle_configuration"] = (
+                self._get_bucket_lifecycle_configuration(bucket_name)
+            )
 
             resources.append(
                 Resource(
@@ -634,6 +637,38 @@ class AWSProvider:
             "status": status,
             "mfa_delete": mfa_delete,
         }
+
+    def _get_bucket_lifecycle_configuration(self, bucket_name: str) -> dict[str, Any]:
+        """Return lifecycle posture with explicit configured/absent/unknown states."""
+        try:
+            response = self.s3_client.get_bucket_lifecycle_configuration(
+                Bucket=bucket_name
+            )
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code")
+            if error_code == "NoSuchLifecycleConfiguration":
+                return {"status": "NOT_CONFIGURED", "rules": []}
+            # Access denied and unexpected API failures are not equivalent to
+            # missing lifecycle configuration.
+            return {"status": "UNKNOWN", "rules": []}
+
+        raw_rules = response.get("Rules")
+        if not isinstance(raw_rules, list):
+            return {"status": "UNKNOWN", "rules": []}
+        rules = []
+        for rule in raw_rules:
+            if not isinstance(rule, dict):
+                continue
+            noncurrent = rule.get("NoncurrentVersionExpiration")
+            expiration = rule.get("Expiration")
+            rules.append({
+                "status": rule.get("Status"),
+                "id": rule.get("ID"),
+                "has_noncurrent_version_expiration": isinstance(noncurrent, dict)
+                and bool(noncurrent),
+                "has_expiration": isinstance(expiration, dict) and bool(expiration),
+            })
+        return {"status": "CONFIGURED", "rules": rules}
 
     def discover_security_groups(self) -> list[Resource]:
         """Discover EC2 security groups and normalise network rules."""
@@ -2075,6 +2110,67 @@ class AWSProvider:
                 raise RuntimeError("Security Hub returned an invalid or repeated NextToken.")
             seen_tokens.add(next_token)
             token = next_token
+
+        return findings
+
+    def get_guardduty_findings(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return a bounded, paginated set of native GuardDuty findings.
+
+        ListFindings is paginated per detector; GetFindings is then called in
+        batches of at most 50 IDs. Permission and service errors propagate.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("GuardDuty finding limit must be between 1 and 1000.")
+
+        detector_ids = self._collect_pages(
+            self.guardduty_client.list_detectors,
+            "DetectorIds",
+            request_token="NextToken",
+            response_token="NextToken",
+        )
+        findings: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for detector_id in detector_ids:
+            finding_ids: list[str] = []
+            token: str | None = None
+            seen_tokens: set[str] = set()
+            while len(findings) + len(finding_ids) < limit:
+                remaining = limit - len(findings) - len(finding_ids)
+                request: dict[str, Any] = {
+                    "DetectorId": detector_id,
+                    "MaxResults": min(50, remaining),
+                }
+                if token:
+                    request["NextToken"] = token
+                response = self.guardduty_client.list_findings(**request)
+                for finding_id in response.get("FindingIds", []):
+                    if isinstance(finding_id, str) and finding_id and finding_id not in seen_ids:
+                        seen_ids.add(finding_id)
+                        finding_ids.append(finding_id)
+                        if len(findings) + len(finding_ids) >= limit:
+                            break
+                next_token = response.get("NextToken")
+                if not next_token or len(findings) + len(finding_ids) >= limit:
+                    break
+                if not isinstance(next_token, str) or next_token in seen_tokens:
+                    raise RuntimeError("GuardDuty returned an invalid or repeated NextToken.")
+                seen_tokens.add(next_token)
+                token = next_token
+
+            for offset in range(0, len(finding_ids), 50):
+                batch = finding_ids[offset:offset + 50]
+                response = self.guardduty_client.get_findings(
+                    DetectorId=detector_id,
+                    FindingIds=batch,
+                )
+                for item in response.get("Findings", []):
+                    if isinstance(item, dict):
+                        findings.append(item)
+                        if len(findings) >= limit:
+                            return findings
+            if len(findings) >= limit:
+                break
 
         return findings
 

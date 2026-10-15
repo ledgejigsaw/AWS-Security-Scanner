@@ -12,6 +12,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_public_acl,
     check_acl_object_ownership,
     check_mfa_delete,
+    check_noncurrent_version_lifecycle,
 )
 
 from aws_security_scanner.rules.iam_rules import (
@@ -169,6 +170,7 @@ def get_all_rules():
         check_public_acl,
         check_acl_object_ownership,
         check_mfa_delete,
+        check_noncurrent_version_lifecycle,
         check_overly_permissive_policy,
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
