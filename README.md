@@ -14,6 +14,22 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 Automated tests use mocks and fixtures; they do not replace validation against a real AWS account. Live scans remain unverified.
 
+## Interactive CLI
+
+Run the guided setup when you want to configure a scan through questions rather than remember flags:
+
+```bash
+aws-security-scan --interactive
+```
+
+The wizard asks for the source (fixture directory, Terraform JSON, Terraform HCL or live AWS), assessment scope, report format and destination, and optional policy, compliance mapping, severity filter, resource graph and baseline operation. For AWS scans, choose a quick core-service scan, all supported discovery domains, a comprehensive scan including bounded native Security Hub and GuardDuty findings, or a custom service list. The wizard displays the selected configuration and asks for confirmation before scanning. Enter `q` at a numbered choice to cancel.
+
+For AWS, supply an AWS shared-config profile name or use the default credential chain. The scanner never asks for access keys or secret keys and does not change AWS configuration. Interactive mode is intended for humans; keep explicit flags for scripts and CI, for example:
+
+```bash
+aws-security-scan --source hcl --file main.tf --format sarif --output reports/iac.sarif
+```
+
 ## Capabilities
 
 ### Sources
