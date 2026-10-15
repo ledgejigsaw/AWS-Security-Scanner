@@ -8,6 +8,7 @@ from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
 from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
+from aws_security_scanner.providers.terraform_hcl import TerraformHCLProvider
 from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
@@ -18,7 +19,7 @@ from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
-from aws_security_scanner.models.finding import Severity
+from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.baseline_history import (
     active_baseline_fingerprints,
     diff_findings,
@@ -44,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--source",
-        choices=["fixture", "terraform", "aws"],
+        choices=["fixture", "terraform", "hcl", "aws"],
         required=True,
         help="Security resource source.",
     )
@@ -52,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--file",
         type=Path,
-        help="Fixture directory or Terraform JSON file.",
+        help="Fixture directory, Terraform JSON file or Terraform HCL source file.",
     )
     parser.add_argument(
         "--accounts-file",
@@ -183,6 +184,12 @@ def discover_resources(
         resources = provider.discover()
         return aggregate_s3_resources(resources)
 
+    if source == "hcl":
+        if source_path is None:
+            raise ValueError("--file is required when using the hcl source.")
+        provider = TerraformHCLProvider(source_path)
+        return aggregate_s3_resources(provider.discover())
+
     if source == "aws":
         provider = (
             AWSProvider(region=region, session=aws_session)
@@ -287,6 +294,38 @@ def run_scan(
     )
 
     findings = engine.scan(resources)
+    if source == "hcl":
+        for resource in resources:
+            unresolved = resource.attributes.get("hcl_unresolved_expressions")
+            diagnostic = resource.attributes.get("hcl_diagnostic")
+            if not unresolved and diagnostic != "module_not_expanded":
+                continue
+            is_module = diagnostic == "module_not_expanded"
+            findings.append(
+                Finding(
+                    check_id="IAC-HCL-002" if is_module else "IAC-HCL-001",
+                    severity=Severity.INFO,
+                    service="Terraform HCL",
+                    resource=resource.resource_id,
+                    title=(
+                        "Terraform module was not expanded"
+                        if is_module
+                        else "Terraform HCL contains unresolved expressions"
+                    ),
+                    description=(
+                        "The scanner does not load or evaluate Terraform modules; resources inside this module are outside this scan."
+                        if is_module
+                        else "One or more HCL expressions could not be resolved statically. Related checks may be incomplete."
+                    ),
+                    remediation=(
+                        "Provide Terraform JSON generated from a reviewed plan for expanded module resources, or review the module source separately."
+                        if is_module
+                        else "Resolve the expression from a trusted, reviewed plan or inspect the referenced values before relying on this assessment."
+                    ),
+                    region=resource.region,
+                    evidence="; ".join(str(item) for item in (unresolved or [])[:5]) or "Module contents were not loaded.",
+                )
+            )
 
     if include_native_findings:
         # Keep native finding ingestion opt-in. A separate provider instance

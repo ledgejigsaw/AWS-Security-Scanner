@@ -2,7 +2,7 @@
 
 This page describes the service-level coverage currently registered in `rules/registry.py`. It is a baseline inventory, not a statement of full AWS service coverage or compliance.
 
-The optional resource graph export represents only explicitly normalised relationships. It does not perform reachability analysis or infer missing edges; unresolved references are reported as unknown.
+Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is intentionally partial: the scanner does not evaluate variables, locals, `count`/`for_each`, dynamic blocks or module source. Such expressions/modules are surfaced as informational diagnostics.
 
 ## Current registered baseline
 
