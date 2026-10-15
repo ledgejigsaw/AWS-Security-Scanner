@@ -50,6 +50,10 @@ def build_sarif_report(
             properties["evidence"] = finding.evidence
         if finding.account_id is not None:
             properties["accountId"] = finding.account_id
+        if finding.risk_score is not None:
+            properties["riskScore"] = finding.risk_score
+            properties["riskScoreVersion"] = finding.risk_score_version
+            properties["riskExplanation"] = finding.risk_explanation
         if finding.source_type != "scanner":
             properties["sourceType"] = finding.source_type
             properties["sourceId"] = finding.source_id
