@@ -113,6 +113,9 @@ def aggregate_s3_resources(
 
                 if policy is not None:
                     bucket.attributes["bucket_policy"] = policy
+        else:
+            # Preserve non-S3 Terraform resources for provider-independent rules.
+            aggregated.append(resource)
 
     return aggregated
 
