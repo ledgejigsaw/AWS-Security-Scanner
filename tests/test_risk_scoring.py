@@ -133,3 +133,19 @@ def test_risk_metadata_is_opt_in_and_reported_in_json_html_and_sarif():
     assert sarif["riskScore"] == 90
     assert sarif["riskScoreVersion"] == "1"
     assert sarif["riskExplanation"]["severity_base"] == 90
+
+
+
+def test_cli_accepts_opt_in_risk_scoring_options():
+    from pathlib import Path
+    from aws_security_scanner.cli import build_parser
+
+    args = build_parser().parse_args([
+        "--source", "terraform",
+        "--file", "terraform.json",
+        "--risk-score",
+        "--risk-config", "risk.json",
+    ])
+
+    assert args.risk_score is True
+    assert args.risk_config == Path("risk.json")
