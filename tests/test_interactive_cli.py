@@ -88,6 +88,7 @@ def test_interactive_invalid_custom_service_reprompts():
         "4",                         # custom services
         "made-up-service",           # invalid
         "s3,iam",                    # valid
+        "n",                         # no native findings
         "",                          # region
         "n",                         # no multi-account
         "",                          # default profile
