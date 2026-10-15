@@ -2053,13 +2053,12 @@ class AWSProvider:
                     for item in statuses
                     if isinstance(item, dict) and isinstance(item.get("name"), str)
                 }
-                values = [status_by_name[name] for name in recorder_names if name in status_by_name]
-                if values:
-                    # Only report stopped recording when every observed recorder is stopped.
-                    # Missing status remains unknown rather than being interpreted as disabled.
-                    recording = any(value is True for value in values)
-                    if not any(isinstance(value, bool) for value in values):
-                        recording = None
+                if all(name in status_by_name for name in recorder_names):
+                    values = [status_by_name[name] for name in recorder_names]
+                    # A missing/non-boolean status is unknown. If all statuses are
+                    # explicit booleans, any stopped recorder means recording is incomplete.
+                    if all(isinstance(value, bool) for value in values):
+                        recording = all(value is True for value in values)
 
         return [
             Resource(
