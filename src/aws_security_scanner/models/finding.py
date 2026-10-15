@@ -27,6 +27,9 @@ class Finding:
     source_product: str | None = None
     first_observed_at: str | None = None
     last_observed_at: str | None = None
+    risk_score: int | None = None
+    risk_score_version: str | None = None
+    risk_explanation: dict | None = None
 
     @classmethod
     def from_rule(
