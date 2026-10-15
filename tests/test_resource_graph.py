@@ -86,3 +86,49 @@ def test_cli_accepts_optional_graph_output():
         "--graph-output", "reports/graph.json",
     ])
     assert str(args.graph_output) == "reports/graph.json"
+
+
+def test_graph_derives_only_explicit_aws_resource_id_relationships():
+    vpc = Resource(
+        resource_type="aws_vpc",
+        resource_id="vpc-123",
+        attributes={},
+        source="aws",
+        region="eu-west-2",
+    )
+    subnet = Resource(
+        resource_type="aws_subnet",
+        resource_id="subnet-123",
+        attributes={"vpc_id": "vpc-123"},
+        source="aws",
+        region="eu-west-2",
+    )
+    instance = Resource(
+        resource_type="aws_instance",
+        resource_id="i-123",
+        attributes={
+            "vpc_id": "vpc-123",
+            "subnet_id": "subnet-123",
+            "security_group_ids": ["sg-123"],
+            "public_ip_address": "203.0.113.5",
+        },
+        source="aws",
+        region="eu-west-2",
+    )
+    security_group = Resource(
+        resource_type="aws_security_group",
+        resource_id="sg-123",
+        attributes={},
+        source="aws",
+        region="eu-west-2",
+    )
+
+    graph = build_resource_graph([instance, subnet, security_group, vpc])
+    edges = {(edge["source"], edge["target"], edge["relationship"]) for edge in graph["edges"]}
+    node = {item["resource_id"]: item["id"] for item in graph["nodes"]}
+
+    assert (node["subnet-123"], node["vpc-123"], "vpc_id") in edges
+    assert (node["i-123"], node["vpc-123"], "vpc_id") in edges
+    assert (node["i-123"], node["subnet-123"], "subnet_id") in edges
+    assert (node["i-123"], node["sg-123"], "security_group_ids") in edges
+    assert all(edge["provenance"] == "normalised_attribute_reference" for edge in graph["edges"])
