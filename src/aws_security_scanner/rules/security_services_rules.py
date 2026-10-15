@@ -123,3 +123,37 @@ def check_config_delivery_channel_missing(resource: Resource) -> list[Finding]:
             evidence="AWS Config DescribeDeliveryChannels returned no delivery channels",
         )
     ]
+
+
+@rule_for(
+    "aws_macie_session",
+    check_id="MACIE-001",
+    service="Amazon Macie",
+    severity=Severity.MEDIUM,
+    category="Detection and Monitoring",
+    title="Amazon Macie is not enabled in this region",
+    description=(
+        "Amazon Macie was explicitly observed as not enabled or paused in "
+        "the assessed region. Sensitive-data discovery coverage from Macie "
+        "may therefore be unavailable in that region; this is a posture signal, "
+        "not proof that the organisation requires Macie everywhere."
+    ),
+    remediation=(
+        "Review regional sensitive-data discovery requirements. Enable and "
+        "configure Amazon Macie in regions where it is required, and review "
+        "delegated-administrator and discovery-job coverage separately."
+    ),
+)
+def check_macie_disabled(resource: Resource) -> list[Finding]:
+    """Report Macie only when the provider explicitly observes it disabled."""
+    if resource.attributes.get("enabled") is not False:
+        return []
+    status = resource.attributes.get("status")
+    return [
+        Finding.from_rule(
+            check_macie_disabled,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=f"Amazon Macie GetMacieSession status={status or 'NOT_ENABLED'}",
+        )
+    ]
