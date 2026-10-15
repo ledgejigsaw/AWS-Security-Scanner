@@ -12,6 +12,7 @@ from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.multi_account import run_multi_account_scan
+from aws_security_scanner.graph import write_resource_graph
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
@@ -102,6 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Path for the generated report.",
+    )
+    parser.add_argument(
+        "--graph-output",
+        type=Path,
+        help="Optional path for deterministic resource-graph JSON (single-account scans only).",
     )
 
     parser.add_argument(
@@ -231,7 +237,8 @@ def run_scan(
     expected_account_id: str | None = None,
     profile: str | None = None,
     services: list[str] | None = None,
-) -> list:
+    return_resources: bool = False,
+) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
     if (profile or services) and source != "aws":
@@ -313,7 +320,7 @@ def run_scan(
                     converted.account_id = expected_account_id
                 findings.append(converted)
 
-    return findings
+    return (findings, resources) if return_resources else findings
 
 
 def main() -> None:
@@ -334,6 +341,8 @@ def main() -> None:
         parser.error("--profile and --service can only be used with --source aws")
     if args.accounts_file and args.profile:
         parser.error("--profile with --accounts-file is not supported; configure the default credential chain for the caller")
+    if args.graph_output and args.accounts_file:
+        parser.error("--graph-output is not yet supported with --accounts-file")
     if not 1 <= args.native_findings_limit <= 1000:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
@@ -352,6 +361,7 @@ def main() -> None:
             parser.error(str(exc))
 
     assessment_metadata = None
+    graph_resources = None
     if args.accounts_file:
         findings, assessment_metadata = run_multi_account_scan(
             args.accounts_file,
@@ -362,7 +372,7 @@ def main() -> None:
             native_findings_limit=args.native_findings_limit,
         )
     else:
-        findings = run_scan(
+        scan_result = run_scan(
             args.source,
             args.file,
             args.policy,
@@ -371,7 +381,12 @@ def main() -> None:
             args.native_findings_limit,
             profile=args.profile,
             services=args.service,
+            return_resources=bool(args.graph_output),
         )
+        if args.graph_output:
+            findings, graph_resources = scan_result
+        else:
+            findings = scan_result
 
     baseline_action_requested = bool(
         args.write_baseline or args.compare_baseline or args.baseline
@@ -418,6 +433,10 @@ def main() -> None:
         if args.format == "sarif"
         else "reports/scan.json"
     )
+
+    if args.graph_output and graph_resources is not None:
+        write_resource_graph(graph_resources, findings, args.graph_output)
+        print(f"Resource graph written to {args.graph_output}")
 
     if args.format == "json":
         write_json_report(findings, output_path, compliance_mapping, assessment_metadata)
