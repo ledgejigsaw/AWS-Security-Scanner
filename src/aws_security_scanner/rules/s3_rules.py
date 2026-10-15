@@ -757,7 +757,7 @@ def _account_ids_from_principal(principal) -> set[str]:
     if not isinstance(principal, str) or principal == "*":
         return set()
 
-    account_ids = set(re.findall(r"arn:(?:aws|aws-us-gov|aws-cn):iam::(\\d{12}):", principal))
+    account_ids = set(re.findall(r"arn:(?:aws|aws-us-gov|aws-cn):iam::([0-9]{12}):", principal))
     if re.fullmatch(r"\d{12}", principal):
         account_ids.add(principal)
     return account_ids
