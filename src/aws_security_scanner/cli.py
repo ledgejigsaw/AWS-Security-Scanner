@@ -366,20 +366,9 @@ def run_scan(
                     converted.account_id = expected_account_id
                 findings.append(converted)
 
-        detector_ids = native_provider._collect_pages(
-            native_provider.guardduty_client.list_detectors,
-            "DetectorIds",
-            request_token="NextToken",
-            response_token="NextToken",
-        )
         guardduty_items = native_provider.get_guardduty_findings(limit=native_findings_limit)
-        detector_id = detector_ids[0] if len(detector_ids) == 1 else None
         for item in guardduty_items:
-            converted = guardduty_to_finding(
-                item,
-                fallback_region=region,
-                detector_id=detector_id,
-            )
+            converted = guardduty_to_finding(item, fallback_region=region)
             if converted is not None:
                 if converted.account_id is None:
                     converted.account_id = expected_account_id
