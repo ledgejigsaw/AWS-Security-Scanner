@@ -74,7 +74,7 @@ class TerraformHCLProvider:
         return resources
 
     def _make_resource(self, resource_type: str, name: str, raw_attributes: Any) -> Resource:
-        attributes = raw_attributes if isinstance(raw_attributes, dict) else {}
+        attributes = self._normalise_nested_blocks(raw_attributes if isinstance(raw_attributes, dict) else {})
         unresolved = self._unresolved_expressions(attributes)
         if unresolved:
             attributes = dict(attributes)
@@ -86,6 +86,29 @@ class TerraformHCLProvider:
             source="terraform",
             region=attributes.get("region"),
         )
+
+    def _normalise_nested_blocks(self, attributes: dict[str, Any]) -> dict[str, Any]:
+        """Flatten known singleton HCL blocks into the JSON-like rule model."""
+        result = dict(attributes)
+        block_names = {
+            "versioning_configuration",
+            "rule",
+            "server_side_encryption_configuration",
+            "public_access_block",
+            "logging",
+            "lifecycle_rule",
+        }
+        for key, value in list(result.items()):
+            if key in block_names and isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
+                result[key] = value[0]
+            elif isinstance(value, dict):
+                result[key] = self._normalise_nested_blocks(value)
+            elif isinstance(value, list):
+                result[key] = [
+                    self._normalise_nested_blocks(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+        return result
 
     def _unresolved_expressions(self, value: Any, path: str = "") -> list[str]:
         unresolved: list[str] = []
