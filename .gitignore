@@ -23,3 +23,21 @@ htmlcov/
 reports/*.json
 reports/*.html
 reports/*.sarif
+
+
+# Local secrets and AWS credentials
+.env
+.env.*
+!.env.example
+.aws/
+
+# Private key material (never commit real credentials or private keys)
+*.pem
+*.key
+
+# Terraform local working directory and state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
