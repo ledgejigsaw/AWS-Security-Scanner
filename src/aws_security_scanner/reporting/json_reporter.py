@@ -30,6 +30,10 @@ def build_json_report(
         }
         if finding.account_id is not None:
             item["account_id"] = finding.account_id
+        if finding.risk_score is not None:
+            item["risk_score"] = finding.risk_score
+            item["risk_score_version"] = finding.risk_score_version
+            item["risk_explanation"] = finding.risk_explanation
         if finding.source_type != "scanner":
             item["source_type"] = finding.source_type
             item["source_id"] = finding.source_id
