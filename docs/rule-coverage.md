@@ -16,7 +16,8 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | CloudTrail | 5 | Trail logging, multi-region, log-file validation, CloudWatch Logs integration review and recent delivery errors. CloudWatch Logs absence is informational; it does not imply S3 delivery is broken. |
 | Security Hub | 1 | Regional hub enablement; optional bounded native-finding import preserves source IDs and timestamps. Standards/control evaluation is not imported. |
 | GuardDuty | 1 | Regional detector enablement; optional bounded native-finding import preserves source IDs and timestamps. |
-| AWS Config | 3 | Regional recorder configuration, recording state and delivery-channel presence. Missing status remains unknown; API errors fail discovery. |\n| KMS | 4 | Rotation, pending deletion, wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal. This is not a full IAM/KMS policy simulator. |
+| AWS Config | 3 | Regional recorder configuration, recording state and delivery-channel presence. Missing status remains unknown; API errors fail discovery. |
+| KMS | 4 | Rotation, pending deletion, wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal. This is not a full IAM/KMS policy simulator. |
 | RDS | 4 | Encryption, public accessibility, backup retention and deletion protection. |
 | Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
 | Secrets Manager | 2 | Explicitly disabled rotation and unconditional wildcard-principal resource policies. Secret values must never be retrieved. |
