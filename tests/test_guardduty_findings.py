@@ -78,10 +78,9 @@ def test_guardduty_provider_paginates_deduplicates_and_obeys_limit():
         {"FindingIds": ["id-1", "id-1"], "NextToken": "page-2"},
         {"FindingIds": ["id-2"], "NextToken": "page-3"},
     ]
-    provider.guardduty_client.get_findings.side_effect = [
-        {"Findings": [guardduty_item(Id="id-1")]},
-        {"Findings": [guardduty_item(Id="id-2")]},
-    ]
+    provider.guardduty_client.get_findings.return_value = {
+        "Findings": [guardduty_item(Id="id-1"), guardduty_item(Id="id-2")]
+    }
 
     findings = provider.get_guardduty_findings(limit=2)
 
@@ -96,7 +95,10 @@ def test_guardduty_provider_paginates_deduplicates_and_obeys_limit():
         "MaxResults": 1,
         "NextToken": "page-2",
     }
-    assert provider.guardduty_client.get_findings.call_count == 2
+    provider.guardduty_client.get_findings.assert_called_once_with(
+        DetectorId="detector-1",
+        FindingIds=["id-1", "id-2"],
+    )
 
 
 @pytest.mark.parametrize("limit", [0, -1, 1001, True, 1.5])
