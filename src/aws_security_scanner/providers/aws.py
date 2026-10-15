@@ -205,6 +205,9 @@ class AWSProvider:
             attributes["lifecycle_configuration"] = (
                 self._get_bucket_lifecycle_configuration(bucket_name)
             )
+            attributes["object_lock_configuration"] = (
+                self._get_bucket_object_lock_configuration(bucket_name)
+            )
 
             resources.append(
                 Resource(
@@ -673,6 +676,68 @@ class AWSProvider:
                 "has_expiration": isinstance(expiration, dict) and bool(expiration),
             })
         return {"status": "CONFIGURED", "rules": rules}
+
+    def _get_bucket_object_lock_configuration(
+        self, bucket_name: str
+    ) -> dict[str, Any]:
+        """Return Object Lock state without reading or modifying bucket objects."""
+        try:
+            response = self.s3_client.get_object_lock_configuration(
+                Bucket=bucket_name
+            )
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code")
+            if error_code in {
+                "ObjectLockConfigurationNotFoundError",
+                "NoSuchObjectLockConfiguration",
+            }:
+                return {
+                    "status": "NOT_CONFIGURED",
+                    "enabled": False,
+                    "default_retention": None,
+                }
+            # Permission failures and unexpected errors must remain unknown.
+            return {
+                "status": "UNKNOWN",
+                "enabled": None,
+                "default_retention": None,
+            }
+
+        configuration = response.get("ObjectLockConfiguration")
+        if not isinstance(configuration, dict):
+            return {
+                "status": "UNKNOWN",
+                "enabled": None,
+                "default_retention": None,
+            }
+
+        enabled = configuration.get("ObjectLockEnabled")
+        if enabled not in {"Enabled", "Disabled"}:
+            return {
+                "status": "UNKNOWN",
+                "enabled": None,
+                "default_retention": None,
+            }
+
+        rule = configuration.get("Rule")
+        default_retention = None
+        if isinstance(rule, dict):
+            raw_retention = rule.get("DefaultRetention")
+            if isinstance(raw_retention, dict):
+                mode = raw_retention.get("Mode")
+                days = raw_retention.get("Days")
+                years = raw_retention.get("Years")
+                default_retention = {
+                    "mode": mode,
+                    "days": days,
+                    "years": years,
+                }
+
+        return {
+            "status": "CONFIGURED",
+            "enabled": enabled == "Enabled",
+            "default_retention": default_retention,
+        }
 
     def discover_security_groups(self) -> list[Resource]:
         """Discover EC2 security groups and normalise network rules."""

@@ -872,3 +872,47 @@ def check_cross_account_bucket_policy(resource: Resource) -> list[Finding]:
     )
     finding.account_id = owner_account
     return [finding]
+
+
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-016",
+    service="S3",
+    severity=Severity.INFO,
+    category="Data Protection",
+    title="Versioned S3 bucket has no Object Lock configuration (review signal)",
+    description=(
+        "The bucket has versioning enabled but Object Lock is explicitly not "
+        "configured. Object Lock can support immutable retention requirements, "
+        "but its absence is not a universal security failure."
+    ),
+    remediation=(
+        "Review data classification, regulatory obligations and recovery "
+        "requirements. If immutable retention is required, evaluate S3 Object "
+        "Lock and an appropriate default retention policy before enabling it."
+    ),
+)
+def check_object_lock_review(resource: Resource) -> list[Finding]:
+    """Signal an absent Object Lock configuration only when state is known."""
+    versioning = resource.attributes.get("versioning_configuration")
+    object_lock = resource.attributes.get("object_lock_configuration")
+
+    if not isinstance(versioning, dict) or versioning.get("status") != "Enabled":
+        return []
+    if not isinstance(object_lock, dict):
+        return []
+    if object_lock.get("status") != "NOT_CONFIGURED":
+        return []
+
+    return [
+        Finding.from_rule(
+            check_object_lock_review,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=(
+                "versioning=Enabled; object_lock=NOT_CONFIGURED; "
+                "policy requirement not evaluated"
+            ),
+        )
+    ]
