@@ -758,7 +758,7 @@ def _account_ids_from_principal(principal) -> set[str]:
         return set()
 
     account_ids = set(re.findall(r"arn:(?:aws|aws-us-gov|aws-cn):iam::(\\d{12}):", principal))
-    if re.fullmatch(r"\\d{12}", principal):
+    if re.fullmatch(r"\d{12}", principal):
         account_ids.add(principal)
     return account_ids
 
@@ -810,7 +810,7 @@ def check_cross_account_bucket_policy(resource: Resource) -> list[Finding]:
     if not isinstance(policy, dict):
         return []
     owner_account = resource.account_id or resource.attributes.get("bucket_owner_account")
-    if not isinstance(owner_account, str) or not re.fullmatch(r"\\d{12}", owner_account):
+    if not isinstance(owner_account, str) or not re.fullmatch(r"\d{12}", owner_account):
         return []
 
     statements = policy.get("Statement", [])
