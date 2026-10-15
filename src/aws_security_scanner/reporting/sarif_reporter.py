@@ -17,6 +17,7 @@ SARIF_LEVELS = {
 def build_sarif_report(
     findings: list[Finding],
     compliance_mapping: dict | None = None,
+    assessment_metadata: dict | None = None,
 ) -> dict:
     """Build a SARIF 2.1.0 report suitable for code-scanning ingestion."""
     rules_by_id = {}
@@ -81,9 +82,14 @@ def build_sarif_report(
         },
         "results": results,
     }
+    run_properties = {}
+    if assessment_metadata is not None:
+        run_properties["assessment"] = assessment_metadata
     metadata = framework_metadata(compliance_mapping)
     if metadata is not None:
-        run["properties"] = {"complianceFramework": metadata}
+        run_properties["complianceFramework"] = metadata
+    if run_properties:
+        run["properties"] = run_properties
 
     return {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -96,11 +102,12 @@ def write_sarif_report(
     findings: list[Finding],
     output_path: str | Path,
     compliance_mapping: dict | None = None,
+    assessment_metadata: dict | None = None,
 ) -> None:
     """Write a SARIF 2.1.0 report."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps(build_sarif_report(findings, compliance_mapping), indent=2) + "\n",
+        json.dumps(build_sarif_report(findings, compliance_mapping, assessment_metadata), indent=2) + "\n",
         encoding="utf-8",
     )

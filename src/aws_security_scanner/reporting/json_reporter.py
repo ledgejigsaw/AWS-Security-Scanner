@@ -9,6 +9,7 @@ from aws_security_scanner.compliance import framework_metadata, mappings_for_che
 def build_json_report(
     findings: list[Finding],
     compliance_mapping: dict | None = None,
+    assessment_metadata: dict | None = None,
 ) -> dict:
     """Build a JSON-serialisable security scan report."""
 
@@ -44,6 +45,8 @@ def build_json_report(
         },
         "findings": finding_items,
     }
+    if assessment_metadata is not None:
+        report["assessment"] = assessment_metadata
     metadata = framework_metadata(compliance_mapping)
     if metadata is not None:
         report["compliance_framework"] = metadata
@@ -58,10 +61,11 @@ def write_json_report(
     findings: list[Finding],
     output_path: str | Path,
     compliance_mapping: dict | None = None,
+    assessment_metadata: dict | None = None,
 ) -> None:
     """Write a security scan report to a JSON file."""
 
-    report = build_json_report(findings, compliance_mapping)
+    report = build_json_report(findings, compliance_mapping, assessment_metadata)
     output_path = Path(output_path)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

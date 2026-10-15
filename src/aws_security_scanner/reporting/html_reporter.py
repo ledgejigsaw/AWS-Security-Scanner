@@ -9,6 +9,7 @@ from aws_security_scanner.compliance import framework_metadata, mappings_for_che
 def build_html_report(
     findings: list[Finding],
     compliance_mapping: dict | None = None,
+    assessment_metadata: dict | None = None,
 ) -> str:
     """Build a self-contained HTML report with escaped finding content."""
     summary = build_summary(findings)
@@ -77,6 +78,36 @@ def build_html_report(
         "<th>Compliance mappings</th>"
         if compliance_mapping is not None else ""
     )
+    assessment_section = ""
+    if assessment_metadata is not None:
+        assessment_summary = assessment_metadata.get("summary", {})
+        account_rows = []
+        for account in assessment_metadata.get("accounts", []):
+            error_parts = [
+                account.get("error_code"),
+                account.get("error_type"),
+                account.get("error_message"),
+            ]
+            error_text = "; ".join(str(part) for part in error_parts if part)
+            account_rows.append(
+                "<tr><td>" + html.escape(str(account.get("account_id", ""))) + "</td>"
+                + "<td>" + html.escape(str(account.get("status", ""))) + "</td>"
+                + "<td>" + html.escape(str(account.get("findings_count", 0))) + "</td>"
+                + "<td>" + html.escape(error_text) + "</td></tr>"
+            )
+        assessment_section = (
+            "<section><h2>Assessment scope</h2><p>Multi-account assessment in region "
+            + html.escape(str(assessment_metadata.get("region") or "default credential-chain region"))
+            + ". Successful accounts: "
+            + html.escape(str(assessment_summary.get("successful_accounts", 0)))
+            + "; failed accounts: "
+            + html.escape(str(assessment_summary.get("failed_accounts", 0)))
+            + ".</p><table><thead><tr><th>Account ID</th><th>Status</th>"
+            "<th>Findings returned</th><th>Error details</th></tr></thead><tbody>"
+            + ("".join(account_rows) if account_rows else '<tr><td colspan="4">No account results.</td></tr>')
+            + "</tbody></table></section>"
+        )
+
     metadata = framework_metadata(compliance_mapping)
     compliance_section = ""
     if metadata is not None:
@@ -108,6 +139,7 @@ def build_html_report(
 </head>
 <body>
   <h1>AWS Security Scanner Report</h1>
+  {assessment_section}
   {compliance_section}
   <p>Total findings: <strong>{summary.total_findings}</strong></p>
   <h2>Findings by severity</h2>
@@ -129,11 +161,12 @@ def write_html_report(
     findings: list[Finding],
     output_path: str | Path,
     compliance_mapping: dict | None = None,
+    assessment_metadata: dict | None = None,
 ) -> None:
     """Write a self-contained HTML security report."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        build_html_report(findings, compliance_mapping),
+        build_html_report(findings, compliance_mapping, assessment_metadata),
         encoding="utf-8",
     )
