@@ -6,6 +6,7 @@ cloud configuration; AWS authentication remains delegated to boto3.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 
 AWS_SERVICES = (
@@ -49,6 +50,11 @@ def _ask(prompt: str, input_fn: Callable[[str], str], *, default: str = "") -> s
     return answer or default
 
 
+def _expand_path(value: str) -> str:
+    """Expand a user-home prefix in a path entered at an interactive prompt."""
+    return str(Path(value).expanduser()) if value else value
+
+
 def _yes_no(
     prompt: str,
     input_fn: Callable[[str], str],
@@ -82,11 +88,16 @@ def build_interactive_args(
         output_fn("the scanner never asks for access keys or secret keys.")
         source = _choose(
             "Where should the scanner read configuration from?",
-            SOURCES,
+            ("fixture", "terraform JSON (.json)", "Terraform HCL (.tf)", "live AWS account"),
             input_fn,
             output_fn,
-            default="terraform",
+            default="terraform JSON (.json)",
         )
+        source = {
+            "terraform JSON (.json)": "terraform",
+            "Terraform HCL (.tf)": "hcl",
+            "live AWS account": "aws",
+        }.get(source, source)
         args = ["--source", source]
 
         if source in {"fixture", "terraform", "hcl"}:
@@ -96,11 +107,24 @@ def build_interactive_args(
                 "hcl": "Terraform HCL (.tf) file path",
             }[source]
             while True:
-                path = _ask(label, input_fn)
-                if path:
-                    args.extend(["--file", path])
-                    break
-                output_fn("A source path is required.")
+                entered_path = _ask(label, input_fn)
+                if not entered_path:
+                    output_fn("A source path is required.")
+                    continue
+                path = Path(_expand_path(entered_path))
+                if not path.exists():
+                    output_fn(f"Path does not exist: {path}. Check the path and try again.")
+                    continue
+                if source == "terraform" and path.suffix.lower() in {".tf", ".tfvars"}:
+                    source = "hcl"
+                    args[1] = source
+                    output_fn("Detected a Terraform HCL file; switching the source to hcl.")
+                elif source == "hcl" and path.suffix.lower() == ".json":
+                    source = "terraform"
+                    args[1] = source
+                    output_fn("Detected a Terraform JSON file; switching the source to terraform.")
+                args.extend(["--file", str(path)])
+                break
             output_fn("File-based scans run all checks applicable to the supplied resources.")
         else:
             depth = _choose(
@@ -142,7 +166,7 @@ def build_interactive_args(
             multi_account = _yes_no("Use an explicit multi-account target file?", input_fn, output_fn)
             if multi_account:
                 while True:
-                    accounts_path = _ask("Path to accounts JSON file", input_fn)
+                    accounts_path = _expand_path(_ask("Path to accounts JSON file", input_fn))
                     if accounts_path:
                         args.extend(["--accounts-file", accounts_path])
                         break
@@ -160,7 +184,7 @@ def build_interactive_args(
             default="html",
         )
         args.extend(["--format", report_format])
-        output = _ask("Report output path", input_fn, default=f"reports/scan.{report_format}")
+        output = _expand_path(_ask("Report output path", input_fn, default=f"reports/scan.{report_format}"))
         args.extend(["--output", output])
 
         severity = _choose(
@@ -175,19 +199,19 @@ def build_interactive_args(
 
         if _yes_no("Include optional risk scores and factor explanations?", input_fn, output_fn):
             args.append("--risk-score")
-            risk_config = _ask("Optional risk-scoring JSON path (blank for defaults)", input_fn)
+            risk_config = _expand_path(_ask("Optional risk-scoring JSON path (blank for defaults)", input_fn))
             if risk_config:
                 args.extend(["--risk-config", risk_config])
 
-        policy = _ask("Optional YAML policy path (blank for defaults)", input_fn)
+        policy = _expand_path(_ask("Optional YAML policy path (blank for defaults)", input_fn))
         if policy:
             args.extend(["--policy", policy])
-        mapping = _ask("Optional compliance mapping JSON path (blank to skip)", input_fn)
+        mapping = _expand_path(_ask("Optional compliance mapping JSON path (blank to skip)", input_fn))
         if mapping:
             args.extend(["--compliance-mapping", mapping])
 
         if not any(option == "--accounts-file" for option in args):
-            graph_path = _ask("Optional resource graph JSON path (blank to skip)", input_fn)
+            graph_path = _expand_path(_ask("Optional resource graph JSON path (blank to skip)", input_fn))
             if graph_path:
                 args.extend(["--graph-output", graph_path])
 
@@ -199,7 +223,7 @@ def build_interactive_args(
             default="None",
         )
         if baseline_action != "None":
-            path = _ask("Baseline JSON path", input_fn)
+            path = _expand_path(_ask("Baseline JSON path", input_fn))
             if not path:
                 output_fn("Baseline operation cancelled because no path was supplied.")
                 raise KeyboardInterrupt
@@ -210,7 +234,7 @@ def build_interactive_args(
             }[baseline_action]
             args.extend([option, path])
             if option == "--compare-baseline":
-                diff_path = _ask("Diff JSON output path", input_fn, default="reports/baseline-diff.json")
+                diff_path = _expand_path(_ask("Diff JSON output path", input_fn, default="reports/baseline-diff.json"))
                 args.extend(["--diff-output", diff_path])
 
         output_fn("\nReview your scan configuration:")
