@@ -120,6 +120,16 @@ aws-security-scan \
 
 Severity filtering is applied after policy overrides, so it uses each finding's effective severity. Valid thresholds are `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` and `INFO`.
 
+### Optional explainable risk scoring
+
+Add per-finding risk scores without replacing severity:
+
+```bash
+aws-security-scan --source terraform --file tests/fixtures/terraform/realistic_s3.json --risk-score --format json
+```
+
+Use `--risk-config risk.json` with `--risk-score` to configure explicit exposure/confidence overrides by check ID and criticality bonuses by exact resource ID. Scores and factor explanations are omitted by default for backwards-compatible reports. The model is a deterministic triage index, not a breach probability; see [risk scoring](docs/risk-scoring.md) for the versioned formula and limitations.
+
 Create a baseline of the current findings:
 
 ```bash
