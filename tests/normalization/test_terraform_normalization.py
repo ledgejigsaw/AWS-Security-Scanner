@@ -201,3 +201,36 @@ def test_s3_bucket_without_encryption_defaults_to_false():
     )
 
     assert bucket.attributes["encryption"] is False
+
+
+def test_terraform_provider_preserves_multiple_resource_references_in_lists(tmp_path):
+    import json
+
+    source = tmp_path / "network.json"
+    source.write_text(
+        json.dumps({
+            "resource": {
+                "aws_security_group": {
+                    "web": {"name": "web"},
+                    "app": {"name": "app"},
+                },
+                "aws_instance": {
+                    "application": {
+                        "vpc_security_group_ids": [
+                            "${aws_security_group.web.id}",
+                            "${aws_security_group.app.id}",
+                        ],
+                    },
+                },
+            }
+        }),
+        encoding="utf-8",
+    )
+
+    resources = TerraformProvider(source).discover()
+    instance = next(item for item in resources if item.resource_type == "aws_instance")
+
+    assert instance.relationships == {
+        "vpc_security_group_ids[0]": "aws_security_group.web",
+        "vpc_security_group_ids[1]": "aws_security_group.app",
+    }
