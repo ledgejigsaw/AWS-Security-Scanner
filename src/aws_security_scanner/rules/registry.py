@@ -151,6 +151,9 @@ from aws_security_scanner.rules.ebs_rules import (
 from aws_security_scanner.rules.security_services_rules import (
     check_security_hub_disabled,
     check_guardduty_disabled,
+    check_config_recorder_missing,
+    check_config_recorder_stopped,
+    check_config_delivery_channel_missing,
 )
 
 def get_all_rules():
@@ -257,4 +260,7 @@ def get_all_rules():
         check_alb_missing_waf_association,
         check_security_hub_disabled,
         check_guardduty_disabled,
+        check_config_recorder_missing,
+        check_config_recorder_stopped,
+        check_config_delivery_channel_missing,
     ]
