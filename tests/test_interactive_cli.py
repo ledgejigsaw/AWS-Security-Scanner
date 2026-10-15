@@ -24,6 +24,7 @@ def test_interactive_file_scan_builds_cli_arguments_and_confirms():
         "2",                         # JSON report
         "reports/custom.json",       # output path
         "3",                         # HIGH minimum severity
+        "n",                         # no risk score
         "policies/default.yaml",     # policy
         "",                          # no compliance mapping
         "",                          # no graph
@@ -53,6 +54,7 @@ def test_interactive_quick_aws_scan_selects_only_core_services():
         "3",       # SARIF
         "reports/aws.sarif",
         "1",       # no severity filter
+        "n",       # no risk score
         "",        # policy
         "",        # compliance mapping
         "",        # graph
@@ -72,7 +74,7 @@ def test_interactive_quick_aws_scan_selects_only_core_services():
 
 def test_interactive_cancellation_does_not_return_scan_arguments():
     answers = Answers([
-        "1", "tests/fixtures", "1", "", "1", "", "", "", "1", "n"
+        "1", "tests/fixtures", "1", "", "1", "n", "", "", "", "1", "n"
     ])
     output = []
 
@@ -88,12 +90,14 @@ def test_interactive_invalid_custom_service_reprompts():
         "4",                         # custom services
         "made-up-service",           # invalid
         "s3,iam",                    # valid
+        "n",                         # no native findings
         "",                          # region
         "n",                         # no multi-account
         "",                          # default profile
         "2",                         # JSON
         "",                          # output default
         "1",                         # no severity filter
+        "n",                         # no risk score
         "",                          # policy
         "",                          # mapping
         "",                          # graph
@@ -107,3 +111,17 @@ def test_interactive_invalid_custom_service_reprompts():
     assert args is not None
     assert args.count("--service") == 2
     assert "Unknown service(s): made-up-service" in output
+
+
+
+def test_interactive_setup_can_enable_risk_scores_with_configuration():
+    answers = Answers([
+        "1", "tests/fixtures", "2", "", "1",
+        "y", "risk.json", "", "", "", "1", "y",
+    ])
+
+    args = build_interactive_args(answers, lambda _message: None)
+
+    assert args is not None
+    assert "--risk-score" in args
+    assert args[args.index("--risk-config") + 1] == "risk.json"
