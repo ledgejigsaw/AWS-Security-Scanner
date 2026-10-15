@@ -315,6 +315,14 @@ def check_imdsv1_enabled(resource: Resource) -> list[Finding]:
         {},
     )
 
+    # Terraform HCL represents nested blocks as lists of dictionaries, while
+    # the AWS API and Terraform JSON paths may provide a dictionary. Accept
+    # both shapes and treat missing/unsupported values as unknown, not secure.
+    if isinstance(metadata_options, list):
+        metadata_options = metadata_options[0] if metadata_options else {}
+    if not isinstance(metadata_options, dict):
+        metadata_options = {}
+
     http_tokens = metadata_options.get("http_tokens")
 
     if http_tokens == "optional":
