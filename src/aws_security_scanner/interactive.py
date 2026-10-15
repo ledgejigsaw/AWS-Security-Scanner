@@ -173,6 +173,12 @@ def build_interactive_args(
         if severity != "No severity filter":
             args.extend(["--min-severity", severity])
 
+        if _yes_no("Include optional risk scores and factor explanations?", input_fn, output_fn):
+            args.append("--risk-score")
+            risk_config = _ask("Optional risk-scoring JSON path (blank for defaults)", input_fn)
+            if risk_config:
+                args.extend(["--risk-config", risk_config])
+
         policy = _ask("Optional YAML policy path (blank for defaults)", input_fn)
         if policy:
             args.extend(["--policy", policy])
