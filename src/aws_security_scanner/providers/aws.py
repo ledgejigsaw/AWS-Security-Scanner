@@ -42,6 +42,7 @@ class AWSProvider:
         guardduty_client: Any | None = None,
         config_client: Any | None = None,
         session: Any | None = None,
+        accessanalyzer_client: Any | None = None,
     ):
         self.region = region
         # Preserve the existing boto3.client path for single-account scans;
@@ -114,6 +115,7 @@ class AWSProvider:
         self.securityhub_client = securityhub_client or self._client("securityhub", region_name=region)
         self.guardduty_client = guardduty_client or self._client("guardduty", region_name=region)
         self.config_client = config_client or self._client("config", region_name=region)
+        self.accessanalyzer_client = accessanalyzer_client or self._client("accessanalyzer", region_name=region)
 
     def _collect_pages(
         self,
@@ -2220,6 +2222,70 @@ class AWSProvider:
             if len(findings) >= limit:
                 break
 
+        return findings
+
+    def get_access_analyzer_findings(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return a bounded, paginated set of active IAM Access Analyzer findings.
+
+        All analyzer types returned by ListAnalyzers are considered. Only finding
+        metadata is returned; API errors and permission failures propagate.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("IAM Access Analyzer finding limit must be between 1 and 1000.")
+
+        analyzers = self._collect_pages(
+            self.accessanalyzer_client.list_analyzers,
+            "analyzers",
+            request_token="nextToken",
+            response_token="nextToken",
+        )
+        findings: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for analyzer in analyzers:
+            if not isinstance(analyzer, dict):
+                continue
+            analyzer_arn = analyzer.get("arn")
+            if not isinstance(analyzer_arn, str) or not analyzer_arn:
+                continue
+
+            token: str | None = None
+            seen_tokens: set[str] = set()
+            while len(findings) < limit:
+                request: dict[str, Any] = {
+                    "analyzerArn": analyzer_arn,
+                    "filter": {"status": [{"eq": ["ACTIVE"]}]},
+                    "maxResults": min(1000, limit - len(findings)),
+                }
+                if token:
+                    request["nextToken"] = token
+                response = self.accessanalyzer_client.list_findings_v2(**request)
+                for item in response.get("findings", []):
+                    if not isinstance(item, dict):
+                        continue
+                    finding_id = item.get("id")
+                    if not isinstance(finding_id, str) or not finding_id or finding_id in seen_ids:
+                        continue
+                    status = item.get("status")
+                    if isinstance(status, str) and status.upper() != "ACTIVE":
+                        continue
+                    seen_ids.add(finding_id)
+                    findings.append(item)
+                    if len(findings) >= limit:
+                        break
+
+                next_token = response.get("nextToken")
+                if not next_token or len(findings) >= limit:
+                    break
+                if not isinstance(next_token, str) or next_token in seen_tokens:
+                    raise RuntimeError(
+                        "IAM Access Analyzer returned an invalid or repeated nextToken."
+                    )
+                seen_tokens.add(next_token)
+                token = next_token
+
+            if len(findings) >= limit:
+                break
         return findings
 
     def discover_guardduty(self) -> list[Resource]:
