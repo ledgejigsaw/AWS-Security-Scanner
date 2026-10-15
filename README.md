@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **103 registered security rules:** 14 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
+- **104 registered security rules:** 15 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer check.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
@@ -60,7 +60,7 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 
 | Service | Coverage |
 | --- | --- |
-| S3 | Public exposure, encryption, versioning, Block Public Access, server-access logging, bucket-policy risks, public ACL grants, ACL-based ownership and MFA Delete review signals |
+| S3 | Public exposure, encryption, versioning, Block Public Access, server-access logging, bucket-policy risks, public ACL grants, ACL-based ownership, MFA Delete and cross-account policy review signals |
 | IAM | Unrestricted and broad permissions, high-risk administrative actions, role trust policies, MFA, access-key state/age/inactivity, password/console credential hygiene and unused roles |
 | EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules; detailed monitoring and missing instance-profile checks are informational review signals |
 | EBS | Explicitly unencrypted volumes/snapshots and snapshots with an observed public create-volume permission; denied permission discovery remains unknown |
@@ -82,7 +82,7 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | Application Load Balancers | Missing WAF association as an informational review signal; network load balancers are not included | 
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 103 rules (14 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 103 rules (15 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
