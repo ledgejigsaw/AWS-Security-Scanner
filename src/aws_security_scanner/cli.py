@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import boto3
@@ -376,14 +377,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.interactive:
-        supplied_options = [
-            args.source, args.file, args.accounts_file, args.region, args.profile,
-            args.service, args.include_native_findings, args.output, args.graph_output,
-            args.policy, args.compliance_mapping, args.min_severity, args.baseline,
-            args.write_baseline, args.compare_baseline, args.diff_output,
-        ]
-        if any(value not in (None, False, []) for value in supplied_options):
-            parser.error("--interactive cannot be combined with other scan options; answer the guided prompts instead")
+        if sys.argv[1:] != ["--interactive"]:
+            parser.error("--interactive must be used by itself; answer the guided prompts instead")
         from aws_security_scanner.interactive import build_interactive_args
 
         interactive_args = build_interactive_args()
