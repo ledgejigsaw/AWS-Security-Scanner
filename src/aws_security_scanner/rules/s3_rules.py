@@ -682,3 +682,59 @@ def check_mfa_delete(resource: Resource) -> list[Finding]:
         )
 
     return findings
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-014",
+    service="S3",
+    severity=Severity.INFO,
+    category="Data Protection",
+    title="Versioned S3 bucket has no noncurrent-version lifecycle expiration",
+    description=(
+        "The bucket has versioning enabled but no enabled lifecycle rule "
+        "was observed that expires noncurrent object versions. This is a "
+        "data-retention and cost review signal, not a universal security failure."
+    ),
+    remediation=(
+        "Review retention and recovery requirements. If policy permits, add "
+        "a lifecycle rule for noncurrent versions; do not shorten retention "
+        "where legal, audit or recovery requirements require older versions."
+    ),
+)
+def check_noncurrent_version_lifecycle(resource: Resource) -> list[Finding]:
+    """Flag only observable versioned buckets lacking noncurrent-version expiry."""
+    versioning = resource.attributes.get("versioning_configuration")
+    lifecycle = resource.attributes.get("lifecycle_configuration")
+    if not isinstance(versioning, dict) or versioning.get("status") != "Enabled":
+        return []
+    if not isinstance(lifecycle, dict):
+        return []
+    status = lifecycle.get("status")
+    if status not in {"NOT_CONFIGURED", "CONFIGURED"}:
+        return []
+
+    rules = lifecycle.get("rules", [])
+    if not isinstance(rules, list):
+        return []
+    has_enabled_expiration = any(
+        isinstance(rule, dict)
+        and rule.get("status") == "Enabled"
+        and rule.get("has_noncurrent_version_expiration") is True
+        for rule in rules
+    )
+    if has_enabled_expiration:
+        return []
+
+    evidence = (
+        "No lifecycle configuration observed"
+        if status == "NOT_CONFIGURED"
+        else "No enabled noncurrent-version expiration rule observed"
+    )
+    return [
+        Finding.from_rule(
+            check_noncurrent_version_lifecycle,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=evidence,
+        )
+    ]

@@ -198,6 +198,9 @@ class AWSProvider:
             attributes["versioning_configuration"] = (
                 self._get_bucket_versioning_configuration(bucket_name)
             )
+            attributes["lifecycle_configuration"] = (
+                self._get_bucket_lifecycle_configuration(bucket_name)
+            )
 
             resources.append(
                 Resource(
@@ -634,6 +637,38 @@ class AWSProvider:
             "status": status,
             "mfa_delete": mfa_delete,
         }
+
+    def _get_bucket_lifecycle_configuration(self, bucket_name: str) -> dict[str, Any]:
+        """Return lifecycle posture with explicit configured/absent/unknown states."""
+        try:
+            response = self.s3_client.get_bucket_lifecycle_configuration(
+                Bucket=bucket_name
+            )
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code")
+            if error_code == "NoSuchLifecycleConfiguration":
+                return {"status": "NOT_CONFIGURED", "rules": []}
+            # Access denied and unexpected API failures are not equivalent to
+            # missing lifecycle configuration.
+            return {"status": "UNKNOWN", "rules": []}
+
+        raw_rules = response.get("Rules")
+        if not isinstance(raw_rules, list):
+            return {"status": "UNKNOWN", "rules": []}
+        rules = []
+        for rule in raw_rules:
+            if not isinstance(rule, dict):
+                continue
+            noncurrent = rule.get("NoncurrentVersionExpiration")
+            expiration = rule.get("Expiration")
+            rules.append({
+                "status": rule.get("Status"),
+                "id": rule.get("ID"),
+                "has_noncurrent_version_expiration": isinstance(noncurrent, dict)
+                and bool(noncurrent),
+                "has_expiration": isinstance(expiration, dict) and bool(expiration),
+            })
+        return {"status": "CONFIGURED", "rules": rules}
 
     def discover_security_groups(self) -> list[Resource]:
         """Discover EC2 security groups and normalise network rules."""
