@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import boto3
@@ -44,10 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Ask guided questions to configure and confirm a scan; cannot be combined with scan options.",
+    )
+
+    parser.add_argument(
         "--source",
         choices=["fixture", "terraform", "hcl", "aws"],
-        required=True,
-        help="Security resource source.",
+        required=False,
+        help="Security resource source (omit only when using --interactive).",
     )
 
     parser.add_argument(
@@ -368,6 +375,18 @@ def main() -> None:
 
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.interactive:
+        if sys.argv[1:] != ["--interactive"]:
+            parser.error("--interactive must be used by itself; answer the guided prompts instead")
+        from aws_security_scanner.interactive import build_interactive_args
+
+        interactive_args = build_interactive_args()
+        if interactive_args is None:
+            return
+        args = parser.parse_args(interactive_args)
+    elif args.source is None:
+        parser.error("--source is required unless --interactive is used")
 
     if args.diff_output and not args.compare_baseline:
         parser.error("--diff-output requires --compare-baseline")
