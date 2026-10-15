@@ -330,7 +330,8 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [ ] Additional CloudTrail/KMS account-wide coverage
 - [x] Initial maintained Lambda runtime lifecycle snapshot and deprecated-runtime check (refresh against AWS before release)
 - [x] Initial CloudFront distribution checks (review scope and false positives before release)
-- [x] Initial regional Security Hub and GuardDuty enablement posture checks plus optional native-finding imports\n- [x] AWS Config recorder, recording-state and delivery-channel posture checks
+- [x] Initial regional Security Hub and GuardDuty enablement posture checks plus optional native-finding imports
+- [x] AWS Config recorder, recording-state and delivery-channel posture checks
 - [x] Extended S3 ACL, Object Ownership and MFA Delete review checks (metadata-only; MFA Delete is informational)
 - [ ] Multi-account scanning and compliance reporting (tracked in GitHub issues)
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
