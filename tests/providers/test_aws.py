@@ -1520,3 +1520,80 @@ def test_aws_provider_keeps_extended_s3_metadata_unknown_on_access_denied():
     assert provider._get_bucket_acl("company-data") is None
     assert provider._get_bucket_object_ownership("company-data") is None
     assert provider._get_bucket_versioning_configuration("company-data") is None
+
+
+
+def test_aws_provider_discovers_s3_object_lock_configuration():
+    s3_client = Mock()
+    s3_client.list_buckets.return_value = {"Buckets": [{"Name": "retention-data"}]}
+    s3_client.get_object_lock_configuration.return_value = {
+        "ObjectLockConfiguration": {
+            "ObjectLockEnabled": "Enabled",
+            "Rule": {
+                "DefaultRetention": {
+                    "Mode": "GOVERNANCE",
+                    "Days": 90,
+                }
+            },
+        }
+    }
+
+    resource = AWSProvider(s3_client=s3_client).discover_s3_buckets()[0]
+
+    assert resource.attributes["object_lock_configuration"] == {
+        "status": "CONFIGURED",
+        "enabled": True,
+        "default_retention": {
+            "mode": "GOVERNANCE",
+            "days": 90,
+            "years": None,
+        },
+    }
+    s3_client.get_object_lock_configuration.assert_called_once_with(
+        Bucket="retention-data"
+    )
+
+
+def test_aws_provider_distinguishes_missing_object_lock_from_access_denied():
+    s3_client = Mock()
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.s3_client = s3_client
+    s3_client.get_object_lock_configuration.side_effect = ClientError(
+        {
+            "Error": {
+                "Code": "ObjectLockConfigurationNotFoundError",
+                "Message": "Object Lock is not configured",
+            }
+        },
+        "GetObjectLockConfiguration",
+    )
+    assert provider._get_bucket_object_lock_configuration("no-lock") == {
+        "status": "NOT_CONFIGURED",
+        "enabled": False,
+        "default_retention": None,
+    }
+
+    s3_client.get_object_lock_configuration.side_effect = ClientError(
+        {"Error": {"Code": "AccessDenied", "Message": "denied"}},
+        "GetObjectLockConfiguration",
+    )
+    assert provider._get_bucket_object_lock_configuration("unknown") == {
+        "status": "UNKNOWN",
+        "enabled": None,
+        "default_retention": None,
+    }
+
+
+def test_aws_provider_keeps_malformed_object_lock_response_unknown():
+    s3_client = Mock()
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.s3_client = s3_client
+    s3_client.get_object_lock_configuration.return_value = {
+        "ObjectLockConfiguration": {}
+    }
+
+    assert provider._get_bucket_object_lock_configuration("malformed") == {
+        "status": "UNKNOWN",
+        "enabled": None,
+        "default_retention": None,
+    }
