@@ -29,6 +29,7 @@ from aws_security_scanner.baseline_history import (
     write_baseline as write_history_baseline,
 )
 from aws_security_scanner.compliance import ComplianceMappingError, load_mapping_file
+from aws_security_scanner.risk import RiskScoringConfigError, load_risk_config, score_findings
 from aws_security_scanner.triage import (
     exclude_baselined_findings,
     filter_by_minimum_severity,
@@ -136,6 +137,17 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[severity.value for severity in Severity],
         default=None,
         help="Only include findings at this severity or higher.",
+    )
+
+    parser.add_argument(
+        "--risk-score",
+        action="store_true",
+        help="Add optional versioned risk scores and factor explanations to each finding.",
+    )
+    parser.add_argument(
+        "--risk-config",
+        type=Path,
+        help="Optional JSON risk-scoring configuration (requires --risk-score).",
     )
 
     baseline_group = parser.add_mutually_exclusive_group()
@@ -401,6 +413,8 @@ def main() -> None:
 
     if args.diff_output and not args.compare_baseline:
         parser.error("--diff-output requires --compare-baseline")
+    if args.risk_config and not args.risk_score:
+        parser.error("--risk-config requires --risk-score")
     if args.include_native_findings and args.source != "aws":
         parser.error("--include-native-findings can only be used with --source aws")
     if args.accounts_file and args.source != "aws":
@@ -428,6 +442,14 @@ def main() -> None:
                 args.compliance_mapping, registered_check_ids
             )
         except ComplianceMappingError as exc:
+            parser.error(str(exc))
+
+    risk_config = None
+    if args.risk_score:
+        registered_check_ids = {rule.metadata.check_id for rule in get_all_rules()}
+        try:
+            risk_config = load_risk_config(args.risk_config, registered_check_ids)
+        except RiskScoringConfigError as exc:
             parser.error(str(exc))
 
     assessment_metadata = None
@@ -495,6 +517,8 @@ def main() -> None:
         )
 
     findings = filter_by_minimum_severity(findings, args.min_severity)
+    if args.risk_score:
+        findings = score_findings(findings, risk_config)
 
     output_path = args.output or Path(
         "reports/scan.html"
