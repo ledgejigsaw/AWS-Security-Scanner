@@ -2,6 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
+import boto3
+
 from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
 from aws_security_scanner.providers.fixture import FixtureProvider
@@ -59,6 +61,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--region",
         help="AWS region to scan.",
+    )
+    parser.add_argument(
+        "--profile",
+        help="AWS shared-config profile to use (AWS source only; no credentials are accepted on the command line).",
+    )
+    parser.add_argument(
+        "--service",
+        action="append",
+        choices=[
+            "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
+            "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty",
+        ],
+        help="Limit AWS discovery to selected service domains; repeat to select multiple. Default: all supported domains.",
     )
 
     parser.add_argument(
@@ -137,6 +153,7 @@ def discover_resources(
     region: str | None = None,
     aws_session=None,
     account_id: str | None = None,
+    services: list[str] | None = None,
 ):
     """Discover resources from the selected source."""
 
@@ -166,130 +183,34 @@ def discover_resources(
             else AWSProvider(region=region)
         )
 
+        discovery_by_service = {
+            "s3": [provider.discover_s3_buckets],
+            "iam": [provider.discover_iam_policies, provider.discover_iam_roles, provider.discover_iam_users, provider.discover_iam_account],
+            "ec2": [provider.discover_ec2_instances],
+            "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots],
+            "vpc": [provider.discover_security_groups, provider.discover_vpcs, provider.discover_subnets, provider.discover_route_tables, provider.discover_network_acls, provider.discover_flow_logs],
+            "cloudtrail": [provider.discover_cloudtrail_trails],
+            "kms": [provider.discover_kms_keys],
+            "rds": [provider.discover_rds_instances],
+            "lambda": [provider.discover_lambda_functions],
+            "secretsmanager": [provider.discover_secrets_manager_secrets],
+            "ecr": [provider.discover_ecr_repositories],
+            "dynamodb": [provider.discover_dynamodb_tables],
+            "sqs": [provider.discover_sqs_queues],
+            "sns": [provider.discover_sns_topics],
+            "apigateway": [provider.discover_api_gateway_rest_apis],
+            "ecs": [provider.discover_ecs_task_definitions, provider.discover_ecs_services],
+            "cloudfront": [provider.discover_cloudfront_distributions],
+            "waf": [lambda: provider.discover_waf_web_acls("CLOUDFRONT"), lambda: provider.discover_waf_web_acls("REGIONAL")],
+            "elb": [provider.discover_application_load_balancers],
+            "securityhub": [provider.discover_security_hub],
+            "guardduty": [provider.discover_guardduty],
+        }
+        selected_services = list(dict.fromkeys(services)) if services else list(discovery_by_service)
         resources = []
-
-        resources.extend(
-            provider.discover_s3_buckets()
-        )
-
-        resources.extend(
-            provider.discover_iam_policies()
-        )
-
-        resources.extend(
-            provider.discover_iam_roles()
-        )
-
-        resources.extend(
-            provider.discover_iam_users()
-        )
-
-        resources.extend(
-            provider.discover_iam_account()
-        )
-        resources.extend(
-            provider.discover_ec2_instances()
-        )
-
-        resources.extend(
-            provider.discover_ebs_volumes()
-        )
-
-        resources.extend(
-            provider.discover_ebs_snapshots()
-        )
-
-        resources.extend(
-            provider.discover_security_groups()
-        )
-
-        resources.extend(
-            provider.discover_waf_web_acls("CLOUDFRONT")
-        )
-
-        resources.extend(
-            provider.discover_waf_web_acls("REGIONAL")
-        )
-
-        resources.extend(
-            provider.discover_application_load_balancers()
-        )
-
-        resources.extend(
-            provider.discover_security_hub()
-        )
-
-        resources.extend(
-            provider.discover_guardduty()
-        )
-
-        resources.extend(
-            provider.discover_vpcs()
-        )
-
-        resources.extend(
-            provider.discover_subnets()
-        )
-
-        resources.extend(
-            provider.discover_route_tables()
-        )
-
-        resources.extend(
-            provider.discover_network_acls()
-        )
-
-        resources.extend(
-            provider.discover_flow_logs()
-        )
-
-        resources.extend(
-            provider.discover_cloudtrail_trails()
-        )
-
-        resources.extend(
-            provider.discover_kms_keys()
-        )
-
-        resources.extend(
-            provider.discover_rds_instances()
-        )
-
-        resources.extend(
-            provider.discover_lambda_functions()
-        )
-
-        resources.extend(
-            provider.discover_secrets_manager_secrets()
-        )
-
-        resources.extend(
-            provider.discover_ecr_repositories()
-        )
-
-        resources.extend(
-            provider.discover_dynamodb_tables()
-        )
-
-        resources.extend(
-            provider.discover_sqs_queues()
-        )
-
-        resources.extend(
-            provider.discover_sns_topics()
-        )
-
-        resources.extend(
-            provider.discover_api_gateway_rest_apis()
-        )
-
-        resources.extend(
-            provider.discover_ecs_task_definitions()
-        )
-
-        resources.extend(
-            provider.discover_ecs_services()
-        )
+        for service in selected_services:
+            for discover in discovery_by_service[service]:
+                resources.extend(discover())
 
         if account_id is not None:
             for resource in resources:
@@ -307,9 +228,24 @@ def run_scan(
     native_findings_limit: int = 100,
     aws_session=None,
     expected_account_id: str | None = None,
+    profile: str | None = None,
+    services: list[str] | None = None,
 ) -> list:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
+    if (profile or services) and source != "aws":
+        raise ValueError("--profile and --service can only be used with --source aws.")
+    if profile and aws_session is not None:
+        raise ValueError("--profile cannot be combined with an injected AWS session.")
+    if services:
+        valid_services = {
+            "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
+            "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty",
+        }
+        unknown = sorted(set(services) - valid_services)
+        if unknown:
+            raise ValueError(f"Unsupported AWS service selection: {', '.join(unknown)}")
     if include_native_findings and (
         isinstance(native_findings_limit, bool)
         or not isinstance(native_findings_limit, int)
@@ -317,7 +253,9 @@ def run_scan(
     ):
         raise ValueError("--native-findings-limit must be between 1 and 1000.")
 
-    if aws_session is None and expected_account_id is None:
+    if profile is not None:
+        aws_session = boto3.Session(profile_name=profile, region_name=region)
+    if aws_session is None and expected_account_id is None and services is None:
         resources = discover_resources(source, source_path, region)
     else:
         resources = discover_resources(
@@ -326,6 +264,7 @@ def run_scan(
             region,
             aws_session,
             expected_account_id,
+            services,
         )
 
     policy = (
@@ -374,6 +313,10 @@ def main() -> None:
         parser.error("--accounts-file can only be used with --source aws")
     if args.accounts_file and args.file:
         parser.error("--accounts-file cannot be combined with --file")
+    if (args.profile or args.service) and args.source != "aws":
+        parser.error("--profile and --service can only be used with --source aws")
+    if args.accounts_file and args.profile:
+        parser.error("--profile with --accounts-file is not supported; configure the default credential chain for the caller")
     if not 1 <= args.native_findings_limit <= 1000:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
@@ -409,6 +352,8 @@ def main() -> None:
             args.region,
             args.include_native_findings,
             args.native_findings_limit,
+            profile=args.profile,
+            services=args.service,
         )
 
     baseline_action_requested = bool(
