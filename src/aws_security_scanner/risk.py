@@ -58,7 +58,7 @@ def load_risk_config(
     except json.JSONDecodeError as exc:
         raise RiskScoringConfigError(f"Risk configuration is not valid JSON: {exc}") from exc
 
-    if not isinstance(data, dict) or data.get("version") != 1:
+    if not isinstance(data, dict) or isinstance(data.get("version"), bool) or data.get("version") != 1:
         raise RiskScoringConfigError("Risk configuration must be a JSON object with version: 1.")
 
     raw_overrides = data.get("check_overrides", {})
