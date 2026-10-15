@@ -40,6 +40,7 @@ class AWSProvider:
         elbv2_client: Any | None = None,
         securityhub_client: Any | None = None,
         guardduty_client: Any | None = None,
+        config_client: Any | None = None,
         session: Any | None = None,
     ):
         self.region = region
@@ -112,6 +113,7 @@ class AWSProvider:
         self.elbv2_client = elbv2_client or self._client("elbv2", region_name=region)
         self.securityhub_client = securityhub_client or self._client("securityhub", region_name=region)
         self.guardduty_client = guardduty_client or self._client("guardduty", region_name=region)
+        self.config_client = config_client or self._client("config", region_name=region)
 
     def _collect_pages(
         self,
@@ -2025,6 +2027,52 @@ class AWSProvider:
             ))
         return resources
 
+
+    def discover_aws_config(self) -> list[Resource]:
+        """Discover regional AWS Config recorder, recording and delivery-channel status."""
+        recorders = self.config_client.describe_configuration_recorders().get(
+            "ConfigurationRecorders", []
+        )
+        channels = self.config_client.describe_delivery_channels().get(
+            "DeliveryChannels", []
+        )
+
+        recording = None
+        if recorders:
+            recorder_names = [
+                recorder.get("name")
+                for recorder in recorders
+                if isinstance(recorder, dict) and isinstance(recorder.get("name"), str)
+            ]
+            if recorder_names:
+                statuses = self.config_client.describe_configuration_recorder_status(
+                    ConfigurationRecorderNames=recorder_names
+                ).get("ConfigurationRecordersStatus", [])
+                status_by_name = {
+                    item.get("name"): item.get("recording")
+                    for item in statuses
+                    if isinstance(item, dict) and isinstance(item.get("name"), str)
+                }
+                if all(name in status_by_name for name in recorder_names):
+                    values = [status_by_name[name] for name in recorder_names]
+                    # A missing/non-boolean status is unknown. If all statuses are
+                    # explicit booleans, any stopped recorder means recording is incomplete.
+                    if all(isinstance(value, bool) for value in values):
+                        recording = all(value is True for value in values)
+
+        return [
+            Resource(
+                resource_type="aws_config_service",
+                resource_id=f"aws-config:{self.region or 'default'}",
+                attributes={
+                    "recorder_configured": bool(recorders),
+                    "recording": recording,
+                    "delivery_channel_configured": bool(channels),
+                },
+                source="aws",
+                region=self.region,
+            )
+        ]
 
     def discover_security_hub(self) -> list[Resource]:
         """Discover regional Security Hub enablement without importing findings.

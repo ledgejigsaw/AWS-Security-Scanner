@@ -51,7 +51,8 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |
 | CloudTrail | Trail logging status, multi-region coverage, log-file validation, CloudWatch Logs integration review and recent delivery errors |
 | Security Hub | Regional hub enablement posture; optional import of up to 100 native findings by default (limit configurable to 1,000), preserving source IDs, product ARNs and observation timestamps |
-| GuardDuty | Regional detector enablement posture only; native findings and threat data are not imported |
+| GuardDuty | Regional detector enablement posture and optional bounded native-finding import, preserving source IDs and timestamps |
+| AWS Config | Regional recorder status, recording state and delivery-channel presence; API permission failures are not treated as disabled state |
 | KMS | Automatic rotation, pending deletion, broad wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
 | Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies and runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot |
@@ -65,7 +66,7 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | Application Load Balancers | Missing WAF association as an informational review signal; network load balancers are not included | 
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 99 rules (13 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 103 rules (14 S3, 17 IAM, 12 EC2, 3 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 4 KMS, 4 RDS, 3 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 6 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -329,7 +330,8 @@ Roadmap status is based on the current repository code and tests, not on the pre
 - [ ] Additional CloudTrail/KMS account-wide coverage
 - [x] Initial maintained Lambda runtime lifecycle snapshot and deprecated-runtime check (refresh against AWS before release)
 - [x] Initial CloudFront distribution checks (review scope and false positives before release)
-- [x] Initial regional Security Hub and GuardDuty enablement posture checks (native findings are not imported)
+- [x] Initial regional Security Hub and GuardDuty enablement posture checks plus optional native-finding imports
+- [x] AWS Config recorder, recording-state and delivery-channel posture checks
 - [x] Extended S3 ACL, Object Ownership and MFA Delete review checks (metadata-only; MFA Delete is informational)
 - [ ] Multi-account scanning and compliance reporting (tracked in GitHub issues)
 - [ ] Finding deduplication, baseline diffs and suppression reason/expiry metadata
