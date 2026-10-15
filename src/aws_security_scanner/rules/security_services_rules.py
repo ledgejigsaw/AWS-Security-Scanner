@@ -51,3 +51,75 @@ def check_guardduty_disabled(resource: Resource) -> list[Finding]:
             evidence="GuardDuty ListDetectors returned no detector IDs",
         )
     ]
+
+
+@rule_for(
+    "aws_config_service",
+    check_id="CONFIG-001",
+    service="AWS Config",
+    severity=Severity.MEDIUM,
+    category="Detection and Monitoring",
+    title="AWS Config configuration recorder is not configured",
+    description="No AWS Config configuration recorder was observed in the assessed region, so resource configuration history and configuration-rule evaluation may be unavailable.",
+    remediation="Review the region's configuration-auditing requirements and configure an AWS Config recorder and delivery channel where required.",
+)
+def check_config_recorder_missing(resource: Resource) -> list[Finding]:
+    """Report AWS Config only when discovery explicitly observes no recorder."""
+    if resource.attributes.get("recorder_configured") is not False:
+        return []
+    return [
+        Finding.from_rule(
+            check_config_recorder_missing,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence="AWS Config DescribeConfigurationRecorders returned no recorders",
+        )
+    ]
+
+
+@rule_for(
+    "aws_config_service",
+    check_id="CONFIG-002",
+    service="AWS Config",
+    severity=Severity.HIGH,
+    category="Detection and Monitoring",
+    title="AWS Config configuration recorder is not recording",
+    description="AWS Config has a configured recorder, but discovery explicitly reports that it is not recording. Configuration history may therefore be incomplete.",
+    remediation="Investigate the recorder status and resume recording after confirming the required delivery channel and permissions.",
+)
+def check_config_recorder_stopped(resource: Resource) -> list[Finding]:
+    """Report a stopped recorder only when AWS explicitly reports recording=False."""
+    if resource.attributes.get("recording") is not False:
+        return []
+    return [
+        Finding.from_rule(
+            check_config_recorder_stopped,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence="AWS Config DescribeConfigurationRecorderStatus reported recording=false",
+        )
+    ]
+
+
+@rule_for(
+    "aws_config_service",
+    check_id="CONFIG-003",
+    service="AWS Config",
+    severity=Severity.MEDIUM,
+    category="Detection and Monitoring",
+    title="AWS Config delivery channel is not configured",
+    description="No AWS Config delivery channel was observed in the assessed region. Configuration snapshots and notifications may not be delivered as expected.",
+    remediation="Review the required AWS Config delivery design and configure an appropriate delivery channel if the service is required in this region.",
+)
+def check_config_delivery_channel_missing(resource: Resource) -> list[Finding]:
+    """Report a missing delivery channel only when discovery explicitly observes none."""
+    if resource.attributes.get("delivery_channel_configured") is not False:
+        return []
+    return [
+        Finding.from_rule(
+            check_config_delivery_channel_missing,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence="AWS Config DescribeDeliveryChannels returned no delivery channels",
+        )
+    ]
