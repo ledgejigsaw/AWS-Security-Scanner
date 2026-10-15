@@ -84,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-native-findings",
         action="store_true",
-        help="Import bounded native AWS Security Hub and GuardDuty findings (AWS source only).",
+        help="Import bounded native Security Hub, GuardDuty and IAM Access Analyzer findings (AWS source only).",
     )
     parser.add_argument(
         "--native-findings-limit",
