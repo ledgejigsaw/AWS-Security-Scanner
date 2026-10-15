@@ -2,6 +2,7 @@ from aws_security_scanner.models.finding import Finding
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.models.rule import Severity
 from aws_security_scanner.rules.decorators import rule_for
+import re
 
 
 @rule_for(
@@ -738,3 +739,136 @@ def check_noncurrent_version_lifecycle(resource: Resource) -> list[Finding]:
             evidence=evidence,
         )
     ]
+
+
+def _account_ids_from_principal(principal) -> set[str]:
+    """Extract explicit 12-digit AWS account IDs from an AWS Principal value."""
+    if isinstance(principal, list):
+        result: set[str] = set()
+        for item in principal:
+            result.update(_account_ids_from_principal(item))
+        return result
+    if isinstance(principal, dict):
+        result: set[str] = set()
+        aws_principal = principal.get("AWS")
+        if aws_principal is not None:
+            result.update(_account_ids_from_principal(aws_principal))
+        return result
+    if not isinstance(principal, str) or principal == "*":
+        return set()
+
+    account_ids = set(re.findall(r"arn:(?:aws|aws-us-gov|aws-cn):iam::(\\d{12}):", principal))
+    if re.fullmatch(r"\\d{12}", principal):
+        account_ids.add(principal)
+    return account_ids
+
+
+def _s3_policy_statement_applies_to_bucket(statement, resource: Resource) -> bool:
+    """Conservatively check whether a statement resource names this bucket."""
+    statement_resources = statement.get("Resource")
+    if isinstance(statement_resources, str):
+        statement_resources = [statement_resources]
+    if not isinstance(statement_resources, list) or not statement_resources:
+        return False
+
+    bucket_name = resource.attributes.get("bucket_name") or resource.resource_id
+    bucket_arn = resource.attributes.get("bucket_arn") or f"arn:aws:s3:::{bucket_name}"
+    accepted = {bucket_arn, f"{bucket_arn}/*", "*"}
+    return any(
+        isinstance(item, str) and (item in accepted or item == bucket_name)
+        for item in statement_resources
+    )
+
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-015",
+    service="S3",
+    severity=Severity.INFO,
+    category="Access Control",
+    title="S3 bucket policy grants cross-account access (review signal)",
+    description=(
+        "An Allow statement names one or more AWS accounts other than the "
+        "known bucket-owner account. Cross-account access may be intentional; "
+        "this check identifies the policy grant for review and does not prove "
+        "that the access is exploitable or unintended."
+    ),
+    remediation=(
+        "Confirm that each external account and action is approved. Review "
+        "conditions, organization restrictions, explicit denies, identity "
+        "policies and the intended data-sharing design before changing access."
+    ),
+)
+def check_cross_account_bucket_policy(resource: Resource) -> list[Finding]:
+    """Identify explicit cross-account S3 policy grants when owner identity is known.
+
+    This is a review signal, not a complete IAM policy evaluator. Unknown owner
+    identity, malformed statements and statements with unknown resource scope
+    do not produce a finding.
+    """
+    policy = resource.attributes.get("bucket_policy")
+    if not isinstance(policy, dict):
+        return []
+    owner_account = resource.account_id or resource.attributes.get("bucket_owner_account")
+    if not isinstance(owner_account, str) or not re.fullmatch(r"\\d{12}", owner_account):
+        return []
+
+    statements = policy.get("Statement", [])
+    if isinstance(statements, dict):
+        statements = [statements]
+    if not isinstance(statements, list):
+        return []
+
+    external_accounts: set[str] = set()
+    actions_seen: set[str] = set()
+    condition_present = False
+    for statement in statements:
+        if not isinstance(statement, dict) or statement.get("Effect") != "Allow":
+            continue
+        if not _s3_policy_statement_applies_to_bucket(statement, resource):
+            continue
+
+        actions = statement.get("Action")
+        if isinstance(actions, str):
+            actions = [actions]
+        if not isinstance(actions, list):
+            continue
+        s3_actions = {
+            action for action in actions
+            if isinstance(action, str)
+            and (action == "*" or action.lower().startswith("s3:"))
+        }
+        if not s3_actions:
+            continue
+
+        principal = statement.get("Principal")
+        principal_accounts = _account_ids_from_principal(principal)
+        external = principal_accounts - {owner_account}
+        if not external:
+            continue
+
+        external_accounts.update(external)
+        actions_seen.update(s3_actions)
+        condition = statement.get("Condition")
+        condition_present = condition_present or (
+            isinstance(condition, dict) and bool(condition)
+        )
+
+    if not external_accounts:
+        return []
+
+    finding = Finding.from_rule(
+        check_cross_account_bucket_policy,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence=(
+            "external_principal_accounts="
+            + ",".join(sorted(external_accounts))
+            + "; actions="
+            + ",".join(sorted(actions_seen))
+            + f"; condition_present={str(condition_present).lower()}"
+            + "; effective access not evaluated"
+        ),
+    )
+    finding.account_id = owner_account
+    return [finding]
