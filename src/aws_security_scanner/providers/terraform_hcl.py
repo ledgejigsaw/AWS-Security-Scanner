@@ -1,6 +1,7 @@
 """Offline, conservative Terraform HCL resource loading."""
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -96,7 +97,7 @@ class TerraformHCLProvider:
 
     def _normalise_nested_blocks(self, attributes: dict[str, Any]) -> dict[str, Any]:
         """Flatten known singleton HCL blocks into the JSON-like rule model."""
-        result = dict(attributes)
+        result: dict[str, Any] = {}
         block_names = {
             "versioning_configuration",
             "rule",
@@ -105,9 +106,18 @@ class TerraformHCLProvider:
             "logging",
             "lifecycle_rule",
         }
-        for key, value in list(result.items()):
+        for key, value in attributes.items():
+            # python-hcl2 preserves quoted literal strings and adds this marker
+            # to nested block dictionaries; neither belongs in normalized attrs.
+            if key == "__is_block__":
+                continue
+            if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
+                try:
+                    value = json.loads(value)
+                except json.JSONDecodeError:
+                    pass
             if key in block_names and isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
-                result[key] = value[0]
+                result[key] = self._normalise_nested_blocks(value[0])
             elif isinstance(value, dict):
                 result[key] = self._normalise_nested_blocks(value)
             elif isinstance(value, list):
@@ -115,6 +125,8 @@ class TerraformHCLProvider:
                     self._normalise_nested_blocks(item) if isinstance(item, dict) else item
                     for item in value
                 ]
+            else:
+                result[key] = value
         return result
 
     def _unresolved_expressions(self, value: Any, path: str = "") -> list[str]:
