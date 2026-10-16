@@ -15,6 +15,7 @@ from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.integrations.access_analyzer import access_analyzer_to_finding
 from aws_security_scanner.integrations.inspector import inspector_to_finding
+from aws_security_scanner.integrations.macie import macie_to_finding
 from aws_security_scanner.multi_account import run_multi_account_scan
 from aws_security_scanner.graph import write_resource_graph
 from aws_security_scanner.reporting.json_reporter import write_json_report
@@ -93,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-native-findings",
         action="store_true",
-        help="Import bounded native Security Hub, GuardDuty, IAM Access Analyzer and Amazon Inspector findings (AWS source only).",
+        help="Import bounded native Security Hub, GuardDuty, IAM Access Analyzer, Amazon Inspector and Macie findings (AWS source only).",
     )
     parser.add_argument(
         "--native-findings-limit",
@@ -222,7 +223,7 @@ def discover_resources(
             "s3": [provider.discover_s3_buckets, provider.discover_s3_account_public_access_block],
             "iam": [provider.discover_iam_policies, provider.discover_iam_roles, provider.discover_iam_users, provider.discover_iam_account],
             "ec2": [provider.discover_ec2_instances],
-            "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots],
+            "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots, provider.discover_amis],
             "vpc": [provider.discover_security_groups, provider.discover_vpcs, provider.discover_subnets, provider.discover_route_tables, provider.discover_network_acls, provider.discover_flow_logs],
             "cloudtrail": [provider.discover_cloudtrail_trails],
             "kms": [provider.discover_kms_keys],
@@ -397,6 +398,16 @@ def run_scan(
         )
         for item in inspector_items:
             converted = inspector_to_finding(item, fallback_region=region)
+            if converted is not None:
+                if converted.account_id is None:
+                    converted.account_id = expected_account_id
+                findings.append(converted)
+
+        macie_items = native_provider.get_macie_findings(
+            limit=native_findings_limit
+        )
+        for item in macie_items:
+            converted = macie_to_finding(item, fallback_region=region)
             if converted is not None:
                 if converted.account_id is None:
                     converted.account_id = expected_account_id
