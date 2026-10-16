@@ -8,7 +8,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 
 | Service/domain | Registered checks | Scope and important limitations |
 |---|---:|---|
-| S3 | 16 | Public exposure, encryption, versioning, Block Public Access, logging, selected bucket-policy risks, public ACL grants, ACL-based ownership, MFA Delete and lifecycle review signals, plus an informational cross-account bucket-policy grant check when owner-account identity is known and a policy-dependent Object Lock review signal for versioned buckets. Object Lock absence is not treated as universally insecure. Conditions are recorded as context, not treated as proof that access is safe; no object-content inspection. |
+| S3 | 17 | Public exposure, encryption, versioning, Block Public Access, logging, selected bucket-policy risks, public ACL grants, ACL-based ownership, MFA Delete and lifecycle review signals, plus an informational cross-account bucket-policy grant check when owner-account identity is known and a policy-dependent Object Lock review signal for versioned buckets. Object Lock absence is not treated as universally insecure; account-level Block Public Access is checked separately from bucket-level settings. Conditions are recorded as context, not treated as proof that access is safe; no object-content inspection. |
 | IAM | 17 | Permissions, trust, MFA, credential hygiene, root-account and unused-role signals. Not a complete IAM policy simulator. |
 | EC2 | 12 | Public IPv4, metadata options, sensitive ports and broad ingress/egress. Detailed monitoring and missing instance-profile checks are informational review signals, not universal requirements. |
 | EBS | 3 | Explicit unencrypted volume/snapshot states and observed public snapshot create-volume permissions. Permission-denied public-access checks remain unknown; AMI sharing and snapshot lifecycle are not covered. |
@@ -31,7 +31,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | Application Load Balancers | 1 | Missing WAF association as an informational review signal. Network Load Balancers are not included. | 
 | ECS/Fargate | 6 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment and shared task/execution role review signal. Public IP assignment does not prove internet reachability; role sharing is informational. |
 | CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
-| **Total** | **106** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **107** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
