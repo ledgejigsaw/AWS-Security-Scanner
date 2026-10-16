@@ -122,7 +122,9 @@ class AWSProvider:
         self.accessanalyzer_client = accessanalyzer_client or self._client("accessanalyzer", region_name=region)
         self.macie_client = macie_client or self._client("macie2", region_name=region)
         self.s3control_client = s3control_client or self._client("s3control", region_name=region)
-        self.sts_client = sts_client or self._client("sts", region_name=region)
+        # STS is only needed for account-scoped checks; create it lazily to avoid
+        # changing client construction for scans that do not need account identity.
+        self.sts_client = sts_client
         self.inspector2_client = inspector2_client or self._client("inspector2", region_name=region)
 
     def _collect_pages(
@@ -169,7 +171,8 @@ class AWSProvider:
 
     def discover_s3_account_public_access_block(self) -> list[Resource]:
         """Discover account-level S3 Block Public Access without changing it."""
-        identity = self.sts_client.get_caller_identity()
+        sts_client = self.sts_client or self._client("sts", region_name=self.region)
+        identity = sts_client.get_caller_identity()
         account_id = identity.get("Account")
         if not isinstance(account_id, str) or not account_id.isdigit() or len(account_id) != 12:
             raise RuntimeError("STS GetCallerIdentity did not return a valid AWS account ID.")
