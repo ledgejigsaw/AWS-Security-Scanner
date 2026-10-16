@@ -916,3 +916,51 @@ def check_object_lock_review(resource: Resource) -> list[Finding]:
             ),
         )
     ]
+\n\n@rule_for(
+    "aws_s3_account_public_access_block",
+    check_id="S3-017",
+    service="S3",
+    severity=Severity.MEDIUM,
+    category="Preventive Controls",
+    title="S3 account-level Block Public Access is not fully enabled",
+    description=(
+        "The account-level S3 Block Public Access configuration is absent or "
+        "does not explicitly enable all four protections. Bucket-level controls "
+        "may still provide protection, so this is an account-wide posture signal "
+        "and not a complete effective-access evaluation."
+    ),
+    remediation=(
+        "Review account and organisation requirements, then enable the missing "
+        "account-level S3 Block Public Access settings where appropriate. "
+        "Validate bucket-level settings and policy exceptions separately."
+    ),
+)
+def check_s3_account_block_public_access(resource: Resource) -> list[Finding]:
+    """Report absent or explicitly incomplete account-level S3 BPA settings."""
+    configured = resource.attributes.get("configured")
+    settings = {
+        "block_public_acls": resource.attributes.get("block_public_acls"),
+        "ignore_public_acls": resource.attributes.get("ignore_public_acls"),
+        "block_public_policy": resource.attributes.get("block_public_policy"),
+        "restrict_public_buckets": resource.attributes.get("restrict_public_buckets"),
+    }
+    if configured is False:
+        evidence = "account-level public access block configuration=NOT_CONFIGURED"
+    elif configured is True:
+        disabled = sorted(name for name, value in settings.items() if value is False)
+        if not disabled:
+            return []
+        evidence = "account-level Block Public Access settings not enabled: " + ", ".join(disabled)
+    else:
+        return []
+
+    return [
+        Finding.from_rule(
+            check_s3_account_block_public_access,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=evidence,
+        )
+    ]
+
+
