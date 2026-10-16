@@ -44,6 +44,8 @@ class AWSProvider:
         session: Any | None = None,
         accessanalyzer_client: Any | None = None,
         macie_client: Any | None = None,
+        s3control_client: Any | None = None,
+        sts_client: Any | None = None,
         inspector2_client: Any | None = None,
     ):
         self.region = region
@@ -119,6 +121,8 @@ class AWSProvider:
         self.config_client = config_client or self._client("config", region_name=region)
         self.accessanalyzer_client = accessanalyzer_client or self._client("accessanalyzer", region_name=region)
         self.macie_client = macie_client or self._client("macie2", region_name=region)
+        self.s3control_client = s3control_client or self._client("s3control", region_name=region)
+        self.sts_client = sts_client or self._client("sts", region_name=region)
         self.inspector2_client = inspector2_client or self._client("inspector2", region_name=region)
 
     def _collect_pages(
@@ -162,6 +166,52 @@ class AWSProvider:
             token = next_token
 
         return items
+
+    def discover_s3_account_public_access_block(self) -> list[Resource]:
+        """Discover account-level S3 Block Public Access without changing it."""
+        identity = self.sts_client.get_caller_identity()
+        account_id = identity.get("Account")
+        if not isinstance(account_id, str) or not account_id.isdigit() or len(account_id) != 12:
+            raise RuntimeError("STS GetCallerIdentity did not return a valid AWS account ID.")
+
+        try:
+            response = self.s3control_client.get_public_access_block(AccountId=account_id)
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if code != "NoSuchPublicAccessBlockConfiguration":
+                # Access denied and unexpected errors must not look like a safe state.
+                raise
+            configuration = None
+        else:
+            configuration = response.get("PublicAccessBlockConfiguration")
+            if not isinstance(configuration, dict):
+                configuration = None
+
+        fields = {
+            "BlockPublicAcls": "block_public_acls",
+            "IgnorePublicAcls": "ignore_public_acls",
+            "BlockPublicPolicy": "block_public_policy",
+            "RestrictPublicBuckets": "restrict_public_buckets",
+        }
+        attributes: dict[str, Any] = {
+            "configured": configuration is not None,
+        }
+        for api_name, attribute_name in fields.items():
+            attributes[attribute_name] = (
+                configuration.get(api_name)
+                if configuration is not None
+                else False
+            )
+        return [
+            Resource(
+                resource_type="aws_s3_account_public_access_block",
+                resource_id=account_id,
+                attributes=attributes,
+                source="aws",
+                region=None,
+                account_id=account_id,
+            )
+        ]
 
     def discover_s3_buckets(self) -> list[Resource]:
         """Discover S3 buckets and their security configuration."""
