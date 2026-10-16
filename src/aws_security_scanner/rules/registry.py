@@ -256,7 +256,6 @@ def get_all_rules():
         check_ecs_service_public_ip,
         check_ecs_task_and_execution_roles_shared,
         check_ecs_image_not_pinned_by_digest,
-        check_ecs_image_not_pinned_by_digest,
         check_cloudfront_http_viewer_access,
         check_cloudfront_weak_tls_policy,
         check_cloudfront_logging_disabled,
