@@ -1674,6 +1674,7 @@ class AWSProvider:
                     resource_id=function_name,
                     attributes={
                         "runtime": function.get("Runtime"),
+                        "code_signing_config_arn": function.get("CodeSigningConfigArn"),
                         "handler": function.get("Handler"),
                         "role": function.get("Role"),
                         "state": function.get("State"),
