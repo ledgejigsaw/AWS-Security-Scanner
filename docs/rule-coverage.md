@@ -20,7 +20,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | Amazon Macie | 1 | Regional session enablement/paused status. This does not assess discovery-job coverage or delegated-administrator configuration; optional bounded native Macie finding import is available with `--include-native-findings`. |
 | KMS | 4 | Rotation, pending deletion, wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal. This is not a full IAM/KMS policy simulator. |
 | RDS | 4 | Encryption, public accessibility, backup retention and deletion protection. |
-| Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
+| Lambda | 4 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
 | Secrets Manager | 2 | Explicitly disabled rotation and unconditional wildcard-principal resource policies. Secret values must never be retrieved. |
 | ECR | 2 | Mutable image tags and explicitly disabled scan-on-push. |
 | DynamoDB | 3 | Point-in-time recovery, explicit server-side encryption state and deletion protection. |
