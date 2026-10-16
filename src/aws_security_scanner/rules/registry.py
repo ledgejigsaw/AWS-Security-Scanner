@@ -118,6 +118,7 @@ from aws_security_scanner.rules.ecs_rules import (
     check_ecs_root_filesystem_writable,
     check_ecs_service_public_ip,
     check_ecs_task_and_execution_roles_shared,
+    check_ecs_image_not_pinned_by_digest,
 )
 
 from aws_security_scanner.rules.cloudfront_rules import (
@@ -254,6 +255,7 @@ def get_all_rules():
         check_ecs_root_filesystem_writable,
         check_ecs_service_public_ip,
         check_ecs_task_and_execution_roles_shared,
+        check_ecs_image_not_pinned_by_digest,
         check_cloudfront_http_viewer_access,
         check_cloudfront_weak_tls_policy,
         check_cloudfront_logging_disabled,

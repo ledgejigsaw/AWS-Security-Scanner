@@ -1926,6 +1926,7 @@ class AWSProvider:
                     continue
                 normalized_containers.append({
                     "name": container.get("name"),
+                    "image": container.get("image"),
                     "privileged": container.get("privileged"),
                     "user": container.get("user"),
                     "readonly_root_filesystem": container.get("readonlyRootFilesystem"),
