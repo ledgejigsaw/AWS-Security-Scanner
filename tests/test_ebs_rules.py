@@ -72,3 +72,32 @@ def test_provider_discovers_volumes_and_snapshots_and_preserves_unknown_permissi
     assert snapshots[0].attributes["public"] is True
     assert snapshots[1].attributes["public"] is None
     assert snapshots[1].attributes["encrypted"] is False
+
+
+def test_public_ami_rule_only_flags_explicit_public_state():
+    from aws_security_scanner.rules.ebs_rules import check_public_ami
+
+    assert check_public_ami(resource("aws_ami", "ami-public", public=True))[0].check_id == "EBS-004"
+    assert check_public_ami(resource("aws_ami", "ami-private", public=False)) == []
+    assert check_public_ami(resource("aws_ami", "ami-unknown", public=None)) == []
+
+
+def test_provider_discovers_ami_public_permissions_and_preserves_unknown(monkeypatch):
+    class EC2:
+        def describe_images(self, **kwargs):
+            assert kwargs["Owners"] == ["self"]
+            return {"Images": [
+                {"ImageId": "ami-public", "Name": "public-image", "State": "available", "OwnerId": "123456789012"},
+                {"ImageId": "ami-unknown", "Name": "unknown-image", "State": "available", "OwnerId": "123456789012"},
+            ]}
+
+        def describe_image_attribute(self, **kwargs):
+            if kwargs["ImageId"] == "ami-public":
+                return {"LaunchPermissions": [{"Group": "all"}]}
+            raise ClientError({"Error": {"Code": "UnauthorizedOperation", "Message": "not permitted"}}, "DescribeImageAttribute")
+
+    monkeypatch.setattr("aws_security_scanner.providers.aws.boto3.client", lambda *args, **kwargs: object())
+    provider = AWSProvider(ec2_client=EC2(), region="eu-west-2")
+    amis = provider.discover_amis()
+    assert amis[0].attributes["public"] is True
+    assert amis[1].attributes["public"] is None
