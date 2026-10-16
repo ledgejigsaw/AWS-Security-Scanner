@@ -254,3 +254,44 @@ def check_ecs_image_not_pinned_by_digest(resource: Resource) -> list[Finding]:
         region=resource.region,
         evidence=evidence,
     )]
+
+
+@rule_for(
+    "aws_ecs_task_definition",
+    check_id="ECS-007",
+    service="ECS",
+    severity=Severity.LOW,
+    category="Software Supply Chain",
+    title="ECS container image is not pinned by digest",
+    description=(
+        "At least one ECS container image reference does not include an immutable "
+        "sha256 digest. Mutable tags can resolve to different image contents over "
+        "time, reducing deployment reproducibility and complicating incident review."
+    ),
+    remediation=(
+        "Where compatible with the release process, pin container images to immutable "
+        "digests and verify image provenance and vulnerability results in a trusted registry."
+    ),
+)
+def check_ecs_image_not_pinned_by_digest(resource: Resource) -> list[Finding]:
+    """Emit a low-severity supply-chain review signal for mutable image references."""
+    containers = resource.attributes.get("containers", [])
+    if not isinstance(containers, list):
+        return []
+    images = [
+        container.get("image")
+        for container in containers
+        if isinstance(container, dict)
+        and isinstance(container.get("image"), str)
+        and container.get("image").strip()
+        and "@sha256:" not in container.get("image")
+    ]
+    if not images:
+        return []
+    evidence = "container image references without digest: " + ", ".join(images[:5])
+    return [Finding.from_rule(
+        check_ecs_image_not_pinned_by_digest,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence=evidence,
+    )]
