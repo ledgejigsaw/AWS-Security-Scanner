@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.decorators import rule_for
