@@ -26,6 +26,8 @@ def aggregate_s3_resources(
             "aws_s3_bucket_public_access_block",
             "aws_s3_bucket_logging",
             "aws_s3_bucket_policy",
+            "aws_s3_bucket_lifecycle_configuration",
+            "aws_s3_bucket_object_lock_configuration",
         }:
             bucket_reference = (
                 resource.relationships.get("bucket")
@@ -113,6 +115,44 @@ def aggregate_s3_resources(
 
                 if policy is not None:
                     bucket.attributes["bucket_policy"] = policy
+
+            elif resource.resource_type == "aws_s3_bucket_lifecycle_configuration":
+                raw_rules = resource.attributes.get("rule", [])
+                if isinstance(raw_rules, dict):
+                    raw_rules = [raw_rules]
+                normalized_rules = []
+                if isinstance(raw_rules, list):
+                    for rule in raw_rules:
+                        if not isinstance(rule, dict):
+                            continue
+                        noncurrent_expiration = rule.get("noncurrent_version_expiration")
+                        if isinstance(noncurrent_expiration, list):
+                            has_noncurrent_expiration = any(
+                                isinstance(item, dict) for item in noncurrent_expiration
+                            )
+                        else:
+                            has_noncurrent_expiration = isinstance(noncurrent_expiration, dict)
+                        normalized_rules.append({
+                            "id": rule.get("id"),
+                            "status": rule.get("status"),
+                            "has_noncurrent_version_expiration": has_noncurrent_expiration,
+                        })
+                bucket.attributes["lifecycle_configuration"] = {
+                    "status": "CONFIGURED",
+                    "rules": normalized_rules,
+                }
+
+            elif resource.resource_type == "aws_s3_bucket_object_lock_configuration":
+                object_lock_enabled = resource.attributes.get("object_lock_enabled")
+                bucket.attributes["object_lock_configuration"] = {
+                    "status": (
+                        "CONFIGURED"
+                        if object_lock_enabled == "Enabled"
+                        else "UNKNOWN"
+                    ),
+                    "object_lock_enabled": object_lock_enabled,
+                    "rule": resource.attributes.get("rule"),
+                }
         else:
             # Preserve non-S3 Terraform resources for provider-independent rules.
             aggregated.append(resource)
