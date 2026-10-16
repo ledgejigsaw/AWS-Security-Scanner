@@ -14,6 +14,7 @@ from aws_security_scanner.providers.aws import AWSProvider
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.integrations.access_analyzer import access_analyzer_to_finding
+from aws_security_scanner.integrations.inspector import inspector_to_finding
 from aws_security_scanner.multi_account import run_multi_account_scan
 from aws_security_scanner.graph import write_resource_graph
 from aws_security_scanner.reporting.json_reporter import write_json_report
@@ -92,7 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-native-findings",
         action="store_true",
-        help="Import bounded native Security Hub, GuardDuty and IAM Access Analyzer findings (AWS source only).",
+        help="Import bounded native Security Hub, GuardDuty, IAM Access Analyzer and Amazon Inspector findings (AWS source only).",
     )
     parser.add_argument(
         "--native-findings-limit",
@@ -386,6 +387,16 @@ def run_scan(
         )
         for item in access_analyzer_items:
             converted = access_analyzer_to_finding(item, fallback_region=region)
+            if converted is not None:
+                if converted.account_id is None:
+                    converted.account_id = expected_account_id
+                findings.append(converted)
+
+        inspector_items = native_provider.get_inspector_findings(
+            limit=native_findings_limit
+        )
+        for item in inspector_items:
+            converted = inspector_to_finding(item, fallback_region=region)
             if converted is not None:
                 if converted.account_id is None:
                     converted.account_id = expected_account_id
