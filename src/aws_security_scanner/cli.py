@@ -219,7 +219,7 @@ def discover_resources(
         )
 
         discovery_by_service = {
-            "s3": [provider.discover_s3_buckets],
+            "s3": [provider.discover_s3_buckets, provider.discover_s3_account_public_access_block],
             "iam": [provider.discover_iam_policies, provider.discover_iam_roles, provider.discover_iam_users, provider.discover_iam_account],
             "ec2": [provider.discover_ec2_instances],
             "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots],
@@ -279,7 +279,7 @@ def run_scan(
         valid_services = {
             "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
             "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie",
         }
         unknown = sorted(set(services) - valid_services)
         if unknown:
