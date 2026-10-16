@@ -15,6 +15,7 @@ from aws_security_scanner.rules.s3_rules import (
     check_noncurrent_version_lifecycle,
     check_cross_account_bucket_policy,
     check_object_lock_review,
+    check_s3_account_block_public_access,
 )
 
 from aws_security_scanner.rules.iam_rules import (
@@ -179,6 +180,7 @@ def get_all_rules():
         check_noncurrent_version_lifecycle,
         check_cross_account_bucket_policy,
         check_object_lock_review,
+        check_s3_account_block_public_access,
         check_overly_permissive_policy,
         check_wildcard_permissions,
         check_excessive_administrative_permissions,
