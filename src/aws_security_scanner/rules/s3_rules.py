@@ -916,7 +916,9 @@ def check_object_lock_review(resource: Resource) -> list[Finding]:
             ),
         )
     ]
-\n\n@rule_for(
+
+
+@rule_for(
     "aws_s3_account_public_access_block",
     check_id="S3-017",
     service="S3",
