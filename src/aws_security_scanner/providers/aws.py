@@ -1713,6 +1713,11 @@ class AWSProvider:
                         "publicly_accessible": instance.get("PubliclyAccessible"),
                         "backup_retention_period": instance.get("BackupRetentionPeriod"),
                         "deletion_protection": instance.get("DeletionProtection"),
+                        "certificate_valid_till": (
+                            instance.get("CertificateDetails", {}).get("ValidTill")
+                            if isinstance(instance.get("CertificateDetails"), dict)
+                            else None
+                        ),
                         "multi_az": instance.get("MultiAZ"),
                         "endpoint_address": (
                             instance.get("Endpoint", {}).get("Address")
