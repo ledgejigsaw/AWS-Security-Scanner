@@ -29,3 +29,4 @@ When a feature is added or changed, update the relevant page in the same pull re
 - [Multi-account assessment foundation](multi-account-assessment.md)
 
 - [Provider-neutral contract design](provider-neutral-contract.md)
+- [Complementary AWS security tooling review](aws-security-tooling-review.md)
