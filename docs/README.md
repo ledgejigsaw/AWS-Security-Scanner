@@ -27,3 +27,6 @@ The scanner is under active development. It supports fixture-based scans, Terraf
 When a feature is added or changed, update the relevant page in the same pull request as the code. Keep claims about supported services and checks aligned with the rule registry, provider implementation and tests. Do not describe a service as live-validated unless a real-account validation has actually been performed.
 
 - [Multi-account assessment foundation](multi-account-assessment.md)
+
+- [Provider-neutral contract design](provider-neutral-contract.md)
+- [Complementary AWS security tooling review](aws-security-tooling-review.md)
