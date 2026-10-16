@@ -409,6 +409,50 @@ class AWSProvider:
             ))
         return resources
 
+    def discover_amis(self) -> list[Resource]:
+        """Discover owned AMIs and their public launch-permission state."""
+        images = self._collect_pages(
+            self.ec2_client.describe_images,
+            "Images",
+            Owners=["self"],
+        )
+        resources: list[Resource] = []
+        for image in images:
+            image_id = image.get("ImageId")
+            if not isinstance(image_id, str) or not image_id:
+                continue
+            public: bool | None = None
+            try:
+                permissions = self._collect_pages(
+                    self.ec2_client.describe_image_attribute,
+                    "LaunchPermissions",
+                    ImageId=image_id,
+                    Attribute="launchPermission",
+                )
+                public = any(
+                    permission.get("Group") == "all"
+                    for permission in permissions
+                    if isinstance(permission, dict)
+                )
+            except ClientError as error:
+                code = error.response.get("Error", {}).get("Code", "")
+                if code not in {"UnauthorizedOperation", "AccessDenied", "AccessDeniedException"}:
+                    raise
+            resources.append(Resource(
+                resource_type="aws_ami",
+                resource_id=image_id,
+                attributes={
+                    "name": image.get("Name"),
+                    "state": image.get("State"),
+                    "public": public,
+                    "owner_id": image.get("OwnerId"),
+                    "creation_date": image.get("CreationDate"),
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
+
     def discover_iam_policies(self) -> list[Resource]:
     
         resources = []
@@ -2545,3 +2589,56 @@ class AWSProvider:
                 )
             )
         return resources
+
+    def get_macie_findings(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return a bounded, paginated set of active Macie findings.
+
+        Only finding metadata is returned; sensitive-data samples and object
+        contents are never requested. API and permission errors propagate.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("Amazon Macie finding limit must be between 1 and 1000.")
+
+        findings: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        token: str | None = None
+        seen_tokens: set[str] = set()
+        while len(findings) < limit:
+            request: dict[str, Any] = {
+                "maxResults": min(50, limit - len(findings)),
+                "findingCriteria": {"criterion": {"archived": {"eq": ["false"]}}},
+            }
+            if token:
+                request["nextToken"] = token
+            response = self.macie_client.list_findings(**request)
+            ids = response.get("findingIds", [])
+            unique_ids = [
+                finding_id for finding_id in ids
+                if isinstance(finding_id, str) and finding_id and finding_id not in seen_ids
+            ]
+            for finding_id in unique_ids:
+                seen_ids.add(finding_id)
+            for offset in range(0, len(unique_ids), 50):
+                batch = unique_ids[offset:offset + 50]
+                detail_response = self.macie_client.get_findings(findingIds=batch)
+                for item in detail_response.get("findings", []):
+                    if not isinstance(item, dict):
+                        continue
+                    finding_id = item.get("id")
+                    if not isinstance(finding_id, str) or not finding_id:
+                        continue
+                    if item.get("archived") is True:
+                        continue
+                    findings.append(item)
+                    if len(findings) >= limit:
+                        break
+                if len(findings) >= limit:
+                    break
+            next_token = response.get("nextToken")
+            if not next_token or len(findings) >= limit:
+                break
+            if not isinstance(next_token, str) or next_token in seen_tokens:
+                raise RuntimeError("Amazon Macie returned an invalid or repeated nextToken.")
+            seen_tokens.add(next_token)
+            token = next_token
+        return findings
