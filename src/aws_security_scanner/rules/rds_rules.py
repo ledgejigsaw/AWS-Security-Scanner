@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.decorators import rule_for
@@ -136,3 +137,47 @@ def check_rds_deletion_protection(resource: Resource) -> list[Finding]:
             evidence="deletion_protection=false",
         )
     ]
+
+
+@rule_for(
+    "aws_db_instance",
+    check_id="RDS-005",
+    service="RDS",
+    severity=Severity.MEDIUM,
+    category="Transport Security",
+    title="RDS server certificate is expired or nearing expiry",
+    description=(
+        "The RDS instance reports a server certificate that is expired or expires "
+        "within the next 30 days. Certificate expiry can interrupt secure client "
+        "connections if clients and server certificates are not rotated in time."
+    ),
+    remediation=(
+        "Review the RDS certificate authority and rotation guidance for the engine, "
+        "schedule any required certificate rotation, and validate client trust stores "
+        "before the expiry date."
+    ),
+)
+def check_rds_certificate_expiry(resource: Resource) -> list[Finding]:
+    """Flag a reported RDS server certificate expiring within 30 days."""
+    value = resource.attributes.get("certificate_valid_till")
+    if isinstance(value, datetime):
+        expiry = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            expiry = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return []
+    else:
+        return []
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    days_remaining = (expiry.astimezone(timezone.utc) - now).days
+    if days_remaining > 30:
+        return []
+    return [Finding.from_rule(
+        check_rds_certificate_expiry,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence=f"certificate_valid_till={expiry.isoformat()}; days_remaining={days_remaining}",
+    )]

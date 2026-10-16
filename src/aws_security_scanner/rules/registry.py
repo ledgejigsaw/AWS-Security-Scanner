@@ -73,6 +73,7 @@ from aws_security_scanner.rules.rds_rules import (
     check_rds_public_accessibility,
     check_rds_backup_retention,
     check_rds_deletion_protection,
+    check_rds_certificate_expiry,
 )
 
 from aws_security_scanner.rules.lambda_rules import (
@@ -230,6 +231,7 @@ def get_all_rules():
         check_rds_public_accessibility,
         check_rds_backup_retention,
         check_rds_deletion_protection,
+        check_rds_certificate_expiry,
         check_lambda_public_function_url,
         check_lambda_wildcard_invoke_policy,
         check_lambda_deprecated_runtime,
