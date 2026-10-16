@@ -172,3 +172,34 @@ def check_lambda_deprecated_runtime(resource: Resource) -> list[Finding]:
             ),
         )
     ]
+
+
+@rule_for(
+    "aws_lambda_function",
+    check_id="LAMBDA-004",
+    service="Lambda",
+    severity=Severity.LOW,
+    category="Software Supply Chain",
+    title="Lambda function has no code-signing configuration",
+    description=(
+        "The function does not report an attached Lambda code-signing configuration. "
+        "Code signing can help ensure that only trusted deployment packages are deployed, "
+        "but applicability depends on the organisation's deployment model."
+    ),
+    remediation=(
+        "Consider configuring a Lambda code-signing configuration with an approved signing "
+        "profile and enforcing signature validation for deployment packages where suitable."
+    ),
+)
+def check_lambda_code_signing_not_enforced(resource: Resource) -> list[Finding]:
+    """Emit a low-severity review signal only when configuration is explicitly absent."""
+    if "code_signing_config_arn" not in resource.attributes:
+        return []
+    if resource.attributes.get("code_signing_config_arn"):
+        return []
+    return [Finding.from_rule(
+        check_lambda_code_signing_not_enforced,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="code_signing_config_arn is absent",
+    )]
