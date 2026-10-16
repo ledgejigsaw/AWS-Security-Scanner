@@ -409,6 +409,50 @@ class AWSProvider:
             ))
         return resources
 
+    def discover_amis(self) -> list[Resource]:
+        """Discover owned AMIs and their public launch-permission state."""
+        images = self._collect_pages(
+            self.ec2_client.describe_images,
+            "Images",
+            Owners=["self"],
+        )
+        resources: list[Resource] = []
+        for image in images:
+            image_id = image.get("ImageId")
+            if not isinstance(image_id, str) or not image_id:
+                continue
+            public: bool | None = None
+            try:
+                permissions = self._collect_pages(
+                    self.ec2_client.describe_image_attribute,
+                    "LaunchPermissions",
+                    ImageId=image_id,
+                    Attribute="launchPermission",
+                )
+                public = any(
+                    permission.get("Group") == "all"
+                    for permission in permissions
+                    if isinstance(permission, dict)
+                )
+            except ClientError as error:
+                code = error.response.get("Error", {}).get("Code", "")
+                if code not in {"UnauthorizedOperation", "AccessDenied", "AccessDeniedException"}:
+                    raise
+            resources.append(Resource(
+                resource_type="aws_ami",
+                resource_id=image_id,
+                attributes={
+                    "name": image.get("Name"),
+                    "state": image.get("State"),
+                    "public": public,
+                    "owner_id": image.get("OwnerId"),
+                    "creation_date": image.get("CreationDate"),
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
+
     def discover_iam_policies(self) -> list[Resource]:
     
         resources = []
@@ -1674,6 +1718,7 @@ class AWSProvider:
                     resource_id=function_name,
                     attributes={
                         "runtime": function.get("Runtime"),
+                        "code_signing_config_arn": function.get("CodeSigningConfigArn"),
                         "handler": function.get("Handler"),
                         "role": function.get("Role"),
                         "state": function.get("State"),

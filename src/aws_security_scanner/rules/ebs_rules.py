@@ -64,3 +64,25 @@ def check_public_ebs_snapshot(resource: Resource) -> list[Finding]:
         region=resource.region,
         evidence="CreateVolumePermissions includes Group=all",
     )]
+
+
+@rule_for(
+    "aws_ami",
+    check_id="EBS-004",
+    service="EBS",
+    severity=Severity.CRITICAL,
+    category="Access Control",
+    title="Amazon Machine Image is publicly launchable",
+    description="The AMI launch permissions explicitly include the public group, allowing any AWS account to launch instances from this image.",
+    remediation="Remove the public launch permission and review whether the image contains sensitive data or embedded credentials. Use narrowly scoped account sharing where required.",
+)
+def check_public_ami(resource: Resource) -> list[Finding]:
+    """Detect AMIs whose launch permission explicitly grants public access."""
+    if resource.attributes.get("public") is not True:
+        return []
+    return [Finding.from_rule(
+        check_public_ami,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="LaunchPermissions includes Group=all",
+    )]

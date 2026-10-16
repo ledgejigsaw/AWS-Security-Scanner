@@ -79,6 +79,7 @@ from aws_security_scanner.rules.lambda_rules import (
     check_lambda_public_function_url,
     check_lambda_wildcard_invoke_policy,
     check_lambda_deprecated_runtime,
+    check_lambda_code_signing_not_enforced,
 )
 
 from aws_security_scanner.rules.secretsmanager_rules import (
@@ -150,6 +151,7 @@ from aws_security_scanner.rules.ebs_rules import (
     check_ebs_volume_encryption,
     check_ebs_snapshot_encryption,
     check_public_ebs_snapshot,
+    check_public_ami,
 )
 
 from aws_security_scanner.rules.security_services_rules import (
@@ -214,6 +216,7 @@ def get_all_rules():
         check_ebs_volume_encryption,
         check_ebs_snapshot_encryption,
         check_public_ebs_snapshot,
+        check_public_ami,
         check_cloudtrail_logging,
         check_cloudtrail_multi_region,
         check_cloudtrail_log_file_validation,
@@ -230,6 +233,7 @@ def get_all_rules():
         check_lambda_public_function_url,
         check_lambda_wildcard_invoke_policy,
         check_lambda_deprecated_runtime,
+        check_lambda_code_signing_not_enforced,
         check_secret_rotation_disabled,
         check_secret_wildcard_resource_policy,
         check_ecr_mutable_image_tags,
