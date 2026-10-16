@@ -34,6 +34,7 @@ def test_ecs_task_definition_discovery_normalises_container_security_settings():
     assert task.attributes["requires_compatibilities"] == ["FARGATE"]
     assert task.attributes["containers"] == [{
         "name": "web",
+        "image": None,
         "privileged": False,
         "user": "10001",
         "readonly_root_filesystem": True,
