@@ -149,6 +149,7 @@ from aws_security_scanner.rules.ebs_rules import (
     check_ebs_volume_encryption,
     check_ebs_snapshot_encryption,
     check_public_ebs_snapshot,
+    check_public_ami,
 )
 
 from aws_security_scanner.rules.security_services_rules import (
@@ -213,6 +214,7 @@ def get_all_rules():
         check_ebs_volume_encryption,
         check_ebs_snapshot_encryption,
         check_public_ebs_snapshot,
+        check_public_ami,
         check_cloudtrail_logging,
         check_cloudtrail_multi_region,
         check_cloudtrail_log_file_validation,
