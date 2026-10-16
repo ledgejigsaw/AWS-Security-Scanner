@@ -123,3 +123,82 @@ def test_provider_normalises_noncurrent_lifecycle_rule():
             }
         ],
     }
+
+
+def test_terraform_s3_lifecycle_child_resource_is_aggregated_into_bucket():
+    from aws_security_scanner.normalization.terraform import aggregate_s3_resources
+
+    bucket = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="archive",
+        attributes={},
+        source="terraform",
+    )
+    lifecycle = Resource(
+        resource_type="aws_s3_bucket_lifecycle_configuration",
+        resource_id="archive_lifecycle",
+        attributes={
+            "rule": {
+                "id": "expire-old",
+                "status": "Enabled",
+                "noncurrent_version_expiration": [{"noncurrent_days": 90}],
+            }
+        },
+        source="terraform",
+        relationships={"bucket": "aws_s3_bucket.archive"},
+    )
+
+    resources = aggregate_s3_resources([bucket, lifecycle])
+
+    assert resources == [bucket]
+    assert bucket.attributes["lifecycle_configuration"] == {
+        "status": "CONFIGURED",
+        "rules": [{
+            "id": "expire-old",
+            "status": "Enabled",
+            "has_noncurrent_version_expiration": True,
+        }],
+    }
+    assert check_noncurrent_version_lifecycle(
+        resource({"status": "Enabled"}, bucket.attributes["lifecycle_configuration"])
+    ) == []
+
+
+def test_terraform_s3_object_lock_child_resource_is_aggregated_conservatively():
+    from aws_security_scanner.normalization.terraform import aggregate_s3_resources
+
+    bucket = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="records",
+        attributes={},
+        source="terraform",
+    )
+    object_lock = Resource(
+        resource_type="aws_s3_bucket_object_lock_configuration",
+        resource_id="records_lock",
+        attributes={
+            "object_lock_enabled": "Enabled",
+            "rule": {"default_retention": [{"mode": "GOVERNANCE", "days": 30}]},
+        },
+        source="terraform",
+        relationships={"bucket": "aws_s3_bucket.records"},
+    )
+
+    resources = aggregate_s3_resources([bucket, object_lock])
+
+    assert resources == [bucket]
+    assert bucket.attributes["object_lock_configuration"]["status"] == "CONFIGURED"
+    assert bucket.attributes["object_lock_configuration"]["object_lock_enabled"] == "Enabled"
+
+
+def test_terraform_s3_lifecycle_child_resource_without_matching_bucket_is_ignored():
+    from aws_security_scanner.normalization.terraform import aggregate_s3_resources
+
+    lifecycle = Resource(
+        resource_type="aws_s3_bucket_lifecycle_configuration",
+        resource_id="orphan_lifecycle",
+        attributes={"rule": {"status": "Enabled"}},
+        source="terraform",
+        relationships={"bucket": "aws_s3_bucket.missing"},
+    )
+    assert aggregate_s3_resources([lifecycle]) == []
