@@ -129,25 +129,3 @@ def test_ecs_digest_pinned_and_unknown_images_are_not_flagged():
     )) == []
     assert check_ecs_image_not_pinned_by_digest(task_definition(containers=[{"name": "api"}])) == []
     assert check_ecs_image_not_pinned_by_digest(task_definition()) == []
-
-
-def test_ecs_mutable_image_tag_generates_low_supply_chain_signal():
-    from aws_security_scanner.rules.ecs_rules import check_ecs_image_not_pinned_by_digest
-
-    findings = check_ecs_image_not_pinned_by_digest(task_definition(
-        containers=[{"name": "api", "image": "123456789012.dkr.ecr.eu-west-2.amazonaws.com/api:latest"}]
-    ))
-    assert len(findings) == 1
-    assert findings[0].check_id == "ECS-007"
-    assert findings[0].severity == Severity.LOW
-    assert "api:latest" in findings[0].evidence
-
-
-def test_ecs_digest_pinned_and_unknown_images_are_not_flagged():
-    from aws_security_scanner.rules.ecs_rules import check_ecs_image_not_pinned_by_digest
-
-    assert check_ecs_image_not_pinned_by_digest(task_definition(
-        containers=[{"name": "api", "image": "repo/api@sha256:0123456789abcdef"}]
-    )) == []
-    assert check_ecs_image_not_pinned_by_digest(task_definition(containers=[{"name": "api"}])) == []
-    assert check_ecs_image_not_pinned_by_digest(task_definition()) == []
