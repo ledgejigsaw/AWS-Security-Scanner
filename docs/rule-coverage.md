@@ -17,7 +17,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | Security Hub | 1 | Regional hub enablement; optional bounded native-finding import preserves source IDs and timestamps. Standards/control evaluation is not imported. |
 | GuardDuty | 1 | Regional detector enablement; optional bounded native-finding import preserves source IDs and timestamps. |
 | AWS Config | 3 | Regional recorder configuration, recording state and delivery-channel presence. Missing status remains unknown; API errors fail discovery. |
-| Amazon Macie | 1 | Regional session enablement/paused status. This does not assess discovery-job coverage or delegated-administrator configuration. |
+| Amazon Macie | 1 | Regional session enablement/paused status. This does not assess discovery-job coverage or delegated-administrator configuration; optional bounded native Macie finding import is available with `--include-native-findings`. |
 | KMS | 4 | Rotation, pending deletion, wildcard key-policy access and unconditional cross-account access to sensitive KMS actions as a review signal. This is not a full IAM/KMS policy simulator. |
 | RDS | 4 | Encryption, public accessibility, backup retention and deletion protection. |
 | Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
