@@ -222,7 +222,7 @@ def discover_resources(
             "s3": [provider.discover_s3_buckets, provider.discover_s3_account_public_access_block],
             "iam": [provider.discover_iam_policies, provider.discover_iam_roles, provider.discover_iam_users, provider.discover_iam_account],
             "ec2": [provider.discover_ec2_instances],
-            "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots],
+            "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots, provider.discover_amis],
             "vpc": [provider.discover_security_groups, provider.discover_vpcs, provider.discover_subnets, provider.discover_route_tables, provider.discover_network_acls, provider.discover_flow_logs],
             "cloudtrail": [provider.discover_cloudtrail_trails],
             "kms": [provider.discover_kms_keys],
