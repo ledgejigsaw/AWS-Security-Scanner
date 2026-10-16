@@ -44,6 +44,7 @@ class AWSProvider:
         session: Any | None = None,
         accessanalyzer_client: Any | None = None,
         macie_client: Any | None = None,
+        inspector2_client: Any | None = None,
     ):
         self.region = region
         # Preserve the existing boto3.client path for single-account scans;
@@ -118,6 +119,7 @@ class AWSProvider:
         self.config_client = config_client or self._client("config", region_name=region)
         self.accessanalyzer_client = accessanalyzer_client or self._client("accessanalyzer", region_name=region)
         self.macie_client = macie_client or self._client("macie2", region_name=region)
+        self.inspector2_client = inspector2_client or self._client("inspector2", region_name=region)
 
     def _collect_pages(
         self,
@@ -2334,6 +2336,48 @@ class AWSProvider:
             if len(findings) >= limit:
                 break
 
+        return findings
+
+    def get_inspector_findings(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return a bounded, paginated set of active Amazon Inspector findings.
+
+        Only selected finding metadata is normalised by the integration layer.
+        The API is regional and read-only; service and permission errors propagate.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("Amazon Inspector finding limit must be between 1 and 1000.")
+
+        findings: list[dict[str, Any]] = []
+        seen_arns: set[str] = set()
+        token: str | None = None
+        seen_tokens: set[str] = set()
+        while len(findings) < limit:
+            request: dict[str, Any] = {
+                "maxResults": min(100, limit - len(findings)),
+                "filterCriteria": {
+                    "findingStatus": [{"comparison": "EQUALS", "value": "ACTIVE"}]
+                },
+            }
+            if token:
+                request["nextToken"] = token
+            response = self.inspector2_client.list_findings(**request)
+            for item in response.get("findings", []):
+                if not isinstance(item, dict):
+                    continue
+                arn = item.get("findingArn")
+                if not isinstance(arn, str) or not arn or arn in seen_arns:
+                    continue
+                seen_arns.add(arn)
+                findings.append(item)
+                if len(findings) >= limit:
+                    break
+            next_token = response.get("nextToken")
+            if not next_token or len(findings) >= limit:
+                break
+            if not isinstance(next_token, str) or next_token in seen_tokens:
+                raise RuntimeError("Amazon Inspector returned an invalid or repeated nextToken.")
+            seen_tokens.add(next_token)
+            token = next_token
         return findings
 
     def get_access_analyzer_findings(self, limit: int = 100) -> list[dict[str, Any]]:
