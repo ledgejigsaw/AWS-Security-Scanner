@@ -90,3 +90,17 @@ def test_unknown_or_malformed_policy_is_not_flagged():
     assert check_lambda_wildcard_invoke_policy(
         make_function(resource_policy="{invalid")
     ) == []
+
+
+def test_lambda_code_signing_rule_is_a_conservative_review_signal():
+    from aws_security_scanner.rules.lambda_rules import check_lambda_code_signing_not_enforced
+
+    assert check_lambda_code_signing_not_enforced(
+        resource("aws_lambda_function", "unsigned", code_signing_config_arn=None)
+    )[0].check_id == "LAMBDA-004"
+    assert check_lambda_code_signing_not_enforced(
+        resource("aws_lambda_function", "signed", code_signing_config_arn="arn:aws:lambda:eu-west-2:123456789012:code-signing-config:csc-123")
+    ) == []
+    assert check_lambda_code_signing_not_enforced(
+        resource("aws_lambda_function", "unknown")
+    ) == []
