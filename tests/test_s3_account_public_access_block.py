@@ -95,3 +95,9 @@ def test_account_public_access_block_permission_error_propagates():
     provider.s3control_client = s3control
     with pytest.raises(ClientError):
         provider.discover_s3_account_public_access_block()
+
+
+def test_account_public_access_block_rule_is_registered():
+    from aws_security_scanner.rules.registry import get_all_rules
+
+    assert check_s3_account_block_public_access in get_all_rules()
