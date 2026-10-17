@@ -138,6 +138,8 @@ def test_hcl_diagnostics_mark_summary_incomplete_and_are_counted_by_code():
         "unresolved_expressions": 1,
         "unexpanded_modules": 1,
         "unevaluated_data_sources": 0,
+        "unresolved_dependencies": 0,
+        "dependency_cycles": 0,
     }
 
 
