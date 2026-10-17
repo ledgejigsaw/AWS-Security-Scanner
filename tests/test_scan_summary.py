@@ -67,3 +67,16 @@ def test_machine_summary_marks_failed_multi_account_assessment_incomplete():
     )
     assert summary["status"] == "incomplete"
     assert summary["accounts"] == {"total": 2, "successful": 1, "failed": 1}
+
+
+def test_cli_accepts_summary_output_and_failure_threshold():
+    from aws_security_scanner.cli import build_parser
+
+    args = build_parser().parse_args([
+        "--source", "terraform",
+        "--file", "tests/fixtures/terraform/realistic_s3.json",
+        "--summary-output", "reports/summary.json",
+        "--fail-on", "HIGH",
+    ])
+    assert str(args.summary_output) == "reports/summary.json"
+    assert args.fail_on == "HIGH"
