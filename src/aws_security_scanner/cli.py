@@ -581,7 +581,13 @@ def run_scan(
                         else "Review the expression and its dependencies, or use a trusted, reviewed Terraform plan where the required values are known."
                     ),
                     region=resource.region,
-                    evidence="; ".join(str(item) for item in unresolved[:5]) or "Module or data-source contents were not evaluated.",
+                    evidence=(
+                        "; ".join(str(item) for item in unresolved[:5])
+                        or str(resource.attributes.get("hcl_diagnostic_reason"))
+                        or f"source_file={resource.source_file or 'unknown'}; address={resource.source_address or resource.resource_id}"
+                    ),
+                    source_file=resource.source_file,
+                    source_address=resource.source_address,
                 )
             )
 
