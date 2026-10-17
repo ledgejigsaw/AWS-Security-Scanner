@@ -216,6 +216,16 @@ Native finding import is disabled by default. It queries Security Hub and GuardD
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
 
+## Resource graph export
+
+Add `--graph-output` to a single-account scan to write a separate machine-readable resource graph:
+
+```bash
+aws-security-scan --source terraform --file terraform.json --graph-output reports/resource-graph.json
+```
+
+The graph contains safe resource identity metadata, explicit resolved relationships with provenance/confidence, unresolved references marked as unknown, and finding check IDs linked only when the resource match is unambiguous. It deliberately excludes raw resource attributes, policies, secret values and object contents. It does not infer network reachability: an absent edge is not evidence of isolation. Multi-account graph output is not supported in this increment.
+
 ## Live AWS authentication and identity check
 
 For `--source aws`, the CLI resolves credentials through boto3's standard AWS credential chain and verifies the active identity with STS before starting discovery. The account ID and principal ARN are printed so the operator can confirm the target. If credentials are missing, the scan stops with setup guidance; the scanner never prompts for, accepts, or stores access keys or secret keys.
@@ -233,15 +243,6 @@ aws-security-scan --source aws --profile audit --region eu-west-2
 
 The profile or default credential chain may also use environment, web-identity, container, or instance-role credentials. Use a dedicated least-privilege read-only identity. STS identity verification is not proof that every service permission is available; service-level access-denied and incomplete-discovery handling remains important. The identity preflight applies to single-account AWS scans; the explicit multi-account workflow validates each assumed-role identity separately. Fixture and IaC scans do not require AWS credentials.
 
-## Resource graph export
-
-Add `--graph-output` to a single-account scan to write a separate machine-readable resource graph:
-
-```bash
-aws-security-scan --source terraform --file terraform.json --graph-output reports/resource-graph.json
-```
-
-The graph contains safe resource identity metadata, explicit resolved relationships with provenance/confidence, unresolved references marked as unknown, and finding check IDs linked only when the resource match is unambiguous. It deliberately excludes raw resource attributes, policies, secret values and object contents. It does not infer network reachability: an absent edge is not evidence of isolation. Multi-account graph output is not supported in this increment.
 
 ## Container usage
 
