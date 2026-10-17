@@ -12,7 +12,7 @@ aws-security-scan \
   --fail-on HIGH
 ```
 
-The normal JSON, HTML or SARIF report remains the detailed findings artifact. The summary is deliberately compact and contains the schema version, scan source/scope, duration, finding counts by severity, discovery completeness, multi-account success/failure counts when applicable, report destination and whether the configured failure threshold was met. It does not copy resource attributes, policies, credentials or secret values.
+The normal JSON, HTML or SARIF report remains the detailed findings artifact. The summary is deliberately compact and contains the schema version, scan source/scope, duration, finding counts by severity, discovery completeness, multi-account success/failure counts when applicable, report destination and whether the configured failure threshold was met. It does not copy resource attributes, policies, credentials or secret values. For HCL scans, the summary also contains an analysis section with stable diagnostic counts for unresolved expressions, unexpanded modules and unevaluated data sources. Any of those diagnostics marks the assessment incomplete and produces exit code 1, even if no HIGH/CRITICAL finding was emitted. This prevents a partial static analysis from being mistaken for a clean result.
 
 ## Exit-code contract
 

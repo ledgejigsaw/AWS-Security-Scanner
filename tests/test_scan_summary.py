@@ -96,3 +96,61 @@ def test_argparse_invalid_threshold_uses_usage_error_exit_code():
     with pytest.raises(SystemExit) as error:
         build_parser().parse_args(["--source", "terraform", "--fail-on", "URGENT"])
     assert error.value.code == 2
+
+
+def test_hcl_diagnostics_mark_summary_incomplete_and_are_counted_by_code():
+    diagnostics = [
+        Finding(
+            check_id="IAC-HCL-001",
+            severity=Severity.INFO,
+            service="Terraform HCL",
+            resource="aws_s3_bucket.data",
+            title="Unresolved expression",
+            description="A variable was not resolved.",
+            remediation="Supply supported inputs or use a reviewed plan.",
+        ),
+        Finding(
+            check_id="IAC-HCL-002",
+            severity=Severity.INFO,
+            service="Terraform HCL",
+            resource="module.network",
+            title="Module was not expanded",
+            description="The module was not analysed.",
+            remediation="Review module source and scan boundaries.",
+        ),
+        finding("HIGH"),
+    ]
+    summary = build_scan_summary(
+        diagnostics,
+        source="hcl",
+        region=None,
+        services=None,
+        report_format="json",
+        report_path="reports/hcl.json",
+        duration_seconds=0.1,
+    )
+
+    assert summary["status"] == "incomplete"
+    assert summary["analysis"] == {
+        "status": "incomplete",
+        "diagnostics_total": 2,
+        "diagnostics_by_code": {"IAC-HCL-001": 1, "IAC-HCL-002": 1},
+        "unresolved_expressions": 1,
+        "unexpanded_modules": 1,
+        "unevaluated_data_sources": 0,
+    }
+
+
+def test_hcl_without_static_analysis_diagnostics_is_complete():
+    summary = build_scan_summary(
+        [finding("HIGH")],
+        source="hcl",
+        region=None,
+        services=None,
+        report_format="json",
+        report_path="reports/hcl.json",
+        duration_seconds=0.1,
+    )
+    assert summary["status"] == "complete"
+    assert summary["analysis"]["status"] == "complete"
+    assert summary["analysis"]["diagnostics_total"] == 0

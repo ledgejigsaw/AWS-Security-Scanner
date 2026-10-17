@@ -141,6 +141,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicitly trust this directory as an additional root for local Terraform HCL modules; repeat for multiple roots (HCL source only).",
     )
     parser.add_argument(
+        "--var-file",
+        type=Path,
+        action="append",
+        default=None,
+        help="Explicit Terraform HCL/JSON variable file; repeat in precedence order (HCL source only).",
+    )
+    parser.add_argument(
         "--accounts-file",
         type=Path,
         help="Opt-in JSON list of account IDs and cross-account audit role ARNs (AWS source only).",
@@ -310,10 +317,13 @@ def discover_resources(
     services: list[str] | None = None,
     discovery_coverage: list[dict] | None = None,
     module_roots: list[Path] | None = None,
+    var_files: list[Path] | None = None,
 ):
     """Discover resources from the selected source."""
     if module_roots and source != "hcl":
         raise ValueError("--module-root can only be used with --source hcl.")
+    if var_files and source != "hcl":
+        raise ValueError("--var-file can only be used with --source hcl.")
 
 
     if source == "fixture":
@@ -338,7 +348,7 @@ def discover_resources(
     if source == "hcl":
         if source_path is None:
             raise ValueError("--file is required when using the hcl source.")
-        provider = TerraformHCLProvider(source_path, module_roots=module_roots)
+        provider = TerraformHCLProvider(source_path, module_roots=module_roots, var_files=var_files)
         return aggregate_s3_resources(provider.discover())
 
     if source == "snapshot":
@@ -454,11 +464,14 @@ def run_scan(
     guardduty_record_state: str = "ALL",
     guardduty_updated_after: str | None = None,
     module_roots: list[Path] | None = None,
+    var_files: list[Path] | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
     if module_roots and source != "hcl":
         raise ValueError("--module-root can only be used with --source hcl.")
+    if var_files and source != "hcl":
+        raise ValueError("--var-file can only be used with --source hcl.")
     if (profile or services) and source != "aws":
         raise ValueError("--profile and --service can only be used with --source aws.")
     if profile and aws_session is not None:
@@ -483,7 +496,7 @@ def run_scan(
         aws_session = boto3.Session(profile_name=profile, region_name=region)
     discovery_coverage: list[dict] = []
     if aws_session is None and expected_account_id is None and services is None and not return_coverage:
-        resources = discover_resources(source, source_path, region, module_roots=module_roots)
+        resources = discover_resources(source, source_path, region, module_roots=module_roots, var_files=var_files)
     else:
         resources = discover_resources(
             source,
@@ -494,6 +507,7 @@ def run_scan(
             services,
             discovery_coverage if return_coverage else None,
             module_roots=module_roots,
+            var_files=var_files,
         )
     if source == "snapshot" and return_coverage and source_path is not None:
         discovery_coverage.extend(load_resource_snapshot_coverage(source_path))
@@ -913,6 +927,8 @@ def main() -> None:
             guardduty_regions=args.guardduty_region,
             guardduty_record_state=args.guardduty_record_state,
             guardduty_updated_after=args.guardduty_updated_after,
+            module_roots=args.module_root,
+            var_files=args.var_file,
         )
         if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result
@@ -1031,6 +1047,16 @@ def main() -> None:
                 "or failed. Review discovery coverage in the JSON report before "
                 "treating this scan as complete."
             )
+    hcl_analysis_incomplete = args.source == "hcl" and any(
+        finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003"}
+        for finding in findings
+    )
+    if hcl_analysis_incomplete:
+        print(
+            "Warning: Terraform HCL analysis is incomplete because expressions, "
+            "modules or data sources remain unresolved. Review IAC-HCL diagnostics "
+            "before treating this scan as complete."
+        )
     threshold_met = threshold_is_met(findings, args.fail_on)
     if args.summary_output:
         summary = build_scan_summary(
@@ -1053,6 +1079,7 @@ def main() -> None:
         baseline_actions_skipped
         or (assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0)
         or discovery_has_gaps
+        or hcl_analysis_incomplete
     )
     exit_code = scan_exit_code(incomplete=assessment_incomplete, threshold_met=threshold_met)
     if exit_code:
