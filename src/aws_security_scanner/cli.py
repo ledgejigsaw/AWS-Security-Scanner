@@ -529,6 +529,8 @@ def run_scan(
                         "bounded_limit": native_findings_limit,
                     })
             except (ClientError, BotoCoreError, RuntimeError) as exc:
+                if not return_coverage:
+                    raise
                 error_code = (
                     exc.response.get("Error", {}).get("Code", "ClientError")
                     if isinstance(exc, ClientError) else
@@ -680,6 +682,9 @@ def main() -> None:
             policy_path=args.policy,
             include_native_findings=args.include_native_findings,
             native_findings_limit=args.native_findings_limit,
+            guardduty_regions=args.guardduty_region,
+            guardduty_record_state=args.guardduty_record_state,
+            guardduty_updated_after=args.guardduty_updated_after,
         )
     else:
         scan_result = run_scan(
