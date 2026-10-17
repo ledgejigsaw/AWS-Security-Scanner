@@ -107,3 +107,48 @@ def check_alb_access_logging_disabled(resource: Resource) -> list[Finding]:
     if resource.attributes.get("access_logs_enabled") is not False:
         return []
     return [Finding.from_rule(check_alb_access_logging_disabled, resource=resource.resource_id, region=resource.region, evidence="access_logs.s3.enabled=false")]
+
+# Explicit legacy policies known to permit TLS 1.0 and/or TLS 1.1. This is a
+# conservative snapshot; unknown policy names are not treated as weak.
+_LEGACY_ALB_TLS_POLICIES = {
+    "ELBSecurityPolicy-2016-08",
+    "ELBSecurityPolicy-2015-05",
+    "ELBSecurityPolicy-2015-03",
+    "ELBSecurityPolicy-2015-02",
+    "ELBSecurityPolicy-TLS-1-1-2017-01",
+}
+
+
+@rule_for(
+    "aws_lb",
+    check_id="ALB-004",
+    service="ELB",
+    severity=Severity.MEDIUM,
+    category="Transport Security",
+    title="Internet-facing Application Load Balancer permits legacy TLS",
+    description="An HTTPS listener uses a known legacy ELB security policy that permits TLS 1.0 and/or TLS 1.1. This check uses an explicit policy-name snapshot; unknown policies are not classified.",
+    remediation="Review AWS's current Application Load Balancer security-policy guidance and select a supported policy that disables deprecated TLS versions while meeting client compatibility requirements.",
+)
+def check_alb_legacy_tls_policy(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("scheme") != "internet-facing":
+        return []
+    listeners = resource.attributes.get("listeners")
+    if not isinstance(listeners, list):
+        return []
+    legacy_policies = sorted({
+        listener.get("ssl_policy")
+        for listener in listeners
+        if isinstance(listener, dict)
+        and listener.get("protocol") == "HTTPS"
+        and listener.get("ssl_policy") in _LEGACY_ALB_TLS_POLICIES
+    })
+    if not legacy_policies:
+        return []
+    return [
+        Finding.from_rule(
+            check_alb_legacy_tls_policy,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence="legacy_tls_policies=" + ",".join(legacy_policies),
+        )
+    ]

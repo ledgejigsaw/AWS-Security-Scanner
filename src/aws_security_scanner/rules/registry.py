@@ -150,6 +150,7 @@ from aws_security_scanner.rules.waf_rules import (
     check_alb_missing_waf_association,
     check_alb_non_tls_listener,
     check_alb_access_logging_disabled,
+    check_alb_legacy_tls_policy,
 )
 
 from aws_security_scanner.rules.ebs_rules import (

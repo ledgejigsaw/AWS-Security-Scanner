@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **115 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 3 Application Load Balancer checks.
+- **116 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 4 Application Load Balancer checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL and AWS APIs.
 - **Output:** JSON, self-contained HTML and SARIF 2.1.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
@@ -121,10 +121,10 @@ The scanner checks that each selected region has an enabled GuardDuty detector. 
 | SNS | Unconditional wildcard-principal access to publish/subscribe actions and explicit encryption status |
 | API Gateway (REST and HTTP APIs) | REST methods and HTTP API routes configured with no authorization; stage access logging not configured |
 | WAFv2 | Managed rule group and rate-based rule coverage review signals; CloudFront-scope ACLs use the global WAF endpoint in us-east-1 |
-| Application Load Balancers | WAF association, internet-facing listener TLS posture and access logging; unknown discovery state is not treated as absence | 
+| Application Load Balancers | WAF association, internet-facing HTTP listeners, explicitly known legacy TLS policies and access logging; unknown discovery state is not treated as absence | 
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 111 rules (17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 4 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 1 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 116 rules (17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 4 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 

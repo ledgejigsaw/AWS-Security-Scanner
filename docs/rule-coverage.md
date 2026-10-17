@@ -28,10 +28,10 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | SNS | 2 | Sensitive wildcard access and explicit encryption state. Messages are never published or consumed. |
 | API Gateway REST APIs | 2 | Method authorization and stage access logging. HTTP APIs v2 are not yet covered. |
 | WAFv2 | 2 | Managed rule group and rate-based rule coverage review signals; does not evaluate rule efficacy or managed-rule versions. |
-| Application Load Balancers | 3 | Missing WAF association, internet-facing HTTP listeners and disabled access logging as review signals. Network Load Balancers are not included. | 
+| Application Load Balancers | 4 | Missing WAF association, internet-facing HTTP listeners, explicitly known legacy TLS policies that permit TLS 1.0/1.1, and disabled access logging as review signals. Unknown policy names are not classified; Network Load Balancers are not included. | 
 | ECS/Fargate | 7 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment, shared task/execution role review signal and mutable container image references without digest pins. Public IP assignment does not prove internet reachability; role sharing and digest pinning are review signals. |
 | CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
-| **Total** | **115** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **116** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
