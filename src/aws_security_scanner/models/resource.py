@@ -11,3 +11,5 @@ class Resource:
     region: str | None = None
     relationships: dict[str, str] | None = None
     account_id: str | None = None
+    source_file: str | None = None
+    source_address: str | None = None
