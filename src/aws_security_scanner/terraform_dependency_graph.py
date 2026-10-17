@@ -1,7 +1,6 @@
 """Deterministic dependency graph for offline Terraform HCL analysis."""
 from __future__ import annotations
 
-from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
@@ -80,46 +79,75 @@ def build_dependency_graph(resources: list[Resource]) -> DependencyGraph:
             edges.append(DependencyEdge(source=source, target=target, attribute=str(attribute)))
             adjacency[source].append(target)
 
-    # Iteratively prune acyclic sources/sinks. Nodes remaining after pruning
-    # belong to directed cycles. Each edge is processed at most twice, avoiding
-    # recursion-depth failures and quadratic rescans on large Terraform modules.
-    active = set(addresses)
-    incoming = {node: 0 for node in addresses}
-    outgoing = {node: 0 for node in addresses}
-    reverse: dict[str, list[str]] = {node: [] for node in addresses}
-    for source, targets in adjacency.items():
-        for target in targets:
-            if target in active:
-                outgoing[source] += 1
-                incoming[target] += 1
-                reverse[target].append(source)
-    queue = deque(sorted(
-        node for node in active
-        if incoming[node] == 0 or outgoing[node] == 0
-    ))
-    while queue:
-        node = queue.popleft()
-        if node not in active:
-            continue
-        active.remove(node)
-        for target in adjacency.get(node, []):
-            if target in active:
-                incoming[target] -= 1
-                if incoming[target] == 0 or outgoing[target] == 0:
-                    queue.append(target)
-        for source in reverse.get(node, []):
-            if source in active:
-                outgoing[source] -= 1
-                if incoming[source] == 0 or outgoing[source] == 0:
-                    queue.append(source)
-    cycle_nodes = active
-
+    cycle_nodes = _find_cycle_nodes(adjacency)
     return DependencyGraph(
         nodes=nodes,
         edges=tuple(sorted(edges, key=lambda edge: (edge.source, edge.attribute, edge.target))),
         unresolved=tuple(sorted(unresolved, key=lambda item: (item["source"], item["attribute"], item["target"]))),
         cycle_nodes=tuple(sorted(cycle_nodes)),
     )
+
+
+def _find_cycle_nodes(adjacency: dict[str, list[str]]) -> set[str]:
+    """Return only nodes in directed cycles using iterative Kosaraju SCCs.
+
+    Iterative traversal avoids Python recursion limits on large Terraform
+    configurations. A node is cyclic only when its strongly connected
+    component has multiple members or it has an explicit self-loop. Merely
+    lying on a path between two separate cycles is not enough.
+    """
+    nodes = set(adjacency)
+    reverse: dict[str, list[str]] = {node: [] for node in nodes}
+    for source, targets in adjacency.items():
+        for target in targets:
+            if target in reverse:
+                reverse[target].append(source)
+    for neighbours in reverse.values():
+        neighbours.sort()
+
+    visited: set[str] = set()
+    finish_order: list[str] = []
+    for start in sorted(nodes):
+        if start in visited:
+            continue
+        visited.add(start)
+        stack: list[tuple[str, Any]] = [
+            (start, iter(sorted(target for target in adjacency.get(start, ()) if target in nodes)))
+        ]
+        while stack:
+            node, neighbours = stack[-1]
+            try:
+                target = next(neighbours)
+            except StopIteration:
+                finish_order.append(node)
+                stack.pop()
+                continue
+            if target not in visited:
+                visited.add(target)
+                stack.append((target, iter(sorted(
+                    child for child in adjacency.get(target, ()) if child in nodes
+                ))))
+
+    assigned: set[str] = set()
+    cyclic: set[str] = set()
+    for start in reversed(finish_order):
+        if start in assigned:
+            continue
+        component: list[str] = []
+        stack = [start]
+        assigned.add(start)
+        while stack:
+            node = stack.pop()
+            component.append(node)
+            for target in reverse.get(node, ()):
+                if target not in assigned:
+                    assigned.add(target)
+                    stack.append(target)
+        if len(component) > 1:
+            cyclic.update(component)
+        elif component and component[0] in adjacency.get(component[0], ()):
+            cyclic.add(component[0])
+    return cyclic
 
 
 def dependency_diagnostics(graph: DependencyGraph, resources: list[Resource]) -> list[Resource]:
