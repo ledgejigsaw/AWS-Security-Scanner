@@ -167,7 +167,7 @@ def build_html_report(
   </table>
   <h2>Findings</h2>
   <table>
-    <thead><tr><th>Severity</th><th>Check</th><th>Service</th><th>Resource</th><th>Title</th><th>Description</th><th>Remediation</th><th>Region</th><th>Evidence</th>{source_header}{risk_header}{mapping_header}</tr></thead>
+    <thead><tr><th>Severity</th><th>Check</th><th>Service</th><th>Resource</th><th>Title</th><th>Description</th><th>Remediation</th><th>Region</th><th>Evidence</th>{location_header}{source_header}{risk_header}{mapping_header}</tr></thead>
     <tbody>{"".join(rows)}</tbody>
   </table>
 </body>
