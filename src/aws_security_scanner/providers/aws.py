@@ -139,11 +139,16 @@ class AWSProvider:
         *,
         request_token: str = "NextToken",
         response_token: str = "NextToken",
+        max_pages: int = 1000,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
-        """Collect every page from AWS APIs that use continuation tokens."""
+        """Collect pages with a hard bound and reject incomplete pagination."""
+        if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
+            raise ValueError("max_pages must be a positive integer.")
+
         items: list[dict[str, Any]] = []
         token = None
+        page_count = 0
 
         while True:
             request = dict(kwargs)
@@ -151,6 +156,7 @@ class AWSProvider:
                 request[request_token] = token
 
             response = method(**request)
+            page_count += 1
             items.extend(response.get(result_key, []))
 
             if response.get("IsTruncated"):
@@ -169,6 +175,12 @@ class AWSProvider:
                 raise RuntimeError(
                     f"AWS API {getattr(method, '__name__', method)!s} "
                     "returned a repeated continuation token."
+                )
+            if page_count >= max_pages:
+                raise RuntimeError(
+                    f"AWS API {getattr(method, '__name__', method)!s} "
+                    f"exceeded the pagination limit of {max_pages} pages; "
+                    "discovery is incomplete."
                 )
             token = next_token
 
