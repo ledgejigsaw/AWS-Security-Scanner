@@ -360,6 +360,8 @@ pip install -e .
 pytest -q
 ```
 
+Run the optional offline performance probes (rule evaluation, resource graph, JSON and SARIF report generation) with `python scripts/benchmark_scan.py --sizes 100 500 1000`. See [performance benchmark guidance](docs/performance-benchmarks.md); the timings are environment-specific observations, not CI thresholds.
+
 The latest pull-request CI runs passed on Python 3.11 and 3.13 after the registry and Lambda lifecycle changes. Test counts change as tests evolve; use the latest GitHub Actions run as the authoritative result. Test results confirm mocked/fixture behaviour, not live-account correctness.
 
 AWS API calls are mocked in automated tests. These tests establish expected behaviour without AWS costs or credentials; they do not replace validation against a real account.
