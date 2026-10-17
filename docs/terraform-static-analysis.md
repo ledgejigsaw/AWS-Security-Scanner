@@ -32,7 +32,7 @@ No HCL expression is evaluated as Python, shell or Terraform code. The scanner d
 
 ## Dependency and provenance model
 
-All direct-child .tf files in a selected root module are loaded together, so file names and directory enumeration order do not define dependency order. Resources retain canonical addresses and source-file paths. Existing relationship extraction records supported resource references separately from resolved scalar values.
+All direct-child .tf files in a selected root module are loaded together, so file names and directory enumeration order do not define dependency order. Resources retain canonical addresses and source-file paths. The provider builds a deterministic directed dependency graph after resource discovery, resolves unique canonical targets, and emits IAC-HCL-004 for missing/ambiguous targets and IAC-HCL-005 for directed dependency cycles. Existing relationship extraction records supported resource references separately from resolved scalar values.
 
 A relationship edge does not imply that the target's provider-computed attributes are known. Data sources are not queried, and resource references are not treated as concrete values unless the static evaluator can prove a supported literal value. Unknowns must not be interpreted as a secure/pass result.
 

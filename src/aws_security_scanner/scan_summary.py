@@ -72,7 +72,7 @@ def build_scan_summary(
 
     hcl_diagnostics = [
         finding for finding in findings
-        if finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003"}
+        if finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003", "IAC-HCL-004", "IAC-HCL-005"}
     ] if source == "hcl" else []
     hcl_codes = Counter(finding.check_id for finding in hcl_diagnostics)
     hcl_analysis = {
@@ -82,6 +82,8 @@ def build_scan_summary(
         "unresolved_expressions": hcl_codes.get("IAC-HCL-001", 0),
         "unexpanded_modules": hcl_codes.get("IAC-HCL-002", 0),
         "unevaluated_data_sources": hcl_codes.get("IAC-HCL-003", 0),
+        "unresolved_dependencies": hcl_codes.get("IAC-HCL-004", 0),
+        "dependency_cycles": hcl_codes.get("IAC-HCL-005", 0),
     }
     complete = coverage_gaps == 0 and failed_accounts == 0 and not hcl_diagnostics
     return {
