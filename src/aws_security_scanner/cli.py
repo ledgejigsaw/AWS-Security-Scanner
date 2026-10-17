@@ -1047,6 +1047,16 @@ def main() -> None:
                 "or failed. Review discovery coverage in the JSON report before "
                 "treating this scan as complete."
             )
+    hcl_analysis_incomplete = args.source == "hcl" and any(
+        finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003"}
+        for finding in findings
+    )
+    if hcl_analysis_incomplete:
+        print(
+            "Warning: Terraform HCL analysis is incomplete because expressions, "
+            "modules or data sources remain unresolved. Review IAC-HCL diagnostics "
+            "before treating this scan as complete."
+        )
     threshold_met = threshold_is_met(findings, args.fail_on)
     if args.summary_output:
         summary = build_scan_summary(
@@ -1069,6 +1079,7 @@ def main() -> None:
         baseline_actions_skipped
         or (assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0)
         or discovery_has_gaps
+        or hcl_analysis_incomplete
     )
     exit_code = scan_exit_code(incomplete=assessment_incomplete, threshold_met=threshold_met)
     if exit_code:
