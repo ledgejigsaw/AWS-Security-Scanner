@@ -50,6 +50,8 @@ class RuleEngine:
         findings = []
 
         for resource in resources:
+            if resource.attributes.get("terraform_removed") is True:
+                continue
             for rule in self.rules:
                 if rule.resource_type != resource.resource_type:
                     continue
