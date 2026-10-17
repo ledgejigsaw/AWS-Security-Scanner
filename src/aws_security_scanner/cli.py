@@ -261,8 +261,13 @@ def discover_resources(
                         error_code = exc.response.get("Error", {}).get("Code", "ClientError")
                     else:
                         error_code = type(exc).__name__
+                    operation_name = (
+                        getattr(discover, "_mock_name", None)
+                        or getattr(discover, "__name__", None)
+                        or "discovery"
+                    )
                     failed_operations.append({
-                        "operation": getattr(discover, "__name__", "discovery"),
+                        "operation": str(operation_name)[:120],
                         "error_code": str(error_code)[:80],
                     })
                     continue
