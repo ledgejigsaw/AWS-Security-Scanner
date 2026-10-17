@@ -158,6 +158,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--securityhub-workflow-status",
+        action="append",
+        choices=["NEW", "NOTIFIED", "RESOLVED", "SUPPRESSED"],
+        help="Filter imported Security Hub findings by workflow status; repeat to include multiple statuses.",
+    )
+    parser.add_argument(
+        "--securityhub-record-state",
+        choices=["ACTIVE", "ARCHIVED", "ALL"],
+        default="ACTIVE",
+        help="Security Hub finding record state to import (default: ACTIVE; ALL disables this filter).",
+    )
+    parser.add_argument(
+        "--securityhub-compliance-status",
+        choices=["PASSED", "WARNING", "FAILED", "NOT_AVAILABLE", "NOT_SUPPORTED"],
+        help="Optional Security Hub control compliance-status filter.",
+    )
+
+    parser.add_argument(
         "--format",
         choices=["json", "html", "sarif"],
         default="json",
@@ -365,6 +383,9 @@ def run_scan(
     services: list[str] | None = None,
     return_resources: bool = False,
     return_coverage: bool = False,
+    securityhub_workflow_status: list[str] | None = None,
+    securityhub_record_state: str = "ACTIVE",
+    securityhub_compliance_status: str | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -457,7 +478,36 @@ def run_scan(
             if aws_session is not None
             else AWSProvider(region=region)
         )
-        native_items = native_provider.get_securityhub_findings(limit=native_findings_limit)
+        try:
+            native_items = native_provider.get_securityhub_findings(
+                limit=native_findings_limit,
+                workflow_statuses=securityhub_workflow_status,
+                record_state=None if securityhub_record_state == "ALL" else securityhub_record_state,
+                compliance_status=securityhub_compliance_status,
+            )
+            if return_coverage:
+                discovery_coverage.append({
+                    "service": "securityhub-findings",
+                    "status": "success" if native_items else "empty",
+                    "resources_discovered": len(native_items),
+                    "successful_operations": 1,
+                    "failed_operations": [],
+                    "bounded_limit": native_findings_limit,
+                })
+        except (ClientError, BotoCoreError, RuntimeError) as exc:
+            error_code = (
+                exc.response.get("Error", {}).get("Code", "ClientError")
+                if isinstance(exc, ClientError) else type(exc).__name__
+            )
+            if return_coverage:
+                discovery_coverage.append({
+                    "service": "securityhub-findings",
+                    "status": "failed",
+                    "resources_discovered": 0,
+                    "successful_operations": 0,
+                    "failed_operations": [{"operation": "get_findings", "error_code": str(error_code)[:80]}],
+                })
+            native_items = []
         for item in native_items:
             # GuardDuty's direct API below is the canonical source for GuardDuty
             # findings; avoid importing the same product again through Security Hub.
@@ -558,6 +608,12 @@ def main() -> None:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
         parser.error("--native-findings-limit requires --include-native-findings")
+    if (
+        (args.securityhub_workflow_status or args.securityhub_record_state != "ACTIVE"
+         or args.securityhub_compliance_status is not None)
+        and not args.include_native_findings
+    ):
+        parser.error("Security Hub filters require --include-native-findings")
 
     compliance_mapping = None
     if args.compliance_mapping:
@@ -609,6 +665,9 @@ def main() -> None:
             services=args.service,
             return_resources=bool(args.graph_output),
             return_coverage=(args.source == "aws"),
+            securityhub_workflow_status=args.securityhub_workflow_status,
+            securityhub_record_state=args.securityhub_record_state,
+            securityhub_compliance_status=args.securityhub_compliance_status,
         )
         if args.graph_output and args.source == "aws":
             findings, graph_resources, discovery_coverage = scan_result
