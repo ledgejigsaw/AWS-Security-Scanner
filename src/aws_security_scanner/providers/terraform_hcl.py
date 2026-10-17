@@ -13,6 +13,7 @@ from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.providers.terraform import TerraformProvider
 
 
+_NON_LITERAL = object()
 _RESOURCE_REFERENCE = re.compile(r"\$\{(aws_[^.]+\.[^.]+)\.[^}]+\}")
 
 
@@ -112,6 +113,13 @@ class TerraformHCLProvider:
             local = f"module.{name}"
             address = f"{address_prefix}.{local}" if address_prefix else local
             source = self._literal_value(attrs.get("source"))
+            if "count" in attrs or "for_each" in attrs:
+                self._set_module_diagnostic(
+                    resources, address, declaring_file,
+                    "Module count/for_each changes module cardinality and is not statically expanded.",
+                    source=source if isinstance(source, str) else None,
+                )
+                continue
             if not isinstance(source, str) or not source.startswith(("./", "../")):
                 self._set_module_diagnostic(
                     resources, address, declaring_file,

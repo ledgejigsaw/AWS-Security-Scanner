@@ -583,8 +583,11 @@ def run_scan(
                     region=resource.region,
                     evidence=(
                         "; ".join(str(item) for item in unresolved[:5])
-                        or str(resource.attributes.get("hcl_diagnostic_reason"))
-                        or f"source_file={resource.source_file or 'unknown'}; address={resource.source_address or resource.resource_id}"
+                        or (
+                            f"{resource.attributes.get('hcl_diagnostic_reason')}; "
+                            f"source_file={resource.source_file or 'unknown'}; "
+                            f"address={resource.source_address or resource.resource_id}"
+                        )
                     ),
                     source_file=resource.source_file,
                     source_address=resource.source_address,

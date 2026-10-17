@@ -301,3 +301,46 @@ def test_hcl_local_module_cycle_is_reported_without_recursing_forever(tmp_path):
     cycle = next(item for item in resources if item.source_address == "module.child.module.back")
     assert cycle.attributes["hcl_diagnostic"] == "module_not_expanded"
     assert "cycle" in cycle.attributes["hcl_diagnostic_reason"]
+
+
+def test_hcl_unknown_module_input_does_not_fall_back_to_child_default(tmp_path):
+    root = tmp_path / "root"
+    child = root / "modules" / "storage"
+    child.mkdir(parents=True)
+    (root / "main.tf").write_text(
+        'module "storage" {\n'
+        '  source = "./modules/storage"\n'
+        '  bucket_name = var.root_bucket\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (child / "main.tf").write_text(
+        'variable "bucket_name" { default = "fallback-data" }\n'
+        'resource "aws_s3_bucket" "data" { bucket = var.bucket_name }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    bucket = next(item for item in resources if item.source_address == "module.storage.aws_s3_bucket.data")
+    assert "fallback-data" != bucket.attributes["bucket"]
+    assert bucket.attributes["hcl_unresolved_expressions"]
+
+
+def test_hcl_module_count_is_not_expanded_as_single_instance(tmp_path):
+    root = tmp_path / "root"
+    child = root / "modules" / "network"
+    child.mkdir(parents=True)
+    (root / "main.tf").write_text(
+        'module "network" { source = "./modules/network" count = 2 }\n',
+        encoding="utf-8",
+    )
+    (child / "main.tf").write_text(
+        'resource "aws_vpc" "main" { cidr_block = "10.0.0.0/16" }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    module = next(item for item in resources if item.source_address == "module.network")
+    assert module.attributes["hcl_diagnostic"] == "module_not_expanded"
+    assert "cardinality" in module.attributes["hcl_diagnostic_reason"]
+    assert not any(item.source_address == "module.network.aws_vpc.main" for item in resources)
