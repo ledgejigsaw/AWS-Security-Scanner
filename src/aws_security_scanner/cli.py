@@ -234,7 +234,7 @@ def discover_resources(
             "dynamodb": [provider.discover_dynamodb_tables],
             "sqs": [provider.discover_sqs_queues],
             "sns": [provider.discover_sns_topics],
-            "apigateway": [provider.discover_api_gateway_rest_apis],
+            "apigateway": [provider.discover_api_gateway_rest_apis, provider.discover_api_gateway_http_apis],
             "ecs": [provider.discover_ecs_task_definitions, provider.discover_ecs_services],
             "cloudfront": [provider.discover_cloudfront_distributions],
             "waf": [lambda: provider.discover_waf_web_acls("CLOUDFRONT"), lambda: provider.discover_waf_web_acls("REGIONAL")],
