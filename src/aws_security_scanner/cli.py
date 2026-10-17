@@ -724,6 +724,7 @@ def main() -> None:
             parser.error(str(exc))
 
     assessment_metadata = None
+    discovery_coverage = None
     graph_resources = None
     live_aws_session = None
     if args.source == "aws" and not args.accounts_file:
