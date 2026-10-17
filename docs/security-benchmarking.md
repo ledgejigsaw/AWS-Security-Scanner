@@ -7,3 +7,15 @@ The `aws_security_scanner.benchmark` module scores observed check IDs against a 
 The starter manifest is `tests/fixtures/benchmarks/security-benchmark-v1.json`. Its expectations are scaffolding and must be checked against the referenced fixtures before making quality claims. A useful mature benchmark should include secure and insecure fixtures, edge cases, unsupported/unresolved cases, and independently reviewed expected results. Fixture performance is not a guarantee of accuracy against every live AWS account.
 
 This API is offline and has no credentials or network requirements.
+## Running the evaluator
+
+Prepare an observed-results JSON file mapping each `fixture_id` to the check IDs returned by a scan, then run:
+
+```bash
+python scripts/evaluate_benchmarks.py \\
+  --manifest tests/fixtures/benchmarks/security-benchmark-v1.json \\
+  --observed reports/benchmark-observed.json \\
+  --output reports/benchmark-results.json
+```
+
+The script evaluates recorded outputs; it does not itself execute scans or assume fixture expectations are correct. Run scans against each fixture using the scanner's normal fixture workflow and keep the observed file with the benchmark run for reproducibility.
