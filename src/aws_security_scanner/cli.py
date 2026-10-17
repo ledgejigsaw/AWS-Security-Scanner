@@ -126,7 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--file",
         type=Path,
-        help="Fixture directory, Terraform JSON file or Terraform HCL source file.",
+        help="Fixture directory, Terraform JSON file, Terraform HCL file, or HCL module directory (top-level *.tf files).",
     )
     parser.add_argument(
         "--accounts-file",
@@ -514,32 +514,48 @@ def run_scan(
         for resource in resources:
             unresolved = resource.attributes.get("hcl_unresolved_expressions")
             diagnostic = resource.attributes.get("hcl_diagnostic")
-            if not unresolved and diagnostic != "module_not_expanded":
+            if not unresolved and diagnostic not in {"module_not_expanded", "data_source_not_evaluated"}:
                 continue
+
             is_module = diagnostic == "module_not_expanded"
+            is_data_source = diagnostic == "data_source_not_evaluated"
+            check_id = (
+                "IAC-HCL-002" if is_module
+                else "IAC-HCL-003" if is_data_source
+                else "IAC-HCL-001"
+            )
             findings.append(
                 Finding(
-                    check_id="IAC-HCL-002" if is_module else "IAC-HCL-001",
+                    check_id=check_id,
                     severity=Severity.INFO,
                     service="Terraform HCL",
                     resource=resource.resource_id,
                     title=(
-                        "Terraform module was not expanded"
-                        if is_module
+                        "Terraform module was not expanded" if is_module
+                        else "Terraform data source was not evaluated" if is_data_source
                         else "Terraform HCL contains unresolved expressions"
                     ),
                     description=(
                         "The scanner does not load or evaluate Terraform modules; resources inside this module are outside this scan."
                         if is_module
+                        else "The scanner does not query Terraform data sources. Values derived from this data source and dependent checks may be incomplete."
+                        if is_data_source
                         else "One or more HCL expressions could not be resolved statically. Related checks may be incomplete."
                     ),
                     remediation=(
-                        "Provide Terraform JSON generated from a reviewed plan for expanded module resources, or review the module source separately."
+                        "Review the module source separately or provide Terraform JSON generated from a reviewed plan that includes expanded module resources."
                         if is_module
-                        else "Resolve the expression from a trusted, reviewed plan or inspect the referenced values before relying on this assessment."
+                        else "Review the data source and its dependent values using a trusted Terraform plan; the scanner does not query providers."
+                        if is_data_source
+                        else "Review the expression and its dependencies, or use a trusted, reviewed Terraform plan where the required values are known."
                     ),
                     region=resource.region,
-                    evidence="; ".join(str(item) for item in (unresolved or [])[:5]) or "Module contents were not loaded.",
+                    evidence=(
+                        "; ".join(str(item) for item in (unresolved or [])[:5])
+                        or f"source_file={resource.source_file or 'unknown'}; address={resource.source_address or resource.resource_id}"
+                    ),
+                    source_file=resource.source_file,
+                    source_address=resource.source_address,
                 )
             )
 
