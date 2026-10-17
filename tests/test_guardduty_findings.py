@@ -118,3 +118,77 @@ def test_native_findings_cli_help_mentions_both_sources():
     ])
     assert args.include_native_findings is True
     assert args.native_findings_limit == 25
+
+
+
+def test_guardduty_provider_applies_archived_and_updated_after_filters():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+    provider.guardduty_client.list_detectors.return_value = {"DetectorIds": ["detector-1"]}
+    provider.guardduty_client.get_detector.return_value = {"Status": "ENABLED"}
+    provider.guardduty_client.list_findings.return_value = {"FindingIds": []}
+
+    assert provider.get_guardduty_findings(
+        limit=10,
+        archived=False,
+        updated_after="2026-10-01T00:00:00Z",
+        require_detector=True,
+    ) == []
+
+    assert provider.guardduty_client.list_findings.call_args.kwargs == {
+        "DetectorId": "detector-1",
+        "MaxResults": 10,
+        "FindingCriteria": {
+            "Criterion": {
+                "service.archived": {"Eq": ["false"]},
+                "updatedAt": {"Gte": ["2026-10-01T00:00:00Z"]},
+            }
+        },
+    }
+
+
+def test_guardduty_provider_marks_missing_detector_as_unavailable():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+    provider.guardduty_client.list_detectors.return_value = {"DetectorIds": []}
+
+    with pytest.raises(RuntimeError, match="GuardDuty is not enabled"):
+        provider.get_guardduty_findings(require_detector=True)
+
+    provider.guardduty_client.list_findings.assert_not_called()
+
+
+def test_guardduty_provider_marks_disabled_detector_as_unavailable():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+    provider.guardduty_client.list_detectors.return_value = {"DetectorIds": ["detector-1"]}
+    provider.guardduty_client.get_detector.return_value = {"Status": "DISABLED"}
+
+    with pytest.raises(RuntimeError, match="detector is not enabled"):
+        provider.get_guardduty_findings(require_detector=True)
+
+    provider.guardduty_client.list_findings.assert_not_called()
+
+
+def test_guardduty_provider_rejects_timezone_missing_update_filter():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+
+    with pytest.raises(ValueError, match="include a timezone"):
+        provider.get_guardduty_findings(updated_after="2026-10-01T00:00:00")
+
+    provider.guardduty_client.list_detectors.assert_not_called()
+
+
+def test_cli_accepts_guardduty_multi_region_and_filter_options():
+    args = build_parser().parse_args([
+        "--source", "aws",
+        "--include-native-findings",
+        "--guardduty-region", "eu-west-2",
+        "--guardduty-region", "us-east-1",
+        "--guardduty-record-state", "ACTIVE",
+        "--guardduty-updated-after", "2026-10-01T00:00:00Z",
+    ])
+    assert args.guardduty_region == ["eu-west-2", "us-east-1"]
+    assert args.guardduty_record_state == "ACTIVE"
+    assert args.guardduty_updated_after == "2026-10-01T00:00:00Z"
