@@ -1,8 +1,4 @@
-resource "aws_s3_bucket" "private_data" {
-  bucket = "benchmark-private-data"
-  public = false
-  encryption = true
-  versioning = true
-  block_public_access = true
-  logging = true
+resource "aws_security_group" "safe" {
+  name = "benchmark-private-security-group"
+  description = "No inbound rules are configured."
 }

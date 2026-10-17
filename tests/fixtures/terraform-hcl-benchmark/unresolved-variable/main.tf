@@ -1,7 +1,8 @@
-variable "bucket_name" {
+variable "security_group_name" {
   type = string
 }
 
-resource "aws_s3_bucket" "data" {
-  bucket = var.bucket_name
+resource "aws_security_group" "unknown" {
+  name = var.security_group_name
+  description = "Name is intentionally unresolved."
 }
