@@ -13,7 +13,7 @@ AWS_SERVICES = (
     "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
     "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
     "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub",
-    "guardduty", "config", "macie", "eks", "cloudwatch",
+    "guardduty", "config", "macie", "eks", "cloudwatch", "codebuild",
 )
 QUICK_SERVICES = ("s3", "iam", "ec2", "vpc", "cloudtrail", "kms", "ebs")
 SOURCES = ("fixture", "terraform", "hcl", "aws")
