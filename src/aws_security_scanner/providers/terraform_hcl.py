@@ -30,14 +30,48 @@ class TerraformHCLProvider:
         self.hcl_file = Path(hcl_file)
 
     def discover(self) -> list[Resource]:
+        """Discover resources from one HCL file or all .tf files in a module root.
+
+        Directory mode deliberately reads only direct children. Nested directories
+        are separate Terraform module/example boundaries and are never merged
+        implicitly.
+        """
+        if not self.hcl_file.exists():
+            raise ValueError(f"Terraform HCL path does not exist: '{self.hcl_file}'")
+        if self.hcl_file.is_dir():
+            files = sorted(path for path in self.hcl_file.glob("*.tf") if path.is_file())
+            if not files:
+                raise ValueError(
+                    f"No Terraform HCL files (*.tf) found directly in module directory '{self.hcl_file}'. "
+                    "Nested directories are treated as separate modules; scan the intended module directory."
+                )
+        else:
+            files = [self.hcl_file]
+
+        resources: list[Resource] = []
+        seen: set[tuple[str, str]] = set()
+        for path in files:
+            for resource in self._discover_file(path):
+                identity = (resource.resource_type, resource.source_address or resource.resource_id)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                resources.append(resource)
+
+        # Resolve references after combining files so resources declared in
+        # separate .tf files can still be linked together.
+        TerraformProvider(self.hcl_file)._resolve_relationships(resources)
+        return resources
+
+    def _discover_file(self, path: Path) -> list[Resource]:
         try:
-            with self.hcl_file.open(encoding="utf-8") as file:
+            with path.open(encoding="utf-8") as file:
                 data = hcl2.load(file)
         except (OSError, ValueError, LarkError) as error:
-            raise ValueError(f"Unable to parse Terraform HCL file '{self.hcl_file}': {error}") from error
+            raise ValueError(f"Unable to parse Terraform HCL file '{path}': {error}") from error
 
         if not isinstance(data, dict):
-            raise ValueError("Terraform HCL root must be an object.")
+            raise ValueError(f"Terraform HCL root in '{path}' must be an object.")
 
         resources: list[Resource] = []
         blocks = data.get("resource", [])
@@ -47,7 +81,7 @@ class TerraformHCLProvider:
                 if not isinstance(instances, dict):
                     continue
                 for name, attributes in instances.items():
-                    resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes))
+                    resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes, path))
         elif isinstance(blocks, list):
             for block in blocks:
                 if not isinstance(block, dict):
@@ -56,10 +90,11 @@ class TerraformHCLProvider:
                     if not isinstance(instances, dict):
                         continue
                     for name, attributes in instances.items():
-                        resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes))
+                        resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes, path))
 
-        # Data sources are not resolved. Emit diagnostics rather than treating
-        # their configuration as discovered resources or evaluating provider calls.
+        # Data sources are not queried or evaluated. A dedicated diagnostic
+        # prevents this limitation from being mislabelled as an unresolved
+        # expression on the resource itself.
         data_blocks = data.get("data", [])
         if isinstance(data_blocks, list):
             for data_block in data_blocks:
@@ -73,44 +108,30 @@ class TerraformHCLProvider:
                         resources.append(Resource(
                             resource_type="terraform_hcl_unsupported",
                             resource_id=address,
-                            attributes={
-                                "hcl_diagnostic": "data_source_not_evaluated",
-                                "hcl_unresolved_expressions": [
-                                    "Terraform data source values were not evaluated; dependent values may be unknown."
-                                ],
-                            },
+                            attributes={"hcl_diagnostic": "data_source_not_evaluated"},
                             source="terraform",
-                            source_file=str(self.hcl_file),
+                            source_file=str(path),
                             source_address=address,
                         ))
 
-        # Module code is deliberately not loaded or evaluated. Emit a diagnostic
-        # placeholder so reports make this analysis limitation visible.
+        # Child module source is deliberately not loaded or evaluated.
         modules = data.get("module", [])
         if isinstance(modules, list):
             for module_block in modules:
                 if isinstance(module_block, dict):
                     for module_name in module_block:
-                        resources.append(
-                            Resource(
-                                resource_type="terraform_hcl_unsupported",
-                                resource_id=f"module.{_unquote_label(module_name)}",
-                                attributes={
-                                    "hcl_diagnostic": "module_not_expanded",
-                                    "hcl_unresolved_expressions": [
-                                        "Module contents were not loaded or evaluated."
-                                    ],
-                                },
-                                source="terraform",
-                                source_file=str(self.hcl_file),
-                                source_address=f"module.{_unquote_label(module_name)}",
-                            )
-                        )
-
-        TerraformProvider(self.hcl_file)._resolve_relationships(resources)
+                        address = f"module.{_unquote_label(module_name)}"
+                        resources.append(Resource(
+                            resource_type="terraform_hcl_unsupported",
+                            resource_id=address,
+                            attributes={"hcl_diagnostic": "module_not_expanded"},
+                            source="terraform",
+                            source_file=str(path),
+                            source_address=address,
+                        ))
         return resources
 
-    def _make_resource(self, resource_type: str, name: str, raw_attributes: Any) -> Resource:
+    def _make_resource(self, resource_type: str, name: str, raw_attributes: Any, source_file: Path | None = None) -> Resource:
         attributes = self._normalise_nested_blocks(raw_attributes if isinstance(raw_attributes, dict) else {})
         unresolved = self._unresolved_expressions(attributes)
         if unresolved:
@@ -122,7 +143,7 @@ class TerraformHCLProvider:
             attributes=attributes,
             source="terraform",
             region=attributes.get("region"),
-            source_file=str(self.hcl_file),
+            source_file=str(source_file or self.hcl_file),
             source_address=f"{resource_type}.{name}",
         )
 
