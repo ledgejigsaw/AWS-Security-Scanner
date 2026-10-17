@@ -56,6 +56,30 @@ The provider contains discovery methods for S3 buckets, IAM policies, roles, use
 
 WAF/application-edge discovery additionally covers regional and CloudFront-scope WAFv2 Web ACL metadata and Application Load Balancer WAF association state. See [WAF and application-edge posture](docs/waf-application-edge.md) for scope and limitations.
 
+### Security Hub native control findings
+
+Native finding ingestion is opt-in and bounded. By default, the Security Hub import requests only `ACTIVE` records, and it can be filtered by workflow status or control compliance status. The imported finding preserves the Security Hub finding ID, product ARN, timestamps, control/generator identifier, compliance state, workflow status and record state where supplied. These are imported source findings, not scanner-authored rule results, and the returned sample is not proof that every standard or control was evaluated.
+
+Examples:
+
+```bash
+# Import active findings (bounded to 100 per source by default)
+aws-security-scan --source aws --profile security-audit --region eu-west-2 --include-native-findings
+
+# Only failed controls that are new or notified
+aws-security-scan --source aws --profile security-audit --region eu-west-2 \
+  --include-native-findings \
+  --securityhub-compliance-status FAILED \
+  --securityhub-workflow-status NEW \
+  --securityhub-workflow-status NOTIFIED
+
+# Include archived records as well
+aws-security-scan --source aws --profile security-audit --region eu-west-2 \
+  --include-native-findings --securityhub-record-state ALL
+```
+
+Required permissions include `securityhub:GetFindings` and permission to call `securityhub:DescribeHub` where hub status is checked. The integration is regional; use a region where Security Hub is enabled. Disabled-hub, access-denied and pagination errors are reported as discovery coverage failures rather than silently converted to zero findings. The default per-source limit is 100 (maximum 1,000); reaching the limit may mean the returned sample is incomplete.
+
 ### Security checks
 
 | Service | Coverage |
