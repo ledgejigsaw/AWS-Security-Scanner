@@ -111,17 +111,22 @@ def _find_cycle_nodes(adjacency: dict[str, list[str]]) -> set[str]:
         if start in visited:
             continue
         visited.add(start)
-        stack: list[tuple[str, bool]] = [(start, False)]
+        stack: list[tuple[str, Any]] = [
+            (start, iter(sorted(target for target in adjacency.get(start, ()) if target in nodes)))
+        ]
         while stack:
-            node, expanded = stack.pop()
-            if expanded:
+            node, neighbours = stack[-1]
+            try:
+                target = next(neighbours)
+            except StopIteration:
                 finish_order.append(node)
+                stack.pop()
                 continue
-            stack.append((node, True))
-            for target in sorted(adjacency.get(node, ()), reverse=True):
-                if target in nodes and target not in visited:
-                    visited.add(target)
-                    stack.append((target, False))
+            if target not in visited:
+                visited.add(target)
+                stack.append((target, iter(sorted(
+                    child for child in adjacency.get(target, ()) if child in nodes
+                ))))
 
     assigned: set[str] = set()
     cyclic: set[str] = set()
