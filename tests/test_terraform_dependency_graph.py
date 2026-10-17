@@ -72,3 +72,30 @@ def test_hcl_dependency_graph_is_empty_for_resources_without_references(tmp_path
     assert provider.dependency_graph.edges == ()
     assert provider.dependency_graph.unresolved == ()
     assert provider.dependency_graph.cycle_nodes == ()
+
+
+def test_hcl_cycle_detection_excludes_path_between_two_cycles(tmp_path):
+    (tmp_path / "main.tf").write_text(
+        'resource "aws_s3_bucket" "a" { bucket = aws_s3_bucket.b.bucket }\n'
+        'resource "aws_s3_bucket" "b" { bucket = aws_s3_bucket.a.bucket }\n'
+        'resource "aws_s3_bucket" "bridge" { bucket = aws_s3_bucket.c.bucket }\n'
+        'resource "aws_s3_bucket" "c" { bucket = aws_s3_bucket.d.bucket }\n'
+        'resource "aws_s3_bucket" "d" { bucket = aws_s3_bucket.c.bucket }\n',
+        encoding="utf-8",
+    )
+    provider = TerraformHCLProvider(tmp_path)
+    provider.discover()
+
+    assert set(provider.dependency_graph.cycle_nodes) == {
+        "aws_s3_bucket.a",
+        "aws_s3_bucket.b",
+        "aws_s3_bucket.c",
+        "aws_s3_bucket.d",
+    }
+    assert "aws_s3_bucket.bridge" not in provider.dependency_graph.cycle_nodes
+
+
+def test_hcl_cycle_detection_identifies_self_loop_only():
+    from aws_security_scanner.terraform_dependency_graph import _find_cycle_nodes
+
+    assert _find_cycle_nodes({"a": ["a"], "b": ["a"], "c": ["b"]}) == {"a"}
