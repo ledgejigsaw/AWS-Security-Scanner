@@ -24,7 +24,7 @@ def _unquote_label(value: str) -> str:
 
 
 class TerraformHCLProvider:
-    """Parse literal Terraform HCL without running Terraform or loading modules."""
+    """Parse Terraform HCL and expand bounded local modules without running Terraform."""
 
     def __init__(self, hcl_file: str | Path):
         self.hcl_file = Path(hcl_file)
@@ -144,6 +144,10 @@ class TerraformHCLProvider:
                 value = self._literal_value(raw_value)
                 if value is not _NON_LITERAL:
                     child_inputs[key] = value
+                else:
+                    # Preserve unknown caller expressions so they override child defaults
+                    # and remain visible as unresolved in the child resources.
+                    child_inputs[key] = self._normalise_nested_blocks(raw_value) if isinstance(raw_value, (dict, list, str)) else raw_value
 
             resources = [resource for resource in resources if not (
                 resource.source_address == address

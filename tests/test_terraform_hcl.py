@@ -174,3 +174,130 @@ resource "aws_internet_gateway" "main" {
     assert route_table.relationships == {
         "route[0].gateway_id": "aws_internet_gateway.main",
     }
+
+
+
+def test_hcl_expands_local_module_and_propagates_literal_inputs(tmp_path):
+    root = tmp_path / "root"
+    child = root / "modules" / "storage"
+    child.mkdir(parents=True)
+    (root / "main.tf").write_text(
+        'module "storage" {\n'
+        '  source = "./modules/storage"\n'
+        '  bucket_name = "production-data"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (child / "variables.tf").write_text(
+        'variable "bucket_name" {\n'
+        '  type = string\n'
+        '  default = "fallback-data"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (child / "main.tf").write_text(
+        'resource "aws_s3_bucket" "data" {\n'
+        '  bucket = var.bucket_name\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    bucket = next(item for item in resources if item.source_address == "module.storage.aws_s3_bucket.data")
+    assert bucket.attributes["bucket"] == "production-data"
+    assert "hcl_unresolved_expressions" not in bucket.attributes
+    assert not any(item.attributes.get("hcl_diagnostic") == "module_not_expanded" for item in resources)
+
+
+def test_hcl_local_module_uses_variable_default_when_input_omitted(tmp_path):
+    root = tmp_path / "root"
+    child = root / "modules" / "storage"
+    child.mkdir(parents=True)
+    (root / "main.tf").write_text(
+        'module "storage" { source = "./modules/storage" }\n',
+        encoding="utf-8",
+    )
+    (child / "main.tf").write_text(
+        'variable "bucket_name" { default = "default-data" }\n'
+        'resource "aws_s3_bucket" "data" { bucket = var.bucket_name }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    bucket = next(item for item in resources if item.source_address == "module.storage.aws_s3_bucket.data")
+    assert bucket.attributes["bucket"] == "default-data"
+
+
+def test_hcl_nested_local_modules_are_expanded_with_distinct_addresses(tmp_path):
+    root = tmp_path / "root"
+    child = root / "modules" / "network"
+    grandchild = child / "modules" / "bucket"
+    grandchild.mkdir(parents=True)
+    (root / "main.tf").write_text(
+        'module "network" { source = "./modules/network" }\n',
+        encoding="utf-8",
+    )
+    (child / "main.tf").write_text(
+        'module "bucket" { source = "./modules/bucket" }\n',
+        encoding="utf-8",
+    )
+    (grandchild / "main.tf").write_text(
+        'resource "aws_s3_bucket" "data" { bucket = "nested-data" }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    assert any(item.source_address == "module.network.module.bucket.aws_s3_bucket.data" for item in resources)
+    assert not any(item.attributes.get("hcl_diagnostic") == "module_not_expanded" for item in resources)
+
+
+def test_hcl_remote_module_is_not_downloaded_and_has_reason(tmp_path):
+    source = tmp_path / "main.tf"
+    source.write_text(
+        'module "remote" { source = "terraform-aws-modules/vpc/aws" }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(source).discover()
+    module = next(item for item in resources if item.source_address == "module.remote")
+    assert module.attributes["hcl_diagnostic"] == "module_not_expanded"
+    assert "not downloaded or executed" in module.attributes["hcl_diagnostic_reason"]
+
+
+def test_hcl_local_module_outside_scan_root_is_not_followed(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "main.tf").write_text(
+        'resource "aws_s3_bucket" "outside" { bucket = "outside-data" }\n',
+        encoding="utf-8",
+    )
+    (root / "main.tf").write_text(
+        'module "escape" { source = "../outside" }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    module = next(item for item in resources if item.source_address == "module.escape")
+    assert module.attributes["hcl_diagnostic"] == "module_not_expanded"
+    assert "outside the selected scan root" in module.attributes["hcl_diagnostic_reason"]
+
+
+def test_hcl_local_module_cycle_is_reported_without_recursing_forever(tmp_path):
+    root = tmp_path / "root"
+    child = root / "modules" / "child"
+    child.mkdir(parents=True)
+    (root / "main.tf").write_text(
+        'module "child" { source = "./modules/child" }\n',
+        encoding="utf-8",
+    )
+    (child / "main.tf").write_text(
+        'module "back" { source = "../../" }\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(root).discover()
+    cycle = next(item for item in resources if item.source_address == "module.child.module.back")
+    assert cycle.attributes["hcl_diagnostic"] == "module_not_expanded"
+    assert "cycle" in cycle.attributes["hcl_diagnostic_reason"]
