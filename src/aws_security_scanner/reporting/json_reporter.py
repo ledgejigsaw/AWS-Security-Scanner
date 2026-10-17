@@ -43,6 +43,7 @@ def build_json_report(
         finding_items.append(item)
 
     report = {
+        "schema_version": "1.0.0",
         "summary": {
             "total_findings": summary.total_findings,
             "by_severity": summary.by_severity,
