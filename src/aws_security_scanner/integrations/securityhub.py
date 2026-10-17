@@ -81,6 +81,25 @@ def securityhub_to_finding(
 
     first_observed = item.get("FirstObservedAt")
     last_observed = item.get("LastObservedAt")
+    # Preserve concise control/status provenance without embedding the full
+    # AWS Security Finding Format payload in reports.
+    generator_id = item.get("GeneratorId")
+    compliance = item.get("Compliance")
+    compliance = compliance if isinstance(compliance, dict) else {}
+    workflow = item.get("Workflow")
+    workflow = workflow if isinstance(workflow, dict) else {}
+    record_state = item.get("RecordState")
+    workflow_status = workflow.get("Status")
+    compliance_status = compliance.get("Status")
+    provenance = [f"Imported from AWS Security Hub; source finding ID: {source_id}"]
+    if isinstance(generator_id, str) and generator_id:
+        provenance.append(f"generator/control: {generator_id}")
+    if isinstance(compliance_status, str) and compliance_status:
+        provenance.append(f"compliance status: {compliance_status}")
+    if isinstance(workflow_status, str) and workflow_status:
+        provenance.append(f"workflow status: {workflow_status}")
+    if isinstance(record_state, str) and record_state:
+        provenance.append(f"record state: {record_state}")
     return Finding(
         check_id="AWS-SHUB-NATIVE",
         severity=severity,
@@ -90,7 +109,7 @@ def securityhub_to_finding(
         description=description,
         remediation=remediation_text,
         region=region,
-        evidence=f"Imported from AWS Security Hub; source finding ID: {source_id}",
+        evidence="; ".join(provenance),
         account_id=account_id,
         source_type="security_hub",
         source_id=source_id,
