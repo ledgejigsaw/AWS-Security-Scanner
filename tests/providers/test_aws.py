@@ -238,7 +238,7 @@ def test_aws_provider_handles_s3_versioning_error():
     resources = provider.discover_s3_buckets()
 
     assert len(resources) == 1
-    assert resources[0].attributes["versioning"] is False
+    assert resources[0].attributes["versioning"] is None
     
 def test_aws_provider_detects_s3_block_public_access():
     s3_client = Mock()
