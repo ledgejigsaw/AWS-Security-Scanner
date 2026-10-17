@@ -28,6 +28,15 @@ def threshold_is_met(findings: list[Finding], fail_on: str | None) -> bool:
     return any(SEVERITY_RANK[finding.severity.value] <= threshold for finding in findings)
 
 
+def scan_exit_code(*, incomplete: bool, threshold_met: bool) -> int:
+    """Return the documented process exit code for a completed scan attempt."""
+    if incomplete:
+        return 1
+    if threshold_met:
+        return 3
+    return 0
+
+
 def build_scan_summary(
     findings: list[Finding],
     *,
