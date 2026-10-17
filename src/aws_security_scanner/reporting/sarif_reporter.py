@@ -65,8 +65,7 @@ def build_sarif_report(
                 compliance_mapping, finding.check_id
             )
 
-        results.append(
-            {
+        result = {
                 "ruleId": finding.check_id,
                 "level": SARIF_LEVELS[finding.severity],
                 "message": {
@@ -74,7 +73,17 @@ def build_sarif_report(
                 },
                 "properties": properties,
             }
-        )
+        if finding.source_file is not None:
+            result["locations"] = [{
+                "physicalLocation": {
+                    "artifactLocation": {"uri": finding.source_file}
+                },
+                "logicalLocations": [{
+                    "name": finding.source_address or finding.resource,
+                    "kind": "resource",
+                }],
+            }]
+        results.append(result)
 
     run = {
         "tool": {
