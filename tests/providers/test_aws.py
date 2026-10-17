@@ -1441,6 +1441,7 @@ def test_aws_provider_discovers_kms_key_policy():
     kms_client.get_key_rotation_status.return_value = {
         "KeyRotationEnabled": True,
     }
+    kms_client.list_grants.return_value = {"Grants": [], "Truncated": False}
     kms_client.get_key_policy.return_value = {
         "Policy": '{"Statement":[{"Effect":"Allow","Principal":"*","Action":"kms:*","Resource":"*"}]}'
     }
