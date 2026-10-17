@@ -85,3 +85,29 @@ def test_rest_api_discovery_preserves_incomplete_metadata():
     resource = AWSProvider(apigateway_client=client).discover_api_gateway_rest_apis()[0]
     assert resource.attributes["methods"][0]["authorization_type"] is None
     assert resource.attributes["access_logging_enabled"] is False
+
+
+def test_http_api_discovery_normalises_routes_and_stage_logging():
+    client = Mock()
+    client.get_apis.return_value = {"Items": [{
+        "ApiId": "http123", "Name": "payments-http", "ProtocolType": "HTTP",
+        "ApiEndpoint": "https://http123.execute-api.eu-west-2.amazonaws.com",
+        "DisableExecuteApiEndpoint": False,
+    }]}
+    client.get_routes.return_value = {"Items": [
+        {"RouteKey": "POST /payments", "AuthorizationType": "NONE"},
+        {"RouteKey": "GET /health", "AuthorizationType": "JWT", "AuthorizerId": "auth1"},
+    ]}
+    client.get_stages.return_value = {"Items": [{
+        "StageName": "$default",
+        "AccessLogSettings": {"DestinationArn": "arn:aws:logs:eu-west-2:123456789012:log-group:http-api", "Format": "$context.requestId"},
+    }]}
+    resources = AWSProvider(apigatewayv2_client=client, region="eu-west-2").discover_api_gateway_http_apis()
+    assert len(resources) == 1
+    resource = resources[0]
+    assert resource.resource_type == "aws_api_gateway_http_api_stage"
+    assert resource.resource_id == "http123:$default"
+    assert resource.attributes["routes"][0]["authorization_type"] == "NONE"
+    assert resource.attributes["access_logging_enabled"] is True
+    client.get_routes.assert_called_once_with(ApiId="http123")
+    client.get_stages.assert_called_once_with(ApiId="http123")
