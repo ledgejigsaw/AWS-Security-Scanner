@@ -2507,8 +2507,15 @@ class AWSProvider:
             )
         ]
 
-    def get_securityhub_findings(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Return a bounded, paginated set of regional Security Hub findings.
+    def get_securityhub_findings(
+        self,
+        limit: int = 100,
+        *,
+        workflow_statuses: list[str] | None = None,
+        record_state: str | None = "ACTIVE",
+        compliance_status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return bounded regional Security Hub findings with optional control filters.
 
         The API is read-only. Access and service errors deliberately propagate;
         an incomplete or denied query must not be represented as zero findings.
@@ -2516,13 +2523,38 @@ class AWSProvider:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("Security Hub finding limit must be between 1 and 1000.")
 
+        valid_workflow_statuses = {"NEW", "NOTIFIED", "RESOLVED", "SUPPRESSED"}
+        if workflow_statuses is not None and (
+            not workflow_statuses
+            or any(not isinstance(value, str) or value not in valid_workflow_statuses for value in workflow_statuses)
+        ):
+            raise ValueError("Security Hub workflow statuses must be NEW, NOTIFIED, RESOLVED or SUPPRESSED.")
+        if record_state not in {None, "ACTIVE", "ARCHIVED"}:
+            raise ValueError("Security Hub record state must be ACTIVE, ARCHIVED or None.")
+        if compliance_status not in {None, "PASSED", "WARNING", "FAILED", "NOT_AVAILABLE", "NOT_SUPPORTED"}:
+            raise ValueError("Unsupported Security Hub compliance status.")
+
         findings: list[dict[str, Any]] = []
         token: str | None = None
         seen_tokens: set[str] = set()
         seen_findings: set[tuple[str, str]] = set()
+        filters: dict[str, list[dict[str, str]]] = {}
+        if record_state is not None:
+            filters["RecordState"] = [{"Comparison": "EQUALS", "Value": record_state}]
+        if workflow_statuses is not None:
+            filters["WorkflowStatus"] = [
+                {"Comparison": "EQUALS", "Value": value}
+                for value in workflow_statuses
+            ]
+        if compliance_status is not None:
+            filters["ComplianceStatus"] = [
+                {"Comparison": "EQUALS", "Value": compliance_status}
+            ]
 
         while len(findings) < limit:
             request: dict[str, Any] = {"MaxResults": min(100, limit - len(findings))}
+            if filters:
+                request["Filters"] = filters
             if token:
                 request["NextToken"] = token
             response = self.securityhub_client.get_findings(**request)
