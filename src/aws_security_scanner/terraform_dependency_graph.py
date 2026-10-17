@@ -1,6 +1,7 @@
 """Deterministic dependency graph for offline Terraform HCL analysis."""
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,7 +57,7 @@ def build_dependency_graph(resources: list[Resource]) -> DependencyGraph:
         source = resource.source_address
         if not source or source not in addresses:
             continue
-        for attribute, raw_target in sorted(resource.relationships.items()):
+        for attribute, raw_target in sorted((resource.relationships or {}).items()):
             target = raw_target
             if target not in addresses:
                 candidates = sorted(
@@ -80,33 +81,37 @@ def build_dependency_graph(resources: list[Resource]) -> DependencyGraph:
             adjacency[source].append(target)
 
     # Iteratively prune acyclic sources/sinks. Nodes remaining after pruning
-    # belong to directed cycles. This avoids recursion-depth failures on large
-    # Terraform modules with thousands of resources.
+    # belong to directed cycles. Each edge is processed at most twice, avoiding
+    # recursion-depth failures and quadratic rescans on large Terraform modules.
     active = set(addresses)
     incoming = {node: 0 for node in addresses}
     outgoing = {node: 0 for node in addresses}
+    reverse: dict[str, list[str]] = {node: [] for node in addresses}
     for source, targets in adjacency.items():
         for target in targets:
             if target in active:
                 outgoing[source] += 1
                 incoming[target] += 1
-    while True:
-        removable = {
-            node for node in active
-            if incoming[node] == 0 or outgoing[node] == 0
-        }
-        if not removable:
-            break
-        for node in removable:
-            active.remove(node)
-        for source in active:
-            for target in adjacency.get(source, []):
-                if target in removable:
-                    outgoing[source] -= 1
-        for target in active:
-            for source in removable:
-                if target in adjacency.get(source, []):
-                    incoming[target] -= 1
+                reverse[target].append(source)
+    queue = deque(sorted(
+        node for node in active
+        if incoming[node] == 0 or outgoing[node] == 0
+    ))
+    while queue:
+        node = queue.popleft()
+        if node not in active:
+            continue
+        active.remove(node)
+        for target in adjacency.get(node, []):
+            if target in active:
+                incoming[target] -= 1
+                if incoming[target] == 0 or outgoing[target] == 0:
+                    queue.append(target)
+        for source in reverse.get(node, []):
+            if source in active:
+                outgoing[source] -= 1
+                if incoming[source] == 0 or outgoing[source] == 0:
+                    queue.append(source)
     cycle_nodes = active
 
     return DependencyGraph(
