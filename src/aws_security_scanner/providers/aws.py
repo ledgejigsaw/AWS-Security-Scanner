@@ -49,6 +49,8 @@ class AWSProvider:
         sts_client: Any | None = None,
         inspector2_client: Any | None = None,
         eks_client: Any | None = None,
+        logs_client: Any | None = None,
+        cloudwatch_client: Any | None = None,
     ):
         self.region = region
         # Preserve the existing boto3.client path for single-account scans;
@@ -133,6 +135,8 @@ class AWSProvider:
         self.sts_client = sts_client
         self.inspector2_client = inspector2_client or self._client("inspector2", region_name=region)
         self.eks_client = eks_client or self._client("eks", region_name=region)
+        self.logs_client = logs_client or self._client("logs", region_name=region)
+        self.cloudwatch_client = cloudwatch_client or self._client("cloudwatch", region_name=region)
 
     def _collect_pages(
         self,
@@ -2224,6 +2228,74 @@ class AWSProvider:
                     "encryption_config": encryption_config,
                     "encryption_configured": bool(encryption_config),
                     "authentication_mode": endpoint_config.get("authenticationMode"),
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
+
+
+    def discover_cloudwatch_log_groups(self) -> list[Resource]:
+        """Discover CloudWatch Logs group metadata without reading log events."""
+        groups = self._collect_pages(
+            self.logs_client.describe_log_groups,
+            "logGroups",
+            request_token="nextToken",
+            response_token="nextToken",
+        )
+        resources: list[Resource] = []
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            name = group.get("logGroupName")
+            if not isinstance(name, str) or not name:
+                continue
+            resources.append(Resource(
+                resource_type="aws_cloudwatch_log_group",
+                resource_id=name,
+                attributes={
+                    "name": name,
+                    "arn": group.get("arn") or group.get("logGroupArn"),
+                    "retention_in_days": group.get("retentionInDays"),
+                    "kms_key_id": group.get("kmsKeyId"),
+                    "stored_bytes": group.get("storedBytes"),
+                    "creation_time": group.get("creationTime"),
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
+
+    def discover_cloudwatch_alarms(self) -> list[Resource]:
+        """Discover CloudWatch alarm configuration, not alarm history or log contents."""
+        alarms = self._collect_pages(
+            self.cloudwatch_client.describe_alarms,
+            "MetricAlarms",
+        )
+        resources: list[Resource] = []
+        for alarm in alarms:
+            if not isinstance(alarm, dict):
+                continue
+            name = alarm.get("AlarmName")
+            if not isinstance(name, str) or not name:
+                continue
+            resources.append(Resource(
+                resource_type="aws_cloudwatch_metric_alarm",
+                resource_id=name,
+                attributes={
+                    "name": name,
+                    "arn": alarm.get("AlarmArn"),
+                    "namespace": alarm.get("Namespace"),
+                    "metric_name": alarm.get("MetricName"),
+                    "actions_enabled": alarm.get("ActionsEnabled"),
+                    "alarm_actions": alarm.get("AlarmActions", []),
+                    "ok_actions": alarm.get("OKActions", []),
+                    "insufficient_data_actions": alarm.get("InsufficientDataActions", []),
+                    "state_value": alarm.get("StateValue"),
+                    "comparison_operator": alarm.get("ComparisonOperator"),
+                    "threshold": alarm.get("Threshold"),
+                    "period": alarm.get("Period"),
+                    "evaluation_periods": alarm.get("EvaluationPeriods"),
                 },
                 source="aws",
                 region=self.region,
