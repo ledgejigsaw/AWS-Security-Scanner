@@ -43,6 +43,7 @@ from aws_security_scanner.triage import (
 from aws_security_scanner.scan_summary import (
     build_scan_summary,
     threshold_is_met,
+    scan_exit_code,
     write_scan_summary,
 )
 
@@ -914,14 +915,14 @@ def main() -> None:
         write_scan_summary(summary, args.summary_output)
         print(f"Machine-readable scan summary written to {args.summary_output}")
 
-    if baseline_actions_skipped:
-        raise SystemExit(1)
-    if assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0:
-        raise SystemExit(1)
-    if discovery_has_gaps:
-        raise SystemExit(1)
-    if threshold_met:
-        raise SystemExit(3)
+    assessment_incomplete = bool(
+        baseline_actions_skipped
+        or (assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0)
+        or discovery_has_gaps
+    )
+    exit_code = scan_exit_code(incomplete=assessment_incomplete, threshold_met=threshold_met)
+    if exit_code:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":
