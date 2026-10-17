@@ -50,6 +50,15 @@ class TerraformHCLProvider:
             address_prefix="", input_values={}, active_stack=(), depth=0,
         )
         TerraformProvider(self.hcl_file)._resolve_relationships(resources)
+        known_addresses = {item.source_address for item in resources if item.source_address}
+        for resource in resources:
+            if not resource.source_address or not resource.source_address.startswith("module.") or not resource.relationships:
+                continue
+            parent_prefix = ".".join(resource.source_address.split(".")[:-2])
+            for key, target in list(resource.relationships.items()):
+                qualified = f"{parent_prefix}.{target}"
+                if qualified in known_addresses:
+                    resource.relationships[key] = qualified
         seen: set[tuple[str, str]] = set()
         unique: list[Resource] = []
         for resource in resources:
@@ -352,6 +361,6 @@ class TerraformHCLProvider:
                 remainder = _RESOURCE_REFERENCE.sub("", value)
                 if not references or (chr(36) + "{") in remainder:
                     unresolved.append(f"{path}: {value}")
-            elif re.search(r"\\b(?:var|local|module)\\.[A-Za-z0-9_-]+", value):
+            elif re.search(r"\b(?:var|local|module)\.[A-Za-z0-9_-]+", value):
                 unresolved.append(f"{path}: {value}")
         return unresolved
