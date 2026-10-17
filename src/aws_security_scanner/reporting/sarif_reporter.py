@@ -86,7 +86,7 @@ def build_sarif_report(
         },
         "results": results,
     }
-    run_properties = {}
+    run_properties = {"scannerReportSchemaVersion": "1.0.0"}
     if assessment_metadata is not None:
         run_properties["assessment"] = assessment_metadata
     metadata = framework_metadata(compliance_mapping)

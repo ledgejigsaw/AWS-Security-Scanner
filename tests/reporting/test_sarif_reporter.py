@@ -33,6 +33,7 @@ def test_sarif_report_has_version_rules_and_results():
 
     assert report["version"] == "2.1.0"
     run = report["runs"][0]
+    assert run["properties"]["scannerReportSchemaVersion"] == "1.0.0"
     assert run["tool"]["driver"]["name"] == "AWS Security Scanner"
     assert {rule["id"] for rule in run["tool"]["driver"]["rules"]} == {
         "S3-006", "S3-010", "IAM-006"

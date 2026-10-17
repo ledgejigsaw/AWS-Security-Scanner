@@ -8,7 +8,7 @@ The scanner's baseline files are local JSON artifacts. They contain finding iden
 aws-security-scan --source terraform --file terraform.json --write-baseline reports/baseline.json
 ```
 
-Newly written baselines use schema version 2 and store a sorted list of finding records. Version 1 files containing a `fingerprints` list remain readable. The identity is derived from check ID, service, resource identifier and region; evidence text, severity and title are not identity fields.
+Newly written baselines currently use schema version 2 and store a sorted list of finding records. Version 1 files containing a `fingerprints` list remain readable. The identity is derived from check ID, service, resource identifier and region, with account ID included when available; evidence text, severity and title are not identity fields. JSON reports expose `schema_version` (`1.0.0`); SARIF retains its standard `2.1.0` format version and adds `scannerReportSchemaVersion` in run properties. These markers describe output structure, not the scanner's rule catalogue version.
 
 ## Compare against a previous baseline
 
@@ -40,3 +40,8 @@ Version 1 fingerprints have no suppression metadata and retain legacy baseline-s
 ## Operational note
 
 A baseline is a comparison reference, not proof that a resource is safe. Review newly introduced findings and any suppression expiry as part of normal change review; do not automatically rewrite the baseline in CI.
+
+
+## Identity and compatibility
+
+Finding fingerprints are deterministic hashes of identity metadata and exclude evidence text and other mutable display fields. Account identity is included when supplied, so callers should provide account context for multi-account scans. Older baselines remain loadable; because legacy entries may lack account identity, review baseline diffs carefully when migrating from scans that did not record accounts. Fingerprints must never include credentials, secret values, or raw resource configuration.
