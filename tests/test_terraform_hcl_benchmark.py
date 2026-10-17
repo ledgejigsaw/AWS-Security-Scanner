@@ -6,7 +6,9 @@ def test_terraform_hcl_benchmark_corpus_matches_expected_findings():
 
     assert result["schema_version"] == "1.0.0"
     assert result["case_count"] >= 4
-    assert result["failed"] == 0, result
+    for case in result["results"]:
+        assert case["passed"], case
+    assert result["failed"] == 0
     assert result["passed"] == result["case_count"]
 
 
