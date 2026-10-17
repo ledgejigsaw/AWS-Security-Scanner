@@ -82,3 +82,28 @@ def test_cloudtrail_provider_normalises_destination_metadata(monkeypatch):
     trails = provider.discover_cloudtrail_trails()
     assert trails[0].attributes["cloudwatch_logs_log_group_arn"].endswith(":trail")
     assert trails[0].attributes["cloudwatch_logs_role_arn"].endswith("CloudTrailLogs")
+
+
+def test_cloudtrail_provider_normalises_selector_metadata(monkeypatch):
+    class CloudTrail:
+        def describe_trails(self, **kwargs):
+            return {"trailList": [{
+                "Name": "org-trail",
+                "TrailARN": "arn:aws:cloudtrail:eu-west-2:111122223333:trail/org-trail",
+                "HomeRegion": "eu-west-2",
+                "IsOrganizationTrail": True,
+                "IsMultiRegionTrail": True,
+            }]}
+        def get_trail_status(self, **kwargs):
+            return {"IsLogging": True}
+        def get_event_selectors(self, **kwargs):
+            return {"EventSelectors": [{
+                "ReadWriteType": "All", "IncludeManagementEvents": True,
+                "DataResources": [{"Type":"AWS::S3::Object","Values":["arn:aws:s3:::example/*"]}],
+            }]}
+    monkeypatch.setattr("aws_security_scanner.providers.aws.boto3.client", lambda *args, **kwargs: object())
+    trail = AWSProvider(cloudtrail_client=CloudTrail(), region="eu-west-2").discover_cloudtrail_trails()[0]
+    assert trail.attributes["is_organization_trail"] is True
+    assert trail.attributes["event_selector_discovery"] == "success"
+    assert trail.attributes["management_events_logged"] is True
+    assert trail.attributes["data_event_selector_count"] == 1
