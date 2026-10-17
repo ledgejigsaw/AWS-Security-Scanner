@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "purpose": "Deterministic offline regression corpus for Terraform HCL security findings and analysis completeness.",
+  "cases": [
+    {
+      "id": "public-bucket",
+      "path": "tests/fixtures/terraform-hcl-benchmark/public-bucket",
+      "expected_check_ids": [
+        "S3-001"
+      ],
+      "expected_status": "complete",
+      "class": "insecure",
+      "notes": "Explicit public=true must generate the critical public-bucket rule."
+    },
+    {
+      "id": "secure-bucket",
+      "path": "tests/fixtures/terraform-hcl-benchmark/secure-bucket",
+      "expected_check_ids": [],
+      "expected_status": "complete",
+      "class": "secure",
+      "notes": "Explicitly secure values must not generate the selected S3 posture findings."
+    },
+    {
+      "id": "unresolved-variable",
+      "path": "tests/fixtures/terraform-hcl-benchmark/unresolved-variable",
+      "expected_check_ids": [
+        "IAC-HCL-001"
+      ],
+      "expected_status": "incomplete",
+      "class": "unknown",
+      "notes": "An unresolved variable must remain visible and must not be treated as a clean assessment."
+    },
+    {
+      "id": "unexpanded-module",
+      "path": "tests/fixtures/terraform-hcl-benchmark/unexpanded-module",
+      "expected_check_ids": [
+        "IAC-HCL-002"
+      ],
+      "expected_status": "incomplete",
+      "class": "unknown",
+      "notes": "A remote module is not fetched implicitly and its skipped coverage must be reported."
+    }
+  ],
+  "upstream_references": [
+    "https://github.com/prowler-cloud/prowler",
+    "https://github.com/bridgecrewio/checkov",
+    "https://github.com/aquasecurity/trivy"
+  ],
+  "notes": [
+    "Fixtures are synthetic and contain no credentials or live cloud identifiers.",
+    "The initial corpus is a local regression benchmark, not a claim of differential parity. Upstream check-by-check adapters should be added only with pinned tool versions and reviewed output normalization."
+  ]
+}

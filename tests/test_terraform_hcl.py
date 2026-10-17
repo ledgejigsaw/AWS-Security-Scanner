@@ -355,11 +355,11 @@ def test_hcl_module_outside_scan_root_expands_when_explicitly_trusted(tmp_path):
     example.mkdir(parents=True)
     module.mkdir(parents=True)
     (example / "main.tf").write_text(
-        'module "storage" { source = "../../modules/storage" }\\n',
+        'module "storage" { source = "../../modules/storage" }\n',
         encoding="utf-8",
     )
     (module / "main.tf").write_text(
-        'resource "aws_s3_bucket" "data" { bucket = "sensitive-data" }\\n',
+        'resource "aws_s3_bucket" "data" { bucket = "sensitive-data" }\n',
         encoding="utf-8",
     )
 
@@ -382,15 +382,15 @@ def test_hcl_trusted_module_root_does_not_allow_escape_outside_trusted_root(tmp_
     module.mkdir(parents=True)
     outside.mkdir()
     (example / "main.tf").write_text(
-        'module "storage" { source = "../../modules/storage" }\\n',
+        'module "storage" { source = "../../modules/storage" }\n',
         encoding="utf-8",
     )
     (module / "main.tf").write_text(
-        'module "escape" { source = "../../../outside" }\\n',
+        'module "escape" { source = "../../../outside" }\n',
         encoding="utf-8",
     )
     (outside / "main.tf").write_text(
-        'resource "aws_s3_bucket" "outside" { bucket = "outside-data" }\\n',
+        'resource "aws_s3_bucket" "outside" { bucket = "outside-data" }\n',
         encoding="utf-8",
     )
 
@@ -402,6 +402,6 @@ def test_hcl_trusted_module_root_does_not_allow_escape_outside_trusted_root(tmp_
 
 def test_hcl_trusted_module_root_must_be_an_existing_directory(tmp_path):
     source = tmp_path / "main.tf"
-    source.write_text('resource "aws_s3_bucket" "data" { bucket = "data" }\\n', encoding="utf-8")
+    source.write_text('resource "aws_s3_bucket" "data" { bucket = "data" }\n', encoding="utf-8")
     with pytest.raises(ValueError, match="Trusted Terraform module root"):
         TerraformHCLProvider(source, module_roots=[tmp_path / "missing"])

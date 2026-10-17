@@ -414,3 +414,21 @@ Use `--format ocsf` to write an OCSF 1.7.0 Detection Finding JSON array to `repo
 ## Resource snapshots
 
 Use `--snapshot-output reports/inventory.json` to save a versioned, redacted inventory for offline rule re-analysis. Replay it with `--source snapshot --file reports/inventory.json`. Snapshots are opt-in and may contain sensitive infrastructure metadata; see [resource snapshots](docs/resource-snapshots.md).
+
+
+## Offline Terraform benchmark and rule inventory
+
+Run the checked-in Terraform HCL regression corpus (secure, insecure and unresolved cases) without AWS credentials or Terraform installed:
+
+```bash
+python scripts/benchmark_terraform_corpus.py
+python scripts/benchmark_terraform_corpus.py --output reports/terraform-benchmark.json
+```
+
+The runner compares expected finding IDs and analysis completeness, and exits non-zero when a case differs. See [the benchmark corpus contract](docs/terraform-benchmark-corpus.md). Export the active rule registry as deterministic JSON for reviews and upstream capability mapping:
+
+```bash
+python scripts/export_rule_inventory.py --output reports/rule-inventory.json
+```
+
+The [upstream-tool gap analysis](docs/upstream-tool-gap-analysis.md) distinguishes AWS CSPM from IaC scanning and tracks check-by-check mappings without claiming unverified parity.
