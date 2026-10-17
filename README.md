@@ -216,10 +216,6 @@ Native finding import is disabled by default. It queries Security Hub and GuardD
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
 
-## AWS discovery pagination limits
-
-AWS API discovery follows continuation tokens and rejects repeated tokens or truncated responses without a continuation token. Pagination now has a hard safety bound of 1,000 pages per collection by default. If the bound is reached while more results remain, discovery raises an explicit incomplete-discovery error instead of returning a partial resource list as though it were complete. This is a safety bound, not a claim that every service has returned all resources; service APIs and permissions still determine actual coverage.
-
 ## Resource graph export
 
 Add `--graph-output` to a single-account scan to write a separate machine-readable resource graph:
@@ -280,6 +276,11 @@ Fixtures / Terraform JSON / Terraform HCL / AWS APIs
 ```
 
 The `Resource` model separates source-specific discovery from security rules. This design is already useful, but large architectural changes are intentionally deferred while functional coverage is expanded.
+
+## AWS discovery pagination limits
+
+AWS API discovery follows continuation tokens and rejects repeated tokens or truncated responses without a continuation token. Pagination now has a hard safety bound of 1,000 pages per collection by default. If the bound is reached while more results remain, discovery raises an explicit incomplete-discovery error instead of returning a partial resource list as though it were complete. This is a safety bound, not a claim that every service has returned all resources; service APIs and permissions still determine actual coverage.
+
 
 ## Development and tests
 
