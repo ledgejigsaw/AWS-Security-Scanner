@@ -69,6 +69,24 @@ def write_resource_snapshot(
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def load_resource_snapshot_coverage(input_path: str | Path) -> list[dict[str, Any]]:
+    """Return the saved discovery coverage so replay cannot hide collection gaps."""
+    path = Path(input_path)
+    try:
+        with path.open(encoding="utf-8") as file:
+            payload = json.load(file)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Unable to read resource snapshot '{path}': {exc}") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != SNAPSHOT_SCHEMA_VERSION:
+        raise ValueError("Cannot read discovery coverage from an unsupported resource snapshot.")
+    coverage = payload.get("discovery_coverage")
+    if coverage is None:
+        return []
+    if not isinstance(coverage, list) or not all(isinstance(item, dict) for item in coverage):
+        raise ValueError("Resource snapshot discovery_coverage must be a list of objects or null.")
+    return coverage
+
+
 def load_resource_snapshot(input_path: str | Path) -> list[Resource]:
     """Load a compatible snapshot and reject unknown structure rather than dropping fields."""
     path = Path(input_path)
