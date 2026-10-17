@@ -52,13 +52,10 @@ def check_eks_unrestricted_public_endpoint(resource: Resource) -> list[Finding]:
     remediation="Enable the EKS audit control-plane log type and review log destination, retention and access controls.",
 )
 def check_eks_audit_logging_disabled(resource: Resource) -> list[Finding]:
-    observed = resource.attributes.get("control_plane_log_types_observed")
+    if resource.attributes.get("control_plane_logging_metadata_available") is not True:
+        return []
     enabled = resource.attributes.get("control_plane_log_types_enabled")
-    if not isinstance(observed, list) or not isinstance(enabled, list):
-        return []
-    if "audit" not in observed:
-        return []
-    if "audit" in enabled:
+    if not isinstance(enabled, list) or "audit" in enabled:
         return []
     # EKS returns configured types and enabled state; absent logging metadata is
     # unknown rather than a confirmed disabled setting.
@@ -66,7 +63,7 @@ def check_eks_audit_logging_disabled(resource: Resource) -> list[Finding]:
         check_eks_audit_logging_disabled,
         resource=resource.resource_id,
         region=resource.region,
-        evidence="control_plane_log_types_observed=" + ",".join(sorted(observed)) + "; enabled=" + ",".join(sorted(enabled)),
+        evidence="control_plane_logging_metadata_available=true; enabled=" + ",".join(sorted(enabled)),
     )]
 
 
