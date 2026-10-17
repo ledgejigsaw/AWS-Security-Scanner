@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import boto3
-from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError, ProfileNotFound
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, PartialCredentialsError, ProfileNotFound
 
 from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
@@ -71,6 +71,12 @@ def create_verified_aws_session(profile: str | None, region: str | None):
         raise RuntimeError(
             f"AWS identity verification failed ({code}). Check credential validity "
             "and network access, then retry. No scan was started."
+        ) from None
+    except BotoCoreError:
+        raise RuntimeError(
+            "AWS identity verification could not complete because the credential "
+            "provider or AWS endpoint was unavailable. Check your AWS SSO login, "
+            "credential configuration and network access. No scan was started."
         ) from None
 
     account_id = identity.get("Account") if isinstance(identity, dict) else None
