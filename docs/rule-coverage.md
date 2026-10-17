@@ -8,7 +8,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 
 | Service/domain | Registered checks | Scope and important limitations |
 |---|---:|---|
-| S3 | 17 | Public exposure, encryption, versioning, Block Public Access, logging, selected bucket-policy risks, public ACL grants, ACL-based ownership, MFA Delete and lifecycle review signals, plus an informational cross-account bucket-policy grant check when owner-account identity is known and a policy-dependent Object Lock review signal for versioned buckets. Object Lock absence is not treated as universally insecure; account-level Block Public Access is checked separately from bucket-level settings. Conditions are recorded as context, not treated as proof that access is safe; no object-content inspection. |
+| S3 | 18 | Public exposure, encryption, versioning, Block Public Access, logging, selected bucket-policy risks, public ACL grants, ACL-based ownership, MFA Delete and lifecycle review signals, plus an informational cross-account bucket-policy grant check when owner-account identity is known and a policy-dependent Object Lock review signal for versioned buckets, and an informational lifecycle-configuration review signal for non-versioned buckets where absence is known. Object Lock absence is not treated as universally insecure; account-level Block Public Access is checked separately from bucket-level settings. Conditions are recorded as context, not treated as proof that access is safe; no object-content inspection. |
 | IAM | 17 | Permissions, trust, MFA, credential hygiene, root-account and unused-role signals. Not a complete IAM policy simulator. |
 | EC2 | 12 | Public IPv4, metadata options, sensitive ports and broad ingress/egress. Detailed monitoring and missing instance-profile checks are informational review signals, not universal requirements. |
 | EBS | 4 | Explicit unencrypted volume/snapshot states plus observed public snapshot create-volume and public AMI launch permissions. Permission-denied public-access checks remain unknown; approved cross-account sharing is not treated as public. |
@@ -35,7 +35,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | CloudWatch | 2 | Missing explicit log-group retention (LOW, policy-dependent) and metric alarms without enabled alarm actions (INFO review signal). The scanner does not read log events or claim that generic alarms cover every security control. |
 | EFS | 2 | Explicitly unencrypted file systems and an informational review signal for access points configured with POSIX UID 0. Network reachability is not inferred from security-group IDs alone. |
 | CodeBuild | 2 | Privileged build mode and sensitive-looking environment variable names explicitly stored as PLAINTEXT. Values are never collected; the checks are not a full build-supply-chain analysis. |
-| **Total** | **125** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **126** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 

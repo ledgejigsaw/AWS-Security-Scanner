@@ -966,3 +966,51 @@ def check_s3_account_block_public_access(resource: Resource) -> list[Finding]:
     ]
 
 
+
+
+@rule_for(
+    "aws_s3_bucket",
+    check_id="S3-018",
+    service="S3",
+    severity=Severity.INFO,
+    category="Data Protection",
+    title="S3 bucket has no lifecycle configuration (review signal)",
+    description=(
+        "No S3 lifecycle configuration was observed for this bucket. Lifecycle "
+        "policies can support retention, deletion and storage-cost controls, "
+        "but their absence is not universally insecure and requirements depend "
+        "on data classification and operational needs."
+    ),
+    remediation=(
+        "Review retention, legal-hold, recovery and cost requirements. Where "
+        "appropriate, define lifecycle transitions or expiration rules that "
+        "match the approved data-retention policy; do not delete data solely "
+        "to satisfy this review signal."
+    ),
+)
+def check_lifecycle_configuration_review(resource: Resource) -> list[Finding]:
+    """Flag known absence of lifecycle rules as a policy-dependent review signal.
+
+    Versioned buckets are handled by S3-014, which specifically reviews
+    noncurrent-version expiration. Unknown or unobservable lifecycle state is
+    intentionally not treated as missing configuration.
+    """
+    lifecycle = resource.attributes.get("lifecycle_configuration")
+    if not isinstance(lifecycle, dict) or lifecycle.get("status") != "NOT_CONFIGURED":
+        return []
+
+    versioning = resource.attributes.get("versioning_configuration")
+    if isinstance(versioning, dict) and versioning.get("status") == "Enabled":
+        return []
+
+    return [
+        Finding.from_rule(
+            check_lifecycle_configuration_review,
+            resource=resource.resource_id,
+            region=resource.region,
+            evidence=(
+                "lifecycle_configuration=NOT_CONFIGURED; "
+                "retention_policy_requirement_not_evaluated"
+            ),
+        )
+    ]
