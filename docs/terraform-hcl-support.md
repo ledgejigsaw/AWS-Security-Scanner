@@ -16,7 +16,10 @@ The HCL provider is deliberately non-evaluating: it parses local HCL with `pytho
 ## Example
 
 ```bash
-aws-security-scan --source hcl --file main.tf --format sarif --output reports/iac.sarif\n\n# Scan all .tf files directly in one module root\naws-security-scan --source hcl --file ./terraform/network --format html --output reports/network.html
+aws-security-scan --source hcl --file main.tf --format sarif --output reports/iac.sarif
+
+# Scan all .tf files directly in one module root
+aws-security-scan --source hcl --file ./terraform/network --format html --output reports/network.html
 ```
 
 Malformed HCL fails with a contextual input error. The scanner does not silently skip parse errors or substitute an empty configuration.
