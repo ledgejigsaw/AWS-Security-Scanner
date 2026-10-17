@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import pytest
 
 from aws_security_scanner.models.resource import Resource
