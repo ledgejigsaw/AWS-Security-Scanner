@@ -143,3 +143,22 @@ def check_cloudtrail_delivery_error(resource: Resource) -> list[Finding]:
         region=resource.region,
         evidence=f"LatestDeliveryError={error.strip()[:240]}",
     )]
+
+
+@rule_for(
+    "aws_cloudtrail_trail", check_id="CT-006", service="CloudTrail",
+    severity=Severity.MEDIUM, category="Logging & Monitoring",
+    title="CloudTrail management event selectors are not observed",
+    description="Accessible selector metadata does not show management events enabled. This check does not infer data-event coverage from management-event configuration.",
+    remediation="Review basic and advanced event selectors. Enable appropriate management-event logging and validate required coverage for the organisation.",
+)
+def check_cloudtrail_management_event_coverage(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("event_selector_discovery") != "success":
+        return []
+    if resource.attributes.get("management_events_logged") is not False:
+        return []
+    return [Finding.from_rule(
+        check_cloudtrail_management_event_coverage,
+        resource=resource.resource_id, region=resource.region,
+        evidence="event_selector_discovery=success; no selector explicitly enables management events",
+    )]
