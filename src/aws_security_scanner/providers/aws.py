@@ -627,15 +627,19 @@ class AWSProvider:
 
         return bool(response.get("ServerSideEncryptionConfiguration"))
 
-    def _get_bucket_versioning(self, bucket_name: str) -> bool:
-        """Return whether versioning is enabled for an S3 bucket."""
+    def _get_bucket_versioning(self, bucket_name: str) -> bool | None:
+        """Return versioning state, or None when the API result is unknown.
+
+        A successful response without Status means versioning is not enabled.
+        An API failure is not evidence that versioning is disabled.
+        """
 
         try:
             response = self.s3_client.get_bucket_versioning(
                 Bucket=bucket_name
             )
         except ClientError:
-            return False
+            return None
 
         return response.get("Status") == "Enabled"
 
@@ -675,15 +679,19 @@ class AWSProvider:
     def _get_bucket_logging(
         self,
         bucket_name: str,
-    ) -> bool:
-        """Return whether S3 server access logging is enabled."""
+    ) -> bool | None:
+        """Return logging state, or None when the API result is unknown.
+
+        A successful response without LoggingEnabled means logging is absent.
+        An API failure is not evidence that logging is disabled.
+        """
 
         try:
             response = self.s3_client.get_bucket_logging(
                 Bucket=bucket_name
             )
         except ClientError:
-            return False
+            return None
 
         return bool(response.get("LoggingEnabled"))
 
