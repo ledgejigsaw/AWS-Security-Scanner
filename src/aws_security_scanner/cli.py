@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from time import perf_counter
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, PartialCredentialsError, ProfileNotFound
@@ -38,6 +39,11 @@ from aws_security_scanner.triage import (
     filter_by_minimum_severity,
     load_baseline,
     write_baseline,
+)
+from aws_security_scanner.scan_summary import (
+    build_scan_summary,
+    threshold_is_met,
+    write_scan_summary,
 )
 
 
@@ -203,6 +209,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Path for the generated report.",
+    )
+    parser.add_argument(
+        "--summary-output",
+        type=Path,
+        help="Optional path for a separate versioned machine-readable scan summary JSON.",
+    )
+    parser.add_argument(
+        "--fail-on",
+        choices=[severity.value for severity in Severity],
+        default=None,
+        help="Exit with code 3 when any reported finding meets or exceeds this severity.",
     )
     parser.add_argument(
         "--graph-output",
@@ -670,6 +687,19 @@ def main() -> None:
     elif args.source is None:
         parser.error("--source is required unless --interactive is used")
 
+    started_at = perf_counter()
+    if args.summary_output:
+        default_report_path = Path(
+            "reports/scan.html"
+            if args.format == "html"
+            else "reports/scan.sarif"
+            if args.format == "sarif"
+            else "reports/scan.json"
+        )
+        selected_report_path = args.output or default_report_path
+        if args.summary_output.resolve() == selected_report_path.resolve():
+            parser.error("--summary-output must not overwrite the detailed --output report")
+
     if args.diff_output and not args.compare_baseline:
         parser.error("--diff-output requires --compare-baseline")
     if args.risk_config and not args.risk_score:
@@ -724,6 +754,7 @@ def main() -> None:
             parser.error(str(exc))
 
     assessment_metadata = None
+    discovery_coverage = None
     graph_resources = None
     live_aws_session = None
     if args.source == "aws" and not args.accounts_file:
@@ -865,12 +896,32 @@ def main() -> None:
                 "or failed. Review discovery coverage in the JSON report before "
                 "treating this scan as complete."
             )
+    threshold_met = threshold_is_met(findings, args.fail_on)
+    if args.summary_output:
+        summary = build_scan_summary(
+            findings,
+            source=args.source,
+            region=args.region,
+            services=args.service,
+            report_format=args.format,
+            report_path=output_path,
+            duration_seconds=perf_counter() - started_at,
+            discovery_coverage=discovery_coverage,
+            assessment_metadata=assessment_metadata,
+            fail_on=args.fail_on,
+            threshold_met=threshold_met,
+        )
+        write_scan_summary(summary, args.summary_output)
+        print(f"Machine-readable scan summary written to {args.summary_output}")
+
     if baseline_actions_skipped:
-        raise SystemExit(2)
+        raise SystemExit(1)
     if assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0:
         raise SystemExit(1)
     if discovery_has_gaps:
         raise SystemExit(1)
+    if threshold_met:
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":
