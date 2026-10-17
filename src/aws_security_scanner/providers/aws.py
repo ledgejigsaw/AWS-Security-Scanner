@@ -1943,6 +1943,46 @@ class AWSProvider:
             else:
                 policy_document = None
 
+            grants: list[dict[str, Any]] = []
+            grant_discovery = "success"
+            marker = None
+            seen_markers: set[str] = set()
+            for _page in range(10):
+                request: dict[str, Any] = {"KeyId": key_id, "Limit": 100}
+                if marker:
+                    request["Marker"] = marker
+                try:
+                    page = self.kms_client.list_grants(**request)
+                except ClientError as error:
+                    code = error.response.get("Error", {}).get("Code", "")
+                    if code in {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"}:
+                        grant_discovery = "unknown"
+                        grants = []
+                        break
+                    raise
+                if not isinstance(page, dict) or not isinstance(page.get("Grants", []), list):
+                    grant_discovery = "unknown"
+                    grants = []
+                    break
+                for grant in page.get("Grants", []):
+                    if isinstance(grant, dict):
+                        grants.append({key: grant[key] for key in (
+                            "GrantId", "GranteePrincipal", "Operations",
+                            "RetiringPrincipal", "Constraints",
+                        ) if key in grant})
+                if not page.get("Truncated"):
+                    break
+                next_marker = page.get("NextMarker")
+                if not isinstance(next_marker, str) or not next_marker or next_marker in seen_markers:
+                    grant_discovery = "unknown"
+                    grants = []
+                    break
+                seen_markers.add(next_marker)
+                marker = next_marker
+            else:
+                grant_discovery = "unknown"
+                grants = []
+
             resources.append(
                 Resource(
                     resource_type="aws_kms_key",
@@ -1958,6 +1998,8 @@ class AWSProvider:
                         "rotation_enabled": rotation_enabled,
                         "description": metadata.get("Description"),
                         "key_policy": policy_document,
+                        "grants": grants,
+                        "grant_discovery": grant_discovery,
                     },
                     source="aws",
                     region=metadata.get("Arn", "").split(":")[3]
