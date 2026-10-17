@@ -3,7 +3,10 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from aws_security_scanner.cli import build_parser, run_scan
+import pytest
+from botocore.exceptions import NoCredentialsError
+
+from aws_security_scanner.cli import build_parser, create_verified_aws_session, run_scan
 from aws_security_scanner.models.resource import Resource
 
 def test_cli_accepts_policy_argument():
@@ -568,3 +571,28 @@ def test_cli_accepts_write_baseline_option():
 
     assert args.write_baseline == Path("reports/baseline.json")
     assert args.baseline is None
+
+
+
+def test_create_verified_aws_session_reports_identity_without_exposing_credentials():
+    session = patch("aws_security_scanner.cli.boto3.Session").start()
+    try:
+        session.return_value.client.return_value.get_caller_identity.return_value = {
+            "Account": "123456789012",
+            "Arn": "arn:aws:iam::123456789012:user/audit",
+        }
+        with patch("builtins.print") as output:
+            verified = create_verified_aws_session("audit", "eu-west-2")
+        assert verified is session.return_value
+        session.assert_called_once_with(profile_name="audit", region_name="eu-west-2")
+        assert "123456789012" in output.call_args.args[0]
+        assert "secret" not in output.call_args.args[0].lower()
+    finally:
+        patch.stopall()
+
+
+def test_create_verified_aws_session_gives_safe_setup_guidance_without_credentials():
+    with patch("aws_security_scanner.cli.boto3.Session") as session_factory:
+        session_factory.return_value.client.return_value.get_caller_identity.side_effect = NoCredentialsError()
+        with pytest.raises(RuntimeError, match="aws configure"):
+            create_verified_aws_session(None, "eu-west-2")
