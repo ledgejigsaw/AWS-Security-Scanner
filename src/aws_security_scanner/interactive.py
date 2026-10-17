@@ -16,7 +16,7 @@ AWS_SERVICES = (
     "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
 )
 QUICK_SERVICES = ("s3", "iam", "ec2", "vpc", "cloudtrail", "kms", "ebs")
-SOURCES = ("fixture", "terraform", "hcl", "aws")
+SOURCES = ("fixture", "terraform", "hcl", "snapshot", "aws")
 FORMATS = ("html", "json", "sarif")
 SEVERITIES = ("", "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 
@@ -88,7 +88,7 @@ def build_interactive_args(
         output_fn("the scanner never asks for access keys or secret keys.")
         source = _choose(
             "Where should the scanner read configuration from?",
-            ("fixture", "terraform JSON (.json)", "Terraform HCL (.tf)", "live AWS account"),
+            ("fixture", "terraform JSON (.json)", "Terraform HCL (.tf)", "resource snapshot (.json)", "live AWS account"),
             input_fn,
             output_fn,
             default="terraform JSON (.json)",
