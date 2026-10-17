@@ -282,6 +282,7 @@ def get_all_rules():
         check_alb_missing_waf_association,
         check_alb_non_tls_listener,
         check_alb_access_logging_disabled,
+        check_alb_legacy_tls_policy,
         check_security_hub_disabled,
         check_guardduty_disabled,
         check_config_recorder_missing,
