@@ -2552,14 +2552,32 @@ class AWSProvider:
 
         return findings
 
-    def get_guardduty_findings(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Return a bounded, paginated set of native GuardDuty findings.
+    def get_guardduty_findings(
+        self,
+        limit: int = 100,
+        *,
+        archived: bool | None = None,
+        updated_after: str | None = None,
+        require_detector: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Return bounded native GuardDuty findings with optional time/status filters.
 
         ListFindings is paginated per detector; GetFindings is then called in
         batches of at most 50 IDs. Permission and service errors propagate.
+        When require_detector is true, absent or disabled detectors are explicit
+        failures rather than being reported as a clean empty result.
         """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("GuardDuty finding limit must be between 1 and 1000.")
+
+        if archived not in {None, True, False}:
+            raise ValueError("archived must be True, False or None.")
+        if updated_after is not None and (
+            not isinstance(updated_after, str)
+            or not updated_after.strip()
+            or "T" not in updated_after
+        ):
+            raise ValueError("updated_after must be an ISO-8601 date-time string.")
 
         detector_ids = self._collect_pages(
             self.guardduty_client.list_detectors,
@@ -2567,10 +2585,16 @@ class AWSProvider:
             request_token="NextToken",
             response_token="NextToken",
         )
+        if not detector_ids and require_detector:
+            raise RuntimeError("GuardDuty is not enabled in this region (no detector found).")
         findings: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
 
         for detector_id in detector_ids:
+            if require_detector:
+                detector = self.guardduty_client.get_detector(DetectorId=detector_id)
+                if detector.get("Status") != "ENABLED":
+                    raise RuntimeError("GuardDuty detector is not enabled in this region.")
             finding_ids: list[str] = []
             token: str | None = None
             seen_tokens: set[str] = set()
@@ -2580,6 +2604,13 @@ class AWSProvider:
                     "DetectorId": detector_id,
                     "MaxResults": min(50, remaining),
                 }
+                criteria: dict[str, dict[str, list[str]]] = {}
+                if archived is not None:
+                    criteria["service.archived"] = {"Eq": ["true" if archived else "false"]}
+                if updated_after is not None:
+                    criteria["updatedAt"] = {"Gte": [updated_after]}
+                if criteria:
+                    request["FindingCriteria"] = {"Criterion": criteria}
                 if token:
                     request["NextToken"] = token
                 response = self.guardduty_client.list_findings(**request)
