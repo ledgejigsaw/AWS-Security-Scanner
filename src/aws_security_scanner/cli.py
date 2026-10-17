@@ -20,6 +20,11 @@ from aws_security_scanner.integrations.inspector import inspector_to_finding
 from aws_security_scanner.integrations.macie import macie_to_finding
 from aws_security_scanner.multi_account import run_multi_account_scan
 from aws_security_scanner.graph import write_resource_graph
+from aws_security_scanner.snapshot import (
+    load_resource_snapshot,
+    load_resource_snapshot_coverage,
+    write_resource_snapshot,
+)
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
@@ -118,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--source",
-        choices=["fixture", "terraform", "hcl", "aws"],
+        choices=["fixture", "terraform", "hcl", "snapshot", "aws"],
         required=False,
         help="Security resource source (omit only when using --interactive).",
     )
@@ -126,7 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--file",
         type=Path,
-        help="Fixture directory, Terraform JSON file or Terraform HCL source file.",
+        help="Fixture directory, Terraform JSON/HCL file or versioned resource snapshot JSON file.",
     )
     parser.add_argument(
         "--accounts-file",
@@ -228,6 +233,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional path for deterministic resource-graph JSON (single-account scans only).",
     )
+    parser.add_argument(
+        "--snapshot-output",
+        type=Path,
+        help="Optional path for a versioned, redacted resource-inventory snapshot; opt-in and potentially sensitive.",
+    )
 
     parser.add_argument(
     "--policy",
@@ -320,6 +330,11 @@ def discover_resources(
             raise ValueError("--file is required when using the hcl source.")
         provider = TerraformHCLProvider(source_path)
         return aggregate_s3_resources(provider.discover())
+
+    if source == "snapshot":
+        if source_path is None:
+            raise ValueError("--file is required when using the snapshot source.")
+        return load_resource_snapshot(source_path)
 
     if source == "aws":
         provider = (
@@ -466,6 +481,8 @@ def run_scan(
             services,
             discovery_coverage if return_coverage else None,
         )
+    if source == "snapshot" and return_coverage and source_path is not None:
+        discovery_coverage.extend(load_resource_snapshot_coverage(source_path))
 
     policy = (
         SecurityPolicy.from_yaml(policy_path)
@@ -479,7 +496,11 @@ def run_scan(
     )
 
     findings = engine.scan(resources)
-    if source == "terraform":
+    if source == "terraform" or any(
+        resource.attributes.get("terraform_unknown_attributes")
+        or resource.attributes.get("terraform_removed") is True
+        for resource in resources
+    ):
         for resource in resources:
             unknown = resource.attributes.get("terraform_unknown_attributes", [])
             if unknown:
@@ -510,7 +531,11 @@ def run_scan(
                         evidence="terraform_plan_actions=" + ", ".join(resource.attributes.get("terraform_plan_actions", ["delete"])),
                     )
                 )
-    if source == "hcl":
+    if source == "hcl" or any(
+        resource.attributes.get("hcl_unresolved_expressions")
+        or resource.attributes.get("hcl_diagnostic")
+        for resource in resources
+    ):
         for resource in resources:
             unresolved = resource.attributes.get("hcl_unresolved_expressions")
             diagnostic = resource.attributes.get("hcl_diagnostic")
@@ -755,6 +780,10 @@ def main() -> None:
         parser.error("--profile with --accounts-file is not supported; configure the default credential chain for the caller")
     if args.graph_output and args.accounts_file:
         parser.error("--graph-output is not yet supported with --accounts-file")
+    if args.snapshot_output and args.accounts_file:
+        parser.error("--snapshot-output is not yet supported with --accounts-file")
+    if args.source == "snapshot" and args.snapshot_output and args.file and args.file.resolve() == args.snapshot_output.resolve():
+        parser.error("--snapshot-output must not overwrite the input snapshot")
     if not 1 <= args.native_findings_limit <= 1000:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
@@ -824,8 +853,8 @@ def main() -> None:
             profile=None if live_aws_session is not None else args.profile,
             aws_session=live_aws_session,
             services=args.service,
-            return_resources=bool(args.graph_output),
-            return_coverage=(args.source == "aws"),
+            return_resources=bool(args.graph_output or args.snapshot_output),
+            return_coverage=(args.source in {"aws", "snapshot"}),
             securityhub_workflow_status=args.securityhub_workflow_status,
             securityhub_record_state=args.securityhub_record_state,
             securityhub_compliance_status=args.securityhub_compliance_status,
@@ -833,11 +862,11 @@ def main() -> None:
             guardduty_record_state=args.guardduty_record_state,
             guardduty_updated_after=args.guardduty_updated_after,
         )
-        if args.graph_output and args.source == "aws":
+        if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result
-        elif args.graph_output:
+        elif args.graph_output or args.snapshot_output:
             findings, graph_resources = scan_result
-        elif args.source == "aws":
+        elif args.source in {"aws", "snapshot"}:
             findings, discovery_coverage = scan_result
         else:
             findings = scan_result
@@ -895,6 +924,17 @@ def main() -> None:
     if args.graph_output and graph_resources is not None:
         write_resource_graph(graph_resources, findings, args.graph_output)
         print(f"Resource graph written to {args.graph_output}")
+    if args.snapshot_output and graph_resources is not None:
+        if args.snapshot_output.resolve() == output_path.resolve():
+            parser.error("--snapshot-output must not overwrite the detailed report")
+        write_resource_snapshot(
+            graph_resources,
+            args.snapshot_output,
+            scan_source=args.source,
+            region=args.region,
+            discovery_coverage=discovery_coverage,
+        )
+        print(f"Resource inventory snapshot written to {args.snapshot_output}")
 
     if args.format == "json":
         report_assessment = assessment_metadata
