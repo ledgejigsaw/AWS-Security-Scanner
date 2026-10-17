@@ -67,6 +67,10 @@ class RuleEngine:
                 for finding in rule_findings:
                     if finding.account_id is None:
                         finding.account_id = resource.account_id
+                    if finding.source_file is None:
+                        finding.source_file = resource.source_file
+                    if finding.source_address is None:
+                        finding.source_address = resource.source_address
                     findings.append(
                         self._apply_policy(finding)
                     )

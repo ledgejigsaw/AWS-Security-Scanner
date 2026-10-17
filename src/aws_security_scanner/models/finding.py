@@ -30,6 +30,8 @@ class Finding:
     risk_score: int | None = None
     risk_score_version: str | None = None
     risk_explanation: dict | None = None
+    source_file: str | None = None
+    source_address: str | None = None
 
     @classmethod
     def from_rule(
