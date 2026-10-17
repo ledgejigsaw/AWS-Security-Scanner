@@ -2570,14 +2570,19 @@ class AWSProvider:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("GuardDuty finding limit must be between 1 and 1000.")
 
-        if archived not in {None, True, False}:
+        if archived is not None and not isinstance(archived, bool):
             raise ValueError("archived must be True, False or None.")
-        if updated_after is not None and (
-            not isinstance(updated_after, str)
-            or not updated_after.strip()
-            or "T" not in updated_after
-        ):
-            raise ValueError("updated_after must be an ISO-8601 date-time string.")
+        if updated_after is not None:
+            if not isinstance(updated_after, str) or not updated_after.strip():
+                raise ValueError("updated_after must be an ISO-8601 date-time string.")
+            try:
+                parsed_updated_after = datetime.fromisoformat(
+                    updated_after.replace("Z", "+00:00")
+                )
+            except ValueError:
+                raise ValueError("updated_after must be an ISO-8601 date-time string.") from None
+            if parsed_updated_after.tzinfo is None:
+                raise ValueError("updated_after must include a timezone, such as Z or +00:00.")
 
         detector_ids = self._collect_pages(
             self.guardduty_client.list_detectors,
