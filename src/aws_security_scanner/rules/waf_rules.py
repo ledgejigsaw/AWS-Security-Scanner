@@ -68,3 +68,42 @@ def check_alb_missing_waf_association(resource: Resource) -> list[Finding]:
         region=resource.region,
         evidence="GetWebACLForResource returned no WebACL association",
     )]
+
+
+@rule_for(
+    "aws_lb",
+    check_id="ALB-002",
+    service="ELB",
+    severity=Severity.MEDIUM,
+    category="Transport Security",
+    title="Internet-facing Application Load Balancer has a non-TLS listener",
+    description="An internet-facing Application Load Balancer has a discovered listener using HTTP rather than HTTPS.",
+    remediation="Review listener exposure and redirect HTTP to HTTPS where appropriate.",
+)
+def check_alb_non_tls_listener(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("scheme") != "internet-facing":
+        return []
+    listeners = resource.attributes.get("listeners")
+    if not isinstance(listeners, list):
+        return []
+    if not any(isinstance(x, dict) and x.get("protocol") == "HTTP" for x in listeners):
+        return []
+    return [Finding.from_rule(check_alb_non_tls_listener, resource=resource.resource_id, region=resource.region, evidence="HTTP listener discovered")]
+
+
+@rule_for(
+    "aws_lb",
+    check_id="ALB-003",
+    service="ELB",
+    severity=Severity.MEDIUM,
+    category="Logging and Monitoring",
+    title="Internet-facing Application Load Balancer access logging is not enabled",
+    description="A successful ALB attribute lookup indicates S3 access logging is disabled.",
+    remediation="Enable ALB access logging to a dedicated S3 bucket and review its security controls.",
+)
+def check_alb_access_logging_disabled(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("scheme") != "internet-facing":
+        return []
+    if resource.attributes.get("access_logs_enabled") is not False:
+        return []
+    return [Finding.from_rule(check_alb_access_logging_disabled, resource=resource.resource_id, region=resource.region, evidence="access_logs.s3.enabled=false")]
