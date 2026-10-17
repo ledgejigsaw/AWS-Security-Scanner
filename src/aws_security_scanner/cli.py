@@ -147,7 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
             "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "codebuild",
         ],
         help="Limit AWS discovery to selected service domains; repeat to select multiple. Default: all supported domains.",
     )
@@ -353,6 +353,7 @@ def discover_resources(
             "macie": [provider.discover_macie_session],
             "eks": [provider.discover_eks_clusters],
             "cloudwatch": [provider.discover_cloudwatch_log_groups, provider.discover_cloudwatch_alarms],
+            "codebuild": [provider.discover_codebuild_projects],
         }
         selected_services = list(dict.fromkeys(services)) if services else list(discovery_by_service)
         resources = []
