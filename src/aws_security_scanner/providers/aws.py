@@ -33,6 +33,7 @@ class AWSProvider:
         sqs_client: Any | None = None,
         sns_client: Any | None = None,
         apigateway_client: Any | None = None,
+        apigatewayv2_client: Any | None = None,
         ecs_client: Any | None = None,
         cloudfront_client: Any | None = None,
         wafv2_client: Any | None = None,
@@ -105,6 +106,10 @@ class AWSProvider:
         )
         self.apigateway_client = apigateway_client or self._client(
             "apigateway",
+            region_name=region,
+        )
+        self.apigatewayv2_client = apigatewayv2_client or self._client(
+            "apigatewayv2",
             region_name=region,
         )
         self.ecs_client = ecs_client or self._client(
@@ -1601,6 +1606,72 @@ class AWSProvider:
                             and isinstance(stage.get("methodSettings", {}).get("*/*", {}), dict)
                             else None
                         ),
+                    },
+                    source="aws",
+                    region=self.region,
+                ))
+        return resources
+
+    def discover_api_gateway_http_apis(self) -> list[Resource]:
+        """Discover API Gateway HTTP APIs, routes and stage access logging."""
+        apis = self._collect_pages(
+            self.apigatewayv2_client.get_apis,
+            "Items",
+            request_token="NextToken",
+            response_token="NextToken",
+        )
+        resources: list[Resource] = []
+        for api in apis:
+            if not isinstance(api, dict) or api.get("ProtocolType") != "HTTP":
+                continue
+            api_id = api.get("ApiId")
+            if not isinstance(api_id, str) or not api_id:
+                continue
+            routes = self._collect_pages(
+                self.apigatewayv2_client.get_routes,
+                "Items",
+                request_token="NextToken",
+                response_token="NextToken",
+                ApiId=api_id,
+            )
+            normalised_routes = [
+                {
+                    "route_key": route.get("RouteKey"),
+                    "authorization_type": route.get("AuthorizationType"),
+                    "authorizer_id": route.get("AuthorizerId"),
+                }
+                for route in routes if isinstance(route, dict)
+            ]
+            stages = self._collect_pages(
+                self.apigatewayv2_client.get_stages,
+                "Items",
+                request_token="NextToken",
+                response_token="NextToken",
+                ApiId=api_id,
+            )
+            for stage in stages:
+                if not isinstance(stage, dict) or not stage.get("StageName"):
+                    continue
+                access_log = stage.get("AccessLogSettings")
+                if not isinstance(access_log, dict):
+                    access_log = {}
+                destination = access_log.get("DestinationArn")
+                fmt = access_log.get("Format")
+                resources.append(Resource(
+                    resource_type="aws_api_gateway_http_api_stage",
+                    resource_id=f"{api_id}:{stage['StageName']}",
+                    attributes={
+                        "api_id": api_id,
+                        "api_name": api.get("Name") or api_id,
+                        "stage_name": stage["StageName"],
+                        "api_endpoint": api.get("ApiEndpoint"),
+                        "protocol_type": api.get("ProtocolType"),
+                        "disable_execute_api_endpoint": api.get("DisableExecuteApiEndpoint"),
+                        "cors_configuration": api.get("CorsConfiguration"),
+                        "routes": normalised_routes,
+                        "access_log_destination_arn": destination,
+                        "access_log_format": fmt,
+                        "access_logging_enabled": bool(destination and fmt),
                     },
                     source="aws",
                     region=self.region,
