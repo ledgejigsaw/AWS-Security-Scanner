@@ -32,7 +32,8 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. HCL support is
 | ECS/Fargate | 7 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment, shared task/execution role review signal and mutable container image references without digest pins. Public IP assignment does not prove internet reachability; role sharing and digest pinning are review signals. |
 | CloudFront | 4 | Viewer HTTP allowance, explicitly weak minimum TLS policy, explicitly disabled access logging and absent WAF association as an informational review signal. No origin requests are made; S3 origin access is recorded but not yet evaluated. |
 | EKS | 3 | Unrestricted public Kubernetes API endpoint CIDRs, missing audit control-plane logging and a public-only endpoint review signal. No workload inventory, pod execution or cluster mutation. |
-| **Total** | **119** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| CloudWatch | 2 | Missing explicit log-group retention (LOW, policy-dependent) and metric alarms without enabled alarm actions (INFO review signal). The scanner does not read log events or claim that generic alarms cover every security control. |
+| **Total** | **121** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
