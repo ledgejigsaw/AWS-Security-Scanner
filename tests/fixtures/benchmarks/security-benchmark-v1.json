@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "description": "Starter benchmark manifest; expected IDs must be verified against the named fixture before being used for quality claims.",
+  "cases": [
+    {
+      "fixture_id": "s3-insecure-bucket",
+      "fixture_path": "tests/fixtures/s3/insecure_bucket.json",
+      "expected_findings": [
+        "S3-001"
+      ],
+      "prohibited_findings": []
+    },
+    {
+      "fixture_id": "s3-secure-bucket",
+      "fixture_path": "tests/fixtures/s3/secure_bucket.json",
+      "expected_findings": [],
+      "prohibited_findings": [
+        "S3-001"
+      ]
+    }
+  ]
+}
