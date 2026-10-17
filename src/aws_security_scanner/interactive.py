@@ -96,15 +96,17 @@ def build_interactive_args(
         source = {
             "terraform JSON (.json)": "terraform",
             "Terraform HCL (.tf)": "hcl",
+            "resource snapshot (.json)": "snapshot",
             "live AWS account": "aws",
         }.get(source, source)
         args = ["--source", source]
 
-        if source in {"fixture", "terraform", "hcl"}:
+        if source in {"fixture", "terraform", "hcl", "snapshot"}:
             label = {
                 "fixture": "Fixture file or directory path",
                 "terraform": "Terraform JSON file path",
                 "hcl": "Terraform HCL (.tf) file path",
+                "snapshot": "Resource snapshot JSON file path",
             }[source]
             while True:
                 entered_path = _ask(label, input_fn)
