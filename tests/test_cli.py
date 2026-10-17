@@ -596,3 +596,14 @@ def test_create_verified_aws_session_gives_safe_setup_guidance_without_credentia
         session_factory.return_value.client.return_value.get_caller_identity.side_effect = NoCredentialsError()
         with pytest.raises(RuntimeError, match="aws configure"):
             create_verified_aws_session(None, "eu-west-2")
+
+
+
+def test_create_verified_aws_session_rejects_malformed_identity():
+    with patch("aws_security_scanner.cli.boto3.Session") as session_factory:
+        session_factory.return_value.client.return_value.get_caller_identity.return_value = {
+            "Account": "not-an-account",
+            "Arn": "",
+        }
+        with pytest.raises(RuntimeError, match="incomplete identity response"):
+            create_verified_aws_session(None, "eu-west-2")
