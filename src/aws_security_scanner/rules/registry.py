@@ -59,6 +59,7 @@ from aws_security_scanner.rules.cloudtrail_rules import (
     check_cloudtrail_log_file_validation,
     check_cloudtrail_cloudwatch_logs_integration,
     check_cloudtrail_delivery_error,
+    check_cloudtrail_management_event_coverage,
 )
 
 from aws_security_scanner.rules.kms_rules import (
@@ -66,6 +67,7 @@ from aws_security_scanner.rules.kms_rules import (
     check_kms_key_pending_deletion,
     check_kms_key_policy_wildcard_access,
     check_kms_cross_account_access,
+    check_kms_broad_grants,
 )
 
 from aws_security_scanner.rules.rds_rules import (
@@ -146,6 +148,8 @@ from aws_security_scanner.rules.waf_rules import (
     check_waf_no_managed_rule_groups,
     check_waf_no_rate_based_rule,
     check_alb_missing_waf_association,
+    check_alb_non_tls_listener,
+    check_alb_access_logging_disabled,
 )
 
 from aws_security_scanner.rules.ebs_rules import (
@@ -223,10 +227,12 @@ def get_all_rules():
         check_cloudtrail_log_file_validation,
         check_cloudtrail_cloudwatch_logs_integration,
         check_cloudtrail_delivery_error,
+        check_cloudtrail_management_event_coverage,
         check_kms_key_rotation,
         check_kms_key_pending_deletion,
         check_kms_key_policy_wildcard_access,
         check_kms_cross_account_access,
+        check_kms_broad_grants,
         check_rds_storage_encryption,
         check_rds_public_accessibility,
         check_rds_backup_retention,
@@ -273,6 +279,8 @@ def get_all_rules():
         check_waf_no_managed_rule_groups,
         check_waf_no_rate_based_rule,
         check_alb_missing_waf_association,
+        check_alb_non_tls_listener,
+        check_alb_access_logging_disabled,
         check_security_hub_disabled,
         check_guardduty_disabled,
         check_config_recorder_missing,
