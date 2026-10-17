@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **121 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF, 4 Application Load Balancer, 3 EKS and 2 CloudWatch checks.
+- **123 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF, 4 Application Load Balancer, 3 EKS, 2 CloudWatch and 2 EFS checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL and AWS APIs.
 - **Output:** JSON, self-contained HTML, SARIF 2.1.0 and OCSF 1.7.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
@@ -52,7 +52,7 @@ The Terraform JSON provider normalises resource data and resolves/aggregates rel
 aws-security-scan --source aws --profile security-audit --region eu-west-2 --service s3 --service iam --format json --output reports/s3-iam.json
 ```
 
-Supported service selectors are `s3`, `iam`, `ec2`, `ebs`, `vpc`, `cloudtrail`, `kms`, `rds`, `lambda`, `secretsmanager`, `ecr`, `dynamodb`, `sqs`, `sns`, `apigateway`, `ecs`, `cloudfront`, `waf`, `elb`, `securityhub`, `guardduty`, `config`, `macie`, `eks` and `cloudwatch`. These filters select discovery domains, not individual rule IDs. The profile name is not a credential and no credentials are accepted as command-line arguments. Profile and service options apply only to `--source aws`; the multi-account role-assumption mode uses the caller's default credential chain in this release.
+Supported service selectors are `s3`, `iam`, `ec2`, `ebs`, `vpc`, `cloudtrail`, `kms`, `rds`, `lambda`, `secretsmanager`, `ecr`, `dynamodb`, `sqs`, `sns`, `apigateway`, `ecs`, `cloudfront`, `waf`, `elb`, `securityhub`, `guardduty`, `config`, `macie`, `eks`, `cloudwatch` and `efs`. These filters select discovery domains, not individual rule IDs. The profile name is not a credential and no credentials are accepted as command-line arguments. Profile and service options apply only to `--source aws`; the multi-account role-assumption mode uses the caller's default credential chain in this release.
 
 The provider contains discovery methods for S3 buckets, IAM policies, roles, users and account-level credential-report settings, EC2 instances/security groups, EBS volumes and owned snapshots, VPCs, subnets, route tables, network ACLs, VPC flow logs, CloudTrail trails, KMS keys, RDS DB instances, Lambda functions, Secrets Manager secret metadata, ECR repositories, DynamoDB table metadata, SQS queue attributes, SNS topic attributes and API Gateway REST and HTTP API stages, including method/route authorization metadata and stage access-log settings, plus ECS task-definition container settings and ECS service network configuration, and regional Security Hub hub status, GuardDuty detector status and AWS Config recorder/recording/delivery-channel status, and regional Amazon Macie session status. Native Security Hub, GuardDuty, IAM Access Analyzer, Amazon Inspector and Macie findings can be imported explicitly with `--include-native-findings`; imported findings retain source identifiers and timestamps where available. API discovery and rule coverage are not the same thing: some resource types have more comprehensive checks than others. A live AWS account has not yet been used for end-to-end validation. Secrets Manager discovery reads metadata and resource policies only; it never retrieves secret values.
 
@@ -303,8 +303,6 @@ Build the image locally:
 docker build --pull -t aws-security-scanner:local .
 ```
 
-Export findings to the OCSF Detection Finding class with `--format ocsf` (default path: `reports/scan.ocsf.json`). The exporter targets OCSF schema 1.7.0 and preserves scanner-specific evidence in the standard `unmapped` object. See [OCSF export](docs/ocsf-export.md).
-
 Run a Terraform JSON scan with the input mounted read-only:
 
 ```bash
@@ -406,3 +404,8 @@ Repository: https://github.com/ledgejigsaw/AWS-Security-Scanner
 ## Compliance mapping example
 
 The scanner supports versioned compliance mappings with `--compliance-mapping`. A partial CIS AWS Foundations Benchmark v1.4.0 example is available at `examples/compliance/cis-aws-foundations-benchmark-1.4.0.json`. It is explicitly illustrative and does not establish certification or complete control coverage; see [compliance mapping examples](docs/compliance-mapping-examples.md).
+
+
+## OCSF output
+
+Use `--format ocsf` to write an OCSF 1.7.0 Detection Finding JSON array to `reports/scan.ocsf.json`. See [OCSF export](docs/ocsf-export.md).
