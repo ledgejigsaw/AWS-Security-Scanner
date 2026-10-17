@@ -573,14 +573,22 @@ def run_scan(
             if not isinstance(unresolved, list):
                 unresolved = []
             diagnostic = resource.attributes.get("hcl_diagnostic")
-            if not unresolved and diagnostic not in {"module_not_expanded", "data_source_not_evaluated"}:
+            supported_diagnostics = {
+                "module_not_expanded", "data_source_not_evaluated",
+                "dependency_reference_unresolved", "dependency_cycle",
+            }
+            if not unresolved and diagnostic not in supported_diagnostics:
                 continue
 
             is_module = diagnostic == "module_not_expanded"
             is_data_source = diagnostic == "data_source_not_evaluated"
+            is_unresolved_dependency = diagnostic == "dependency_reference_unresolved"
+            is_dependency_cycle = diagnostic == "dependency_cycle"
             check_id = (
                 "IAC-HCL-002" if is_module
                 else "IAC-HCL-003" if is_data_source
+                else "IAC-HCL-004" if is_unresolved_dependency
+                else "IAC-HCL-005" if is_dependency_cycle
                 else "IAC-HCL-001"
             )
             findings.append(
@@ -592,6 +600,8 @@ def run_scan(
                     title=(
                         "Terraform module was not expanded" if is_module
                         else "Terraform data source was not evaluated" if is_data_source
+                        else "Terraform resource dependency could not be resolved" if is_unresolved_dependency
+                        else "Terraform resource dependency cycle detected" if is_dependency_cycle
                         else "Terraform HCL contains unresolved expressions"
                     ),
                     description=(
@@ -599,6 +609,10 @@ def run_scan(
                         if is_module
                         else "The scanner does not query Terraform data sources. Values derived from this data source and dependent checks may be incomplete."
                         if is_data_source
+                        else "A resource reference does not identify exactly one discovered resource. The dependent relationship remains unknown."
+                        if is_unresolved_dependency
+                        else "The extracted resource dependency graph contains a directed cycle. Terraform may reject this configuration and dependency-based reasoning is incomplete."
+                        if is_dependency_cycle
                         else "One or more HCL expressions could not be resolved statically. Related checks may be incomplete."
                     ),
                     remediation=(
@@ -606,6 +620,10 @@ def run_scan(
                         if is_module
                         else "Review the data source and its dependent values using a trusted Terraform plan; the scanner does not query providers."
                         if is_data_source
+                        else "Review the missing/ambiguous resource reference and scan the complete root module so dependencies are visible."
+                        if is_unresolved_dependency
+                        else "Review the resource references that form the cycle and correct the dependency structure before relying on this scan."
+                        if is_dependency_cycle
                         else "Review the expression and its dependencies, or use a trusted, reviewed Terraform plan where the required values are known."
                     ),
                     region=resource.region,
@@ -1048,7 +1066,7 @@ def main() -> None:
                 "treating this scan as complete."
             )
     hcl_analysis_incomplete = args.source == "hcl" and any(
-        finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003"}
+        finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003", "IAC-HCL-004", "IAC-HCL-005"}
         for finding in findings
     )
     if hcl_analysis_incomplete:
