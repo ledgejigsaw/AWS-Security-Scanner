@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
@@ -184,8 +185,10 @@ def discover_resources(
     aws_session=None,
     account_id: str | None = None,
     services: list[str] | None = None,
+    discovery_coverage: list[dict] | None = None,
 ):
     """Discover resources from the selected source."""
+
 
     if source == "fixture":
         if source_path is None:
@@ -247,8 +250,42 @@ def discover_resources(
         selected_services = list(dict.fromkeys(services)) if services else list(discovery_by_service)
         resources = []
         for service in selected_services:
+            service_resources = []
+            successful_operations = 0
+            failed_operations = []
             for discover in discovery_by_service[service]:
-                resources.extend(discover())
+                try:
+                    discovered = discover()
+                except (ClientError, BotoCoreError, RuntimeError) as exc:
+                    if isinstance(exc, ClientError):
+                        error_code = exc.response.get("Error", {}).get("Code", "ClientError")
+                    else:
+                        error_code = type(exc).__name__
+                    failed_operations.append({
+                        "operation": getattr(discover, "__name__", "discovery"),
+                        "error_code": str(error_code)[:80],
+                    })
+                    continue
+                successful_operations += 1
+                service_resources.extend(discovered)
+
+            resources.extend(service_resources)
+            if discovery_coverage is not None:
+                if failed_operations and successful_operations:
+                    status = "partial"
+                elif failed_operations:
+                    status = "failed"
+                elif not service_resources:
+                    status = "empty"
+                else:
+                    status = "success"
+                discovery_coverage.append({
+                    "service": service,
+                    "status": status,
+                    "resources_discovered": len(service_resources),
+                    "successful_operations": successful_operations,
+                    "failed_operations": failed_operations,
+                })
 
         if account_id is not None:
             for resource in resources:
@@ -269,6 +306,7 @@ def run_scan(
     profile: str | None = None,
     services: list[str] | None = None,
     return_resources: bool = False,
+    return_coverage: bool = False,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -294,7 +332,8 @@ def run_scan(
 
     if profile is not None:
         aws_session = boto3.Session(profile_name=profile, region_name=region)
-    if aws_session is None and expected_account_id is None and services is None:
+    discovery_coverage: list[dict] = []
+    if aws_session is None and expected_account_id is None and services is None and not return_coverage:
         resources = discover_resources(source, source_path, region)
     else:
         resources = discover_resources(
@@ -304,6 +343,7 @@ def run_scan(
             aws_session,
             expected_account_id,
             services,
+            discovery_coverage if return_coverage else None,
         )
 
     policy = (
@@ -413,7 +453,13 @@ def run_scan(
                     converted.account_id = expected_account_id
                 findings.append(converted)
 
-    return (findings, resources) if return_resources else findings
+    if return_resources and return_coverage:
+        return findings, resources, discovery_coverage
+    if return_resources:
+        return findings, resources
+    if return_coverage:
+        return findings, discovery_coverage
+    return findings
 
 
 def main() -> None:
@@ -477,6 +523,7 @@ def main() -> None:
 
     assessment_metadata = None
     graph_resources = None
+    discovery_coverage = None
     if args.accounts_file:
         findings, assessment_metadata = run_multi_account_scan(
             args.accounts_file,
@@ -497,9 +544,14 @@ def main() -> None:
             profile=args.profile,
             services=args.service,
             return_resources=bool(args.graph_output),
+            return_coverage=(args.source == "aws"),
         )
-        if args.graph_output:
+        if args.graph_output and args.source == "aws":
+            findings, graph_resources, discovery_coverage = scan_result
+        elif args.graph_output:
             findings, graph_resources = scan_result
+        elif args.source == "aws":
+            findings, discovery_coverage = scan_result
         else:
             findings = scan_result
 
@@ -556,7 +608,20 @@ def main() -> None:
         print(f"Resource graph written to {args.graph_output}")
 
     if args.format == "json":
-        write_json_report(findings, output_path, compliance_mapping, assessment_metadata)
+        report_assessment = assessment_metadata
+        if discovery_coverage is not None:
+            failed_services = sum(
+                item["status"] in {"partial", "failed"}
+                for item in discovery_coverage
+            )
+            report_assessment = {
+                "discovery_coverage": discovery_coverage,
+                "discovery_summary": {
+                    "services_assessed": len(discovery_coverage),
+                    "services_with_gaps": failed_services,
+                },
+            }
+        write_json_report(findings, output_path, compliance_mapping, report_assessment)
     elif args.format == "html":
         write_html_report(findings, output_path, compliance_mapping, assessment_metadata)
     else:
@@ -566,9 +631,28 @@ def main() -> None:
         f"Security scan complete. "
         f"{len(findings)} findings written to {output_path}"
     )
+    discovery_has_gaps = False
+    if discovery_coverage is not None:
+        discovery_has_gaps = any(
+            item["status"] in {"partial", "failed"}
+            for item in discovery_coverage
+        )
+        for item in discovery_coverage:
+            print(
+                f"Discovery {item['service']}: {item['status']} "
+                f"({item['resources_discovered']} resources)"
+            )
+        if discovery_has_gaps:
+            print(
+                "Warning: one or more service domains were only partially assessed "
+                "or failed. Review discovery coverage in the JSON report before "
+                "treating this scan as complete."
+            )
     if baseline_actions_skipped:
         raise SystemExit(2)
     if assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0:
+        raise SystemExit(1)
+    if discovery_has_gaps:
         raise SystemExit(1)
 
 
