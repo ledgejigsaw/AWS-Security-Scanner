@@ -17,6 +17,7 @@ def build_html_report(
     rows = []
 
     include_source_columns = any(finding.source_type != "scanner" for finding in findings)
+    include_location_columns = any(finding.source_file is not None for finding in findings)
     include_risk_columns = any(finding.risk_score is not None for finding in findings)
 
     for finding in findings:
@@ -31,6 +32,8 @@ def build_html_report(
             finding.region or "",
             finding.evidence or "",
         )
+        if include_location_columns:
+            values += (finding.source_file or "", finding.source_address or "")
         if include_source_columns:
             values += (
                 finding.source_type,
@@ -69,7 +72,7 @@ def build_html_report(
         rows.append(f"<tr>{cells}</tr>")
 
     if not rows:
-        colspan = (10 if compliance_mapping is not None else 9) + (5 if include_source_columns else 0) + (2 if include_risk_columns else 0)
+        colspan = (10 if compliance_mapping is not None else 9) + (2 if include_location_columns else 0) + (5 if include_source_columns else 0) + (2 if include_risk_columns else 0)
         rows.append(f'<tr><td colspan="{colspan}">No findings.</td></tr>')
 
     severity_rows = "".join(
@@ -80,6 +83,10 @@ def build_html_report(
         "<th>Source type</th><th>Source finding ID</th><th>Source product</th>"
         "<th>First observed</th><th>Last observed</th>"
         if include_source_columns else ""
+    )
+    location_header = (
+        "<th>Source file</th><th>Source resource address</th>"
+        if include_location_columns else ""
     )
     risk_header = (
         "<th>Risk score (v1)</th><th>Risk factors</th>"
