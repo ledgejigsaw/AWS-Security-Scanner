@@ -205,6 +205,8 @@ aws-security-scan \
 
 The diff deterministically separates `new`, `resolved` and `unchanged` findings. `--diff-output` requires `--compare-baseline`; its default is `reports/baseline-diff.json`. The baseline-writing and suppression options remain mutually exclusive.
 
+For CI automation, add `--summary-output reports/scan-summary.json` to write a versioned summary separately from the detailed report. Use `--fail-on HIGH` to return exit code `3` when any reported finding is HIGH or CRITICAL; incomplete assessments return `1`, invalid CLI/configuration returns `2`, and a completed scan without a threshold breach returns `0`. See [the exit-code contract](docs/scan-summary-and-exit-codes.md).
+
 Generate SARIF for CI/code-scanning ingestion:
 
 ```bash
