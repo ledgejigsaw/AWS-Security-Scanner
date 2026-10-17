@@ -91,9 +91,13 @@ def test_securityhub_provider_paginates_deduplicates_and_obeys_limit():
 
     assert [item["Title"] for item in findings] == ["Suspicious activity", "Second finding"]
     assert provider.securityhub_client.get_findings.call_count == 2
-    assert provider.securityhub_client.get_findings.call_args_list[0].kwargs == {"MaxResults": 2}
+    assert provider.securityhub_client.get_findings.call_args_list[0].kwargs == {
+        "MaxResults": 2,
+        "Filters": {"RecordState": [{"Comparison": "EQUALS", "Value": "ACTIVE"}]},
+    }
     assert provider.securityhub_client.get_findings.call_args_list[1].kwargs == {
         "MaxResults": 1,
+        "Filters": {"RecordState": [{"Comparison": "EQUALS", "Value": "ACTIVE"}]},
         "NextToken": "page-2",
     }
 
@@ -185,3 +189,74 @@ def test_native_finding_source_metadata_survives_baseline_and_diff(tmp_path):
     assert resolved["source_id"] == finding.source_id
     assert resolved["first_observed_at"] == finding.first_observed_at
     assert resolved["last_observed_at"] == finding.last_observed_at
+
+
+
+def test_securityhub_provider_filters_workflow_record_and_compliance_status():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.securityhub_client = Mock()
+    provider.securityhub_client.get_findings.return_value = {"Findings": []}
+
+    assert provider.get_securityhub_findings(
+        limit=10,
+        workflow_statuses=["NEW", "NOTIFIED"],
+        record_state="ARCHIVED",
+        compliance_status="FAILED",
+    ) == []
+
+    assert provider.securityhub_client.get_findings.call_args.kwargs == {
+        "MaxResults": 10,
+        "Filters": {
+            "RecordState": [{"Comparison": "EQUALS", "Value": "ARCHIVED"}],
+            "WorkflowStatus": [
+                {"Comparison": "EQUALS", "Value": "NEW"},
+                {"Comparison": "EQUALS", "Value": "NOTIFIED"},
+            ],
+            "ComplianceStatus": [{"Comparison": "EQUALS", "Value": "FAILED"}],
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"workflow_statuses": ["INVALID"]},
+        {"workflow_statuses": []},
+        {"record_state": "UNKNOWN"},
+        {"compliance_status": "MAYBE"},
+    ],
+)
+def test_securityhub_provider_rejects_invalid_filters(kwargs):
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.securityhub_client = Mock()
+    with pytest.raises(ValueError):
+        provider.get_securityhub_findings(**kwargs)
+    provider.securityhub_client.get_findings.assert_not_called()
+
+
+def test_securityhub_mapping_preserves_control_and_workflow_context():
+    finding = securityhub_to_finding(securityhub_item(
+        GeneratorId="aws-foundational-security-best-practices/v/1.0.0/EC2.1",
+        Compliance={"Status": "FAILED"},
+        Workflow={"Status": "NEW"},
+        RecordState="ACTIVE",
+    ))
+    assert finding is not None
+    assert "EC2.1" in finding.evidence
+    assert "compliance status: FAILED" in finding.evidence
+    assert "workflow status: NEW" in finding.evidence
+    assert "record state: ACTIVE" in finding.evidence
+
+
+def test_cli_accepts_securityhub_control_filters():
+    args = build_parser().parse_args([
+        "--source", "aws",
+        "--include-native-findings",
+        "--securityhub-workflow-status", "NEW",
+        "--securityhub-workflow-status", "NOTIFIED",
+        "--securityhub-record-state", "ARCHIVED",
+        "--securityhub-compliance-status", "FAILED",
+    ])
+    assert args.securityhub_workflow_status == ["NEW", "NOTIFIED"]
+    assert args.securityhub_record_state == "ARCHIVED"
+    assert args.securityhub_compliance_status == "FAILED"
