@@ -64,6 +64,11 @@ def test_alb_provider_ignores_network_load_balancers_and_normalises_association(
                 {"Type": "application", "LoadBalancerArn": "arn:aws:elasticloadbalancing:eu-west-2:123:loadbalancer/app/one/1", "LoadBalancerName": "one", "Scheme": "internet-facing", "VpcId": "vpc-1"},
                 {"Type": "network", "LoadBalancerArn": "arn:aws:elasticloadbalancing:eu-west-2:123:loadbalancer/net/two/2", "LoadBalancerName": "two"},
             ]}
+        def describe_listeners(self, **kwargs):
+            return {"Listeners": []}
+
+        def describe_load_balancer_attributes(self, **kwargs):
+            return {"Attributes": [{"Key": "access_logs.s3.enabled", "Value": "false"}]}
 
     class WAF:
         def get_web_acl_for_resource(self, **kwargs):
