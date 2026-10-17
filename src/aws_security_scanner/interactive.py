@@ -17,7 +17,7 @@ AWS_SERVICES = (
 )
 QUICK_SERVICES = ("s3", "iam", "ec2", "vpc", "cloudtrail", "kms", "ebs")
 SOURCES = ("fixture", "terraform", "hcl", "snapshot", "aws")
-FORMATS = ("html", "json", "sarif")
+FORMATS = ("html", "json", "sarif", "ocsf")
 SEVERITIES = ("", "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 
 
