@@ -23,6 +23,7 @@ from aws_security_scanner.graph import write_resource_graph
 from aws_security_scanner.reporting.json_reporter import write_json_report
 from aws_security_scanner.reporting.html_reporter import write_html_report
 from aws_security_scanner.reporting.sarif_reporter import write_sarif_report
+from aws_security_scanner.reporting.ocsf_reporter import write_ocsf_report
 from aws_security_scanner.rules.registry import get_all_rules
 from aws_security_scanner.policy import SecurityPolicy
 from aws_security_scanner.models.finding import Finding, Severity
@@ -200,7 +201,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--format",
-        choices=["json", "html", "sarif"],
+        choices=["json", "html", "sarif", "ocsf"],
         default="json",
         help="Report output format.",
     )
@@ -730,6 +731,8 @@ def main() -> None:
             if args.format == "html"
             else "reports/scan.sarif"
             if args.format == "sarif"
+            else "reports/scan.ocsf.json"
+            if args.format == "ocsf"
             else "reports/scan.json"
         )
         selected_report_path = args.output or default_report_path
@@ -884,6 +887,8 @@ def main() -> None:
         if args.format == "html"
         else "reports/scan.sarif"
         if args.format == "sarif"
+        else "reports/scan.ocsf.json"
+        if args.format == "ocsf"
         else "reports/scan.json"
     )
 
@@ -908,8 +913,10 @@ def main() -> None:
         write_json_report(findings, output_path, compliance_mapping, report_assessment)
     elif args.format == "html":
         write_html_report(findings, output_path, compliance_mapping, assessment_metadata)
-    else:
+    elif args.format == "sarif":
         write_sarif_report(findings, output_path, compliance_mapping, assessment_metadata)
+    else:
+        write_ocsf_report(findings, output_path)
 
     print(
         f"Security scan complete. "

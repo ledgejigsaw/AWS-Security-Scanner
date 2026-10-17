@@ -604,3 +604,14 @@ def test_create_verified_aws_session_rejects_malformed_identity():
         }
         with pytest.raises(RuntimeError, match="incomplete identity response"):
             create_verified_aws_session(None, "eu-west-2")
+
+
+def test_cli_accepts_ocsf_report_format():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--source", "terraform",
+        "--file", "tests/fixtures/terraform/realistic_s3.json",
+        "--format", "ocsf",
+    ])
+    assert args.format == "ocsf"
+    assert args.output is None
