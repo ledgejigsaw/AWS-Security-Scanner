@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, PartialCredentialsError, ProfileNotFound
 
 from aws_security_scanner.engine import RuleEngine
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
@@ -39,6 +40,59 @@ from aws_security_scanner.triage import (
     write_baseline,
 )
 
+
+
+
+def create_verified_aws_session(profile: str | None, region: str | None):
+    """Resolve configured AWS credentials and verify the active identity via STS.
+
+    Credentials are never requested interactively or accepted as CLI arguments.
+    AWS CLI profiles, IAM Identity Center, environment variables, and supported
+    workload credential providers remain the responsibility of boto3's chain.
+    """
+    try:
+        session = boto3.Session(profile_name=profile, region_name=region) if profile else boto3.Session(region_name=region)
+        identity = session.client("sts", region_name=region or "us-east-1").get_caller_identity()
+    except (NoCredentialsError, PartialCredentialsError):
+        raise RuntimeError(
+            "No usable AWS credentials were found. Configure a read-only profile "
+            "with 'aws configure', sign in with 'aws configure sso' and 'aws sso login "
+            "--profile PROFILE', or use an approved environment/workload credential "
+            "provider. Do not paste credentials into the scanner."
+        ) from None
+    except ProfileNotFound:
+        raise RuntimeError(
+            f"AWS profile {profile!r} was not found. Check ~/.aws/config and "
+            "~/.aws/credentials, or create the profile with 'aws configure' / "
+            "'aws configure sso'."
+        ) from None
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "AWSClientError")
+        raise RuntimeError(
+            f"AWS identity verification failed ({code}). Check credential validity "
+            "and network access, then retry. No scan was started."
+        ) from None
+    except BotoCoreError:
+        raise RuntimeError(
+            "AWS identity verification could not complete because the credential "
+            "provider or AWS endpoint was unavailable. Check your AWS SSO login, "
+            "credential configuration and network access. No scan was started."
+        ) from None
+
+    account_id = identity.get("Account") if isinstance(identity, dict) else None
+    arn = identity.get("Arn") if isinstance(identity, dict) else None
+    if (
+        not isinstance(account_id, str)
+        or len(account_id) != 12
+        or not account_id.isdigit()
+        or not isinstance(arn, str)
+        or not arn
+    ):
+        raise RuntimeError(
+            "AWS STS returned an incomplete identity response. No scan was started."
+        )
+    print(f"AWS identity verified: account {account_id}; principal {arn}")
+    return session
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -477,6 +531,12 @@ def main() -> None:
 
     assessment_metadata = None
     graph_resources = None
+    live_aws_session = None
+    if args.source == "aws" and not args.accounts_file:
+        try:
+            live_aws_session = create_verified_aws_session(args.profile, args.region)
+        except RuntimeError as exc:
+            parser.error(str(exc))
     if args.accounts_file:
         findings, assessment_metadata = run_multi_account_scan(
             args.accounts_file,
@@ -494,7 +554,8 @@ def main() -> None:
             args.region,
             args.include_native_findings,
             args.native_findings_limit,
-            profile=args.profile,
+            profile=None if live_aws_session is not None else args.profile,
+            aws_session=live_aws_session,
             services=args.service,
             return_resources=bool(args.graph_output),
         )
