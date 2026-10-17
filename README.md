@@ -27,7 +27,7 @@ The wizard asks for the source (fixture directory, Terraform JSON, Terraform HCL
 For AWS, supply an AWS shared-config profile name or use the default credential chain. The scanner never asks for access keys or secret keys and does not change AWS configuration. Interactive mode is intended for humans; keep explicit flags for scripts and CI, for example:
 
 ```bash
-aws-security-scan --source hcl --file main.tf --format sarif --output reports/iac.sarif
+aws-security-scan --source hcl --file ./terraform --var-file ./environments/production.tfvars --format sarif --output reports/iac.sarif
 ```
 
 ## Capabilities
@@ -44,7 +44,7 @@ Generate a plan JSON file with:
 terraform show -json > terraform.json
 ```
 
-The Terraform JSON provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging, lifecycle and bucket-policy configuration. The direct HCL provider uses `python-hcl2` for offline static analysis and accepts either a single `.tf` file or a module-root directory (all direct-child `.tf` files are parsed together). It does not execute Terraform or query providers; relative local modules inside the selected scan root are expanded with bounded recursion and conservative literal variable propagation. Registry/Git modules are not downloaded, and unresolved variables/locals and provider-dependent data sources remain diagnostics. Unresolved expressions, count/for_each and dynamic blocks, unexpanded modules, and unevaluated data sources produce separate informational diagnostics. Nested directories are separate module/example boundaries and are not recursively merged. The scanner never executes arbitrary HCL expressions. See [rule coverage](docs/rule-coverage.md) for the supported subset.
+The Terraform JSON provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging, lifecycle and bucket-policy configuration. The direct HCL provider uses `python-hcl2` for offline static analysis and accepts either a single `.tf` file or a module-root directory (all direct-child `.tf` files are parsed together). It loads `terraform.tfvars`, sorted `*.auto.tfvars` files and repeatable explicit `--var-file` inputs in that precedence order; later explicit files override earlier files. It resolves literal variable defaults/overrides, a bounded subset of local references, and supported literal module arguments. It does not execute Terraform, evaluate arbitrary functions, read Terraform environment/CLI variables, or query providers. Relative local modules inside the selected scan root are expanded with bounded recursion; Registry/Git modules are not downloaded. Unresolved expressions, count/for_each and dynamic blocks, unexpanded modules, and unevaluated data sources produce informational diagnostics. Nested directories remain separate module/example boundaries. See [Terraform static-analysis design](docs/terraform-static-analysis.md) and [rule coverage](docs/rule-coverage.md) for the supported subset.
 
 **AWS APIs** are accessed through boto3 in read-only mode. Use `--profile` to select a profile from the standard AWS shared configuration/credentials files, and repeat `--service` to limit discovery to specific supported service domains. Without `--service`, the scanner runs its full supported discovery scope. For example:
 
