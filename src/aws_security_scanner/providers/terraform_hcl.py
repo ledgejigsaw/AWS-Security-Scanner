@@ -11,6 +11,10 @@ from lark.exceptions import LarkError
 
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.providers.terraform import TerraformProvider
+from aws_security_scanner.terraform_dependency_graph import (
+    build_dependency_graph,
+    dependency_diagnostics,
+)
 
 
 _NON_LITERAL = object()
@@ -31,6 +35,7 @@ class TerraformHCLProvider:
         self.hcl_file = Path(hcl_file)
         self.module_roots = tuple(Path(root).resolve() for root in (module_roots or []))
         self.var_files = tuple(Path(path).resolve() for path in (var_files or []))
+        self.dependency_graph = None
         for root in self.module_roots:
             if not root.is_dir():
                 raise ValueError(f"Trusted Terraform module root is not an existing directory: '{root}'.")
@@ -75,6 +80,10 @@ class TerraformHCLProvider:
             if identity not in seen:
                 seen.add(identity)
                 unique.append(resource)
+        # Construct and validate the graph only after all files and permitted
+        # local modules have been discovered, so file order cannot affect edges.
+        self.dependency_graph = build_dependency_graph(unique)
+        unique.extend(dependency_diagnostics(self.dependency_graph, unique))
         return unique
 
     @staticmethod
