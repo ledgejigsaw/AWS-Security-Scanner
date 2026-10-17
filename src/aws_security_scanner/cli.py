@@ -497,12 +497,15 @@ def run_scan(
 
     findings = engine.scan(resources)
     if source == "terraform" or any(
-        resource.attributes.get("terraform_unknown_attributes")
+        (isinstance(resource.attributes.get("terraform_unknown_attributes"), list)
+         and bool(resource.attributes.get("terraform_unknown_attributes")))
         or resource.attributes.get("terraform_removed") is True
         for resource in resources
     ):
         for resource in resources:
             unknown = resource.attributes.get("terraform_unknown_attributes", [])
+            if not isinstance(unknown, list):
+                unknown = []
             if unknown:
                 findings.append(
                     Finding(
