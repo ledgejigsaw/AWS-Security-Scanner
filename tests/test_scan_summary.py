@@ -1,5 +1,5 @@
 from aws_security_scanner.models.finding import Finding, Severity
-from aws_security_scanner.scan_summary import build_scan_summary, threshold_is_met
+from aws_security_scanner.scan_summary import build_scan_summary, scan_exit_code, threshold_is_met
 
 
 def finding(severity):
@@ -80,3 +80,19 @@ def test_cli_accepts_summary_output_and_failure_threshold():
     ])
     assert str(args.summary_output) == "reports/summary.json"
     assert args.fail_on == "HIGH"
+
+
+def test_exit_code_contract_prioritises_incomplete_assessment():
+    assert scan_exit_code(incomplete=False, threshold_met=False) == 0
+    assert scan_exit_code(incomplete=True, threshold_met=False) == 1
+    assert scan_exit_code(incomplete=True, threshold_met=True) == 1
+    assert scan_exit_code(incomplete=False, threshold_met=True) == 3
+
+
+def test_argparse_invalid_threshold_uses_usage_error_exit_code():
+    import pytest
+    from aws_security_scanner.cli import build_parser
+
+    with pytest.raises(SystemExit) as error:
+        build_parser().parse_args(["--source", "terraform", "--fail-on", "URGENT"])
+    assert error.value.code == 2
