@@ -35,6 +35,7 @@ def test_build_json_report_contains_summary():
 
     report = build_json_report(findings)
 
+    assert report["schema_version"] == "1.0.0"
     assert report["summary"]["total_findings"] == 3
 
     assert report["summary"]["by_severity"] == {
