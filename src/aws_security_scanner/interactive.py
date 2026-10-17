@@ -16,7 +16,7 @@ AWS_SERVICES = (
     "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
 )
 QUICK_SERVICES = ("s3", "iam", "ec2", "vpc", "cloudtrail", "kms", "ebs")
-SOURCES = ("fixture", "terraform", "hcl", "aws")
+SOURCES = ("fixture", "terraform", "hcl", "aws", "snapshot")
 FORMATS = ("html", "json", "sarif", "ocsf")
 SEVERITIES = ("", "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 
@@ -88,7 +88,7 @@ def build_interactive_args(
         output_fn("the scanner never asks for access keys or secret keys.")
         source = _choose(
             "Where should the scanner read configuration from?",
-            ("fixture", "terraform JSON (.json)", "Terraform HCL (.tf)", "live AWS account"),
+            ("fixture", "terraform JSON (.json)", "Terraform HCL (.tf)", "live AWS account", "resource snapshot (.json)"),
             input_fn,
             output_fn,
             default="terraform JSON (.json)",
@@ -96,15 +96,17 @@ def build_interactive_args(
         source = {
             "terraform JSON (.json)": "terraform",
             "Terraform HCL (.tf)": "hcl",
+            "resource snapshot (.json)": "snapshot",
             "live AWS account": "aws",
         }.get(source, source)
         args = ["--source", source]
 
-        if source in {"fixture", "terraform", "hcl"}:
+        if source in {"fixture", "terraform", "hcl", "snapshot"}:
             label = {
                 "fixture": "Fixture file or directory path",
                 "terraform": "Terraform JSON file path",
                 "hcl": "Terraform HCL (.tf) file path",
+                "snapshot": "Resource snapshot JSON file path",
             }[source]
             while True:
                 entered_path = _ask(label, input_fn)

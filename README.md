@@ -8,8 +8,8 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 - **125 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF, 4 Application Load Balancer, 3 EKS, 2 CloudWatch and 2 EFS and 2 CodeBuild checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
-- **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL and AWS APIs.
-- **Output:** JSON, self-contained HTML, SARIF 2.1.0 and OCSF 1.7.0 reporting, with minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
+- **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL, versioned resource snapshots and AWS APIs.
+- **Output:** JSON, self-contained HTML, SARIF 2.1.0 and OCSF 1.7.0 reporting, opt-in versioned resource snapshots, minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
 - **AWS access:** read-only API calls; tests use mocks and do not require AWS credentials.
 
 Automated tests use mocks and fixtures; they do not replace validation against a real AWS account. Live scans remain unverified.
@@ -22,7 +22,7 @@ Run the guided setup when you want to configure a scan through questions rather 
 aws-security-scan --interactive
 ```
 
-The wizard asks for the source (fixture directory, Terraform JSON, Terraform HCL or live AWS), assessment scope, report format and destination, and optional policy, compliance mapping, severity filter, resource graph and baseline operation. For AWS scans, choose a quick core-service scan, all supported discovery domains, a comprehensive scan including bounded native Security Hub and GuardDuty findings, or a custom service list. The wizard displays the selected configuration and asks for confirmation before scanning. Enter `q` at a numbered choice to cancel.
+The wizard asks for the source (fixture directory, Terraform JSON, Terraform HCL, a saved resource snapshot or live AWS), assessment scope, report format and destination, and optional policy, compliance mapping, severity filter, resource graph and baseline operation. For AWS scans, choose a quick core-service scan, all supported discovery domains, a comprehensive scan including bounded native Security Hub and GuardDuty findings, or a custom service list. The wizard displays the selected configuration and asks for confirmation before scanning. Enter `q` at a numbered choice to cancel.
 
 For AWS, supply an AWS shared-config profile name or use the default credential chain. The scanner never asks for access keys or secret keys and does not change AWS configuration. Interactive mode is intended for humans; keep explicit flags for scripts and CI, for example:
 
@@ -409,3 +409,8 @@ The scanner supports versioned compliance mappings with `--compliance-mapping`. 
 ## OCSF output
 
 Use `--format ocsf` to write an OCSF 1.7.0 Detection Finding JSON array to `reports/scan.ocsf.json`. See [OCSF export](docs/ocsf-export.md).
+
+
+## Resource snapshots
+
+Use `--snapshot-output reports/inventory.json` to save a versioned, redacted inventory for offline rule re-analysis. Replay it with `--source snapshot --file reports/inventory.json`. Snapshots are opt-in and may contain sensitive infrastructure metadata; see [resource snapshots](docs/resource-snapshots.md).
