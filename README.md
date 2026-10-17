@@ -399,3 +399,8 @@ Status reflects repository code and automated tests. All provider tests are mock
 This project is intended to demonstrate practical experience in Python, AWS security, IAM, infrastructure-as-code analysis, security automation, testing, API integration and security reporting.
 
 Repository: https://github.com/ledgejigsaw/AWS-Security-Scanner
+
+
+## Compliance mapping example
+
+The scanner supports versioned compliance mappings with `--compliance-mapping`. A partial CIS AWS Foundations Benchmark v1.4.0 example is available at `examples/compliance/cis-aws-foundations-benchmark-1.4.0.json`. It is explicitly illustrative and does not establish certification or complete control coverage; see [compliance mapping examples](docs/compliance-mapping-examples.md).

@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "framework": {
+    "name": "CIS AWS Foundations Benchmark",
+    "version": "1.4.0",
+    "source_url": "https://docs.aws.amazon.com/securityhub/latest/userguide/cis-aws-foundations-benchmark.html"
+  },
+  "mapping_notice": "Indicative mapping example only. This scanner does not implement every CIS requirement, this mapping is not a certification, and control assessment may require additional evidence or manual review.",
+  "controls": [
+    {
+      "control_id": "IAM.1",
+      "title": "IAM policies should not allow full administrative privileges",
+      "check_ids": ["IAM-001"],
+      "confidence": "direct",
+      "rationale": "IAM-001 detects unrestricted IAM permissions. This check does not prove that every identity or policy in the account has been discovered."
+    },
+    {
+      "control_id": "IAM.4",
+      "title": "IAM root user access key should not exist",
+      "check_ids": ["IAM-014"],
+      "confidence": "direct",
+      "rationale": "IAM-014 identifies an active root-account access key when that account-level evidence is available."
+    },
+    {
+      "control_id": "IAM.9",
+      "title": "MFA should be enabled for the root user",
+      "check_ids": ["IAM-013"],
+      "confidence": "direct",
+      "rationale": "IAM-013 evaluates the observed root MFA state."
+    },
+    {
+      "control_id": "KMS.4",
+      "title": "KMS key rotation should be enabled",
+      "check_ids": ["KMS-001"],
+      "confidence": "direct",
+      "rationale": "KMS-001 evaluates rotation for customer-managed KMS keys within the discovered scope."
+    },
+    {
+      "control_id": "CloudTrail.1",
+      "title": "CloudTrail should be enabled with a multi-Region trail and management events",
+      "check_ids": ["CT-001", "CT-002", "CT-006"],
+      "confidence": "partial",
+      "rationale": "The checks cover trail logging, multi-Region configuration and observed management-event selector coverage. They do not establish that all accounts and regions have been assessed unless discovery coverage is complete."
+    },
+    {
+      "control_id": "CloudTrail.4",
+      "title": "CloudTrail log file validation should be enabled",
+      "check_ids": ["CT-003"],
+      "confidence": "direct",
+      "rationale": "CT-003 evaluates the observed CloudTrail log-file validation setting."
+    },
+    {
+      "control_id": "CloudTrail.5",
+      "title": "CloudTrail trails should be integrated with CloudWatch Logs",
+      "check_ids": ["CT-004"],
+      "confidence": "direct",
+      "rationale": "CT-004 reviews CloudWatch Logs integration for discovered trails; inaccessible trail metadata remains an assessment gap."
+    },
+    {
+      "control_id": "S3.5",
+      "title": "S3 buckets should require requests to use TLS",
+      "check_ids": ["S3-007"],
+      "confidence": "direct",
+      "rationale": "S3-007 evaluates whether the observed bucket policy enforces TLS. This mapping does not establish complete bucket discovery."
+    },
+    {
+      "control_id": "S3.8",
+      "title": "S3 buckets should block public access",
+      "check_ids": ["S3-001", "S3-004", "S3-017"],
+      "confidence": "partial",
+      "rationale": "The checks cover observed bucket public exposure and bucket/account Block Public Access settings, but do not replace the full CIS assessment procedure."
+    }
+  ]
+}
