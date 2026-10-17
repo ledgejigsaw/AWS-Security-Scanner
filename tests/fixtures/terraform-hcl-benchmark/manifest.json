@@ -6,11 +6,12 @@
       "id": "public-bucket",
       "path": "tests/fixtures/terraform-hcl-benchmark/public-bucket",
       "expected_check_ids": [
-        "S3-001"
+        "S3-001",
+        "S3-007"
       ],
       "expected_status": "complete",
       "class": "insecure",
-      "notes": "Explicit public=true must generate the critical public-bucket rule."
+      "notes": "An explicitly public bucket produces S3-001; the current HCL model also reports missing TLS-enforcement policy evidence as S3-007."
     },
     {
       "id": "secure-bucket",
@@ -18,7 +19,7 @@
       "expected_check_ids": [],
       "expected_status": "complete",
       "class": "secure",
-      "notes": "Explicitly secure values must not generate the selected S3 posture findings."
+      "notes": "A security group with no inbound rules is the secure/no-finding control case."
     },
     {
       "id": "unresolved-variable",
@@ -28,7 +29,7 @@
       ],
       "expected_status": "incomplete",
       "class": "unknown",
-      "notes": "An unresolved variable must remain visible and must not be treated as a clean assessment."
+      "notes": "An unresolved security-group name must remain visible without unrelated S3 findings."
     },
     {
       "id": "unexpanded-module",
