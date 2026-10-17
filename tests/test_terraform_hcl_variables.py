@@ -64,7 +64,10 @@ def test_local_values_propagate_to_local_module_arguments(tmp_path):
     child.mkdir(parents=True)
     (root / "main.tf").write_text(
         'locals { bucket_name = "private-module-data" }\n'
-        'module "storage" { source = "./modules/storage" bucket_name = local.bucket_name }\n',
+        'module "storage" {\n'
+        '  source = "./modules/storage"\n'
+        '  bucket_name = local.bucket_name\n'
+        '}\n',
         encoding="utf-8",
     )
     (child / "main.tf").write_text(
