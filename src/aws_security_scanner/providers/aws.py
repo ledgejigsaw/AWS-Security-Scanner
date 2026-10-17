@@ -2213,6 +2213,7 @@ class AWSProvider:
                     "security_group_ids": vpc_config.get("securityGroupIds", []),
                     "subnet_ids": vpc_config.get("subnetIds", []),
                     "control_plane_log_types_enabled": sorted(set(enabled_types)),
+                    "control_plane_logging_metadata_available": isinstance(cluster.get("logging"), dict),
                     "control_plane_log_types_observed": sorted({
                         log_type
                         for item in (logging_config.get("clusterLogging", []) or [])
