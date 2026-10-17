@@ -474,6 +474,37 @@ def run_scan(
     )
 
     findings = engine.scan(resources)
+    if source == "terraform":
+        for resource in resources:
+            unknown = resource.attributes.get("terraform_unknown_attributes", [])
+            if unknown:
+                findings.append(
+                    Finding(
+                        check_id="IAC-TF-PLAN-001",
+                        severity=Severity.INFO,
+                        service="Terraform plan",
+                        resource=resource.attributes.get("terraform_address", resource.resource_id),
+                        title="Terraform plan contains unknown values",
+                        description="One or more planned resource attributes are unknown at plan time. Checks that depend on those attributes cannot establish the final security posture.",
+                        remediation="Review the plan after resolving its inputs, or provide a later reviewed plan where these attributes are known.",
+                        region=resource.region,
+                        evidence="unknown_attributes=" + ", ".join(str(item) for item in unknown[:20]),
+                    )
+                )
+            if resource.attributes.get("terraform_removed") is True:
+                findings.append(
+                    Finding(
+                        check_id="IAC-TF-PLAN-002",
+                        severity=Severity.INFO,
+                        service="Terraform plan",
+                        resource=resource.attributes.get("terraform_address", resource.resource_id),
+                        title="Terraform plan removes a resource",
+                        description="This resource is planned for deletion and was excluded from current-posture rule evaluation.",
+                        remediation="Review the planned deletion and its downstream dependencies as part of change approval.",
+                        region=resource.region,
+                        evidence="terraform_plan_actions=" + ", ".join(resource.attributes.get("terraform_plan_actions", ["delete"])),
+                    )
+                )
     if source == "hcl":
         for resource in resources:
             unresolved = resource.attributes.get("hcl_unresolved_expressions")
