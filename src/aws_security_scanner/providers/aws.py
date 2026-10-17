@@ -1864,6 +1864,24 @@ class AWSProvider:
                 continue
 
             status = self.cloudtrail_client.get_trail_status(Name=trail_arn)
+            selector_state = "unknown"
+            event_selectors: list[dict[str, Any]] = []
+            advanced_selectors: list[dict[str, Any]] = []
+            selector_method = getattr(self.cloudtrail_client, "get_event_selectors", None)
+            if callable(selector_method):
+                try:
+                    selector_response = selector_method(TrailName=trail_arn)
+                    if isinstance(selector_response, dict):
+                        raw_basic = selector_response.get("EventSelectors", [])
+                        raw_advanced = selector_response.get("AdvancedEventSelectors", [])
+                        if isinstance(raw_basic, list) and isinstance(raw_advanced, list):
+                            event_selectors = [item for item in raw_basic if isinstance(item, dict)]
+                            advanced_selectors = [item for item in raw_advanced if isinstance(item, dict)]
+                            selector_state = "success"
+                except ClientError as error:
+                    code = error.response.get("Error", {}).get("Code", "")
+                    if code not in {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"}:
+                        raise
             resources.append(
                 Resource(
                     resource_type="aws_cloudtrail_trail",
@@ -1887,6 +1905,17 @@ class AWSProvider:
                         "latest_delivery_error": status.get("LatestDeliveryError"),
                         "cloudwatch_logs_log_group_arn": trail.get("CloudWatchLogsLogGroupArn"),
                         "cloudwatch_logs_role_arn": trail.get("CloudWatchLogsRoleArn"),
+                        "event_selector_discovery": selector_state,
+                        "event_selectors": event_selectors,
+                        "advanced_event_selectors": advanced_selectors,
+                        "management_events_logged": (
+                            any(item.get("IncludeManagementEvents") is True for item in event_selectors)
+                            if selector_state == "success" and event_selectors else None
+                        ),
+                        "data_event_selector_count": (
+                            sum(len(item.get("DataResources", [])) for item in event_selectors if isinstance(item.get("DataResources", []), list)) + len(advanced_selectors)
+                            if selector_state == "success" else None
+                        ),
                     },
                     source="aws",
                     region=trail.get("HomeRegion") or self.region,

@@ -22,3 +22,8 @@ Existing discovery uses read-only CloudTrail trail description/status and KMS ke
 - Delivery errors are signals for investigation and may reflect temporary or destination-specific conditions.
 - Cross-account KMS findings require owner review and must not be treated as proof of malicious access.
 - Tests use synthetic policy and API responses. No live AWS account validation is claimed.
+
+
+### CloudTrail event selectors and organisation trails
+
+Trail metadata includes the organisation-trail flag, multi-region flag and selector metadata from GetEventSelectors. Advanced selectors are retained conservatively and are not interpreted as proof of complete data-event coverage. CT-006 only flags a successful selector response that does not show management events enabled. Access-denied selector discovery is marked unknown, so it does not produce a false finding of absent coverage. Data-event coverage depends on resource types, values and advanced selector conditions; a selector count is not a completeness guarantee.

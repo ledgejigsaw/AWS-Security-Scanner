@@ -6,6 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
+- **113 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 4 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 3 Application Load Balancer check.
 - **112 registered security rules:** 17 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 5 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 3 Application Load Balancer check.
 
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
@@ -66,7 +67,7 @@ WAF/application-edge discovery additionally covers regional and CloudFront-scope
 | EC2 | SSH/RDP and sensitive-port exposure, broad ingress/egress, public IPv4, IMDSv1 and broad IPv6 rules; detailed monitoring and missing instance-profile checks are informational review signals |
 | EBS | Explicitly unencrypted volumes/snapshots and snapshots with an observed public create-volume permission; denied permission discovery remains unknown |
 | VPC/network | Public subnet configuration, internet routes, broad IPv4/IPv6 routes, network ACL ingress/egress and default NACL checks |
-| CloudTrail | Trail logging status, multi-region coverage, log-file validation, CloudWatch Logs integration review and recent delivery errors |
+| CloudTrail | Trail logging status, organisation-trail metadata, multi-region coverage, basic/advanced event-selector metadata, log-file validation, CloudWatch Logs integration review and recent delivery errors |
 | Security Hub | Regional hub enablement posture; optional import of up to 100 native findings by default (limit configurable to 1,000), preserving source IDs, product ARNs and observation timestamps |
 | GuardDuty | Regional detector enablement posture and optional bounded native-finding import, preserving source IDs and timestamps |
 | AWS Config | Regional recorder status, recording state and delivery-channel presence; API permission failures are not treated as disabled state |

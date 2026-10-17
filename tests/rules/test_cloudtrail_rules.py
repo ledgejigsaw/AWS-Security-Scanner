@@ -72,3 +72,18 @@ def test_cloudtrail_log_file_validation_enabled_generates_no_finding():
     assert check_cloudtrail_log_file_validation(
         make_trail(log_file_validation_enabled=True)
     ) == []
+
+
+def test_cloudtrail_missing_management_events_generates_finding():
+    from aws_security_scanner.rules.cloudtrail_rules import check_cloudtrail_management_event_coverage
+    findings = check_cloudtrail_management_event_coverage(make_trail(
+        event_selector_discovery="success", management_events_logged=False,
+    ))
+    assert len(findings) == 1
+    assert findings[0].check_id == "CT-006"
+
+def test_cloudtrail_unknown_selector_state_does_not_generate_finding():
+    from aws_security_scanner.rules.cloudtrail_rules import check_cloudtrail_management_event_coverage
+    assert check_cloudtrail_management_event_coverage(make_trail(
+        event_selector_discovery="unknown", management_events_logged=None,
+    )) == []
