@@ -164,7 +164,7 @@ class TerraformHCLProvider:
                 else:
                     # Preserve unknown caller expressions so they override child defaults
                     # and remain visible as unresolved in the child resources.
-                    child_inputs[key] = self._normalise_nested_blocks(raw_value) if isinstance(raw_value, (dict, list, str)) else raw_value
+                    child_inputs[key] = raw_value
 
             resources = [resource for resource in resources if not (
                 resource.source_address == address
