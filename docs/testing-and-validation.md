@@ -38,3 +38,8 @@ The automated suite uses mocks and fixtures. It demonstrates expected behaviour 
 ## Safe test-data practices
 
 Do not commit AWS credentials, secret values, production exports containing sensitive data, or generated scan reports. Keep test fixtures synthetic and purpose-built. Live-account validation should use an isolated non-production account and a least-privilege read-only identity.
+
+
+## Terraform plan JSON
+
+The Terraform JSON provider accepts both the project's legacy normalised resource JSON and JSON emitted by `terraform show -json` for a reviewed plan. For plan input, it traverses root and child modules, retains per-resource action metadata and records paths explicitly marked unknown in `change.after_unknown`. Unknown values generate informational `IAC-TF-PLAN-001` findings; these findings mean the final posture is not yet fully knowable and are not evidence of a vulnerability. Resources planned for deletion generate `IAC-TF-PLAN-002` informational findings and are excluded from current-posture rule evaluation. No Terraform command is executed by the scanner, and no provider or module is downloaded.
