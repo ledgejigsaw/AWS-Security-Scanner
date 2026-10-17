@@ -107,3 +107,39 @@ def test_snapshot_source_is_supported_by_cli_and_replays_rules_offline(tmp_path)
 
     findings = run_scan("snapshot", snapshot)
     assert any(item.check_id == "S3-001" for item in findings)
+
+
+def test_snapshot_replay_preserves_discovery_gaps_and_cli_accepts_snapshot_output(tmp_path):
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="example",
+        attributes={"public": True},
+        source="aws",
+        region="eu-west-2",
+    )
+    snapshot = tmp_path / "inventory.json"
+    write_resource_snapshot(
+        [resource],
+        snapshot,
+        scan_source="aws",
+        region="eu-west-2",
+        discovery_coverage=[{
+            "service": "s3",
+            "status": "failed",
+            "resources_discovered": 0,
+            "successful_operations": 0,
+            "failed_operations": [{"operation": "discover_s3_buckets", "error_code": "AccessDenied"}],
+        }],
+    )
+
+    findings, coverage = run_scan("snapshot", snapshot, return_coverage=True)
+    assert any(item.check_id == "S3-001" for item in findings)
+    assert coverage[0]["status"] == "failed"
+
+    args = build_parser().parse_args([
+        "--source", "snapshot",
+        "--file", str(snapshot),
+        "--snapshot-output", str(tmp_path / "replay.json"),
+    ])
+    assert args.source == "snapshot"
+    assert args.snapshot_output == tmp_path / "replay.json"
