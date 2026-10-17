@@ -36,7 +36,9 @@ aws-security-scan --source hcl --file main.tf --format sarif --output reports/ia
 
 **Fixtures** provide deterministic, offline test inputs.
 
-**Terraform JSON** can be generated from a plan/state representation with:
+**Terraform JSON** can be generated from a reviewed plan with `terraform show -json`. The scanner accepts the plan structure, records unknown planned attributes and create/update/delete actions, and emits informational diagnostics when a final value is not yet known. It does not execute Terraform or download providers/modules. The legacy normalised JSON input remains supported.
+
+Generate a plan JSON file with:
 
 ```bash
 terraform show -json > terraform.json
