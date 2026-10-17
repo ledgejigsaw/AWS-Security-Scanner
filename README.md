@@ -56,6 +56,23 @@ The provider contains discovery methods for S3 buckets, IAM policies, roles, use
 
 WAF/application-edge discovery additionally covers regional and CloudFront-scope WAFv2 Web ACL metadata and Application Load Balancer WAF association state. See [WAF and application-edge posture](docs/waf-application-edge.md) for scope and limitations.
 
+### GuardDuty native findings across regions
+
+Native GuardDuty finding import can query more than one region. If no `--guardduty-region` is supplied, the scanner uses `--region`, then the configured AWS region, and finally `us-east-1` if no region is configured. Repeat the option to select an explicit region list. The normal resource-posture discovery region is unchanged; this option expands only native GuardDuty finding ingestion.
+
+```bash
+aws-security-scan --source aws --profile security-audit --region eu-west-2 \
+  --include-native-findings \
+  --guardduty-region eu-west-2 \
+  --guardduty-region us-east-1 \
+  --guardduty-record-state ACTIVE \
+  --guardduty-updated-after 2026-10-01T00:00:00Z
+```
+
+`--guardduty-record-state` accepts `ACTIVE`, `ARCHIVED` or `ALL`; the default `ALL` preserves the previous import behaviour. `--guardduty-updated-after` accepts a timezone-aware ISO-8601 date-time and filters on the finding's update time. Findings are deduplicated by region, account and native finding ID, so matching IDs in different regions are not incorrectly collapsed.
+
+The scanner checks that each selected region has an enabled GuardDuty detector. Missing/disabled detectors, denied permissions, throttling exhaustion or pagination failures are reported as regional coverage gaps; they are not represented as zero findings. Use a read-only identity with the relevant GuardDuty permissions, including `guardduty:ListDetectors`, `guardduty:GetDetector`, `guardduty:ListFindings` and `guardduty:GetFindings`. The limit applies per selected region; results remain bounded and do not establish complete threat-history coverage.
+
 ### Security checks
 
 | Service | Coverage |
