@@ -48,6 +48,7 @@ class AWSProvider:
         s3control_client: Any | None = None,
         sts_client: Any | None = None,
         inspector2_client: Any | None = None,
+        eks_client: Any | None = None,
     ):
         self.region = region
         # Preserve the existing boto3.client path for single-account scans;
@@ -131,6 +132,7 @@ class AWSProvider:
         # changing client construction for scans that do not need account identity.
         self.sts_client = sts_client
         self.inspector2_client = inspector2_client or self._client("inspector2", region_name=region)
+        self.eks_client = eks_client or self._client("eks", region_name=region)
 
     def _collect_pages(
         self,
@@ -2159,6 +2161,73 @@ class AWSProvider:
                     ))
         return resources
 
+
+
+    def discover_eks_clusters(self) -> list[Resource]:
+        """Discover EKS control-plane posture without reading workloads or secrets."""
+        cluster_names = self._collect_pages(
+            self.eks_client.list_clusters,
+            "clusters",
+            request_token="nextToken",
+            response_token="nextToken",
+        )
+        resources: list[Resource] = []
+        for name in cluster_names:
+            if not isinstance(name, str) or not name:
+                continue
+            response = self.eks_client.describe_cluster(name=name)
+            cluster = response.get("cluster", {}) if isinstance(response, dict) else {}
+            if not isinstance(cluster, dict):
+                continue
+            cluster_name = cluster.get("name") or name
+            vpc_config = cluster.get("resourcesVpcConfig", {})
+            if not isinstance(vpc_config, dict):
+                vpc_config = {}
+            endpoint_config = cluster.get("accessConfig", {})
+            if not isinstance(endpoint_config, dict):
+                endpoint_config = {}
+            logging_config = cluster.get("logging", {})
+            if not isinstance(logging_config, dict):
+                logging_config = {}
+            enabled_types = []
+            for item in logging_config.get("clusterLogging", []) or []:
+                if not isinstance(item, dict) or item.get("enabled") is not True:
+                    continue
+                for log_type in item.get("types", []) or []:
+                    if isinstance(log_type, str):
+                        enabled_types.append(log_type)
+            encryption_config = cluster.get("encryptionConfig", [])
+            resources.append(Resource(
+                resource_type="aws_eks_cluster",
+                resource_id=str(cluster_name),
+                attributes={
+                    "name": cluster_name,
+                    "arn": cluster.get("arn"),
+                    "status": cluster.get("status"),
+                    "version": cluster.get("version"),
+                    "role_arn": cluster.get("roleArn"),
+                    "endpoint_public_access": vpc_config.get("endpointPublicAccess"),
+                    "endpoint_private_access": vpc_config.get("endpointPrivateAccess"),
+                    "public_access_cidrs": vpc_config.get("publicAccessCidrs", []),
+                    "cluster_security_group_id": vpc_config.get("clusterSecurityGroupId"),
+                    "security_group_ids": vpc_config.get("securityGroupIds", []),
+                    "subnet_ids": vpc_config.get("subnetIds", []),
+                    "control_plane_log_types_enabled": sorted(set(enabled_types)),
+                    "control_plane_log_types_observed": sorted({
+                        log_type
+                        for item in (logging_config.get("clusterLogging", []) or [])
+                        if isinstance(item, dict)
+                        for log_type in (item.get("types", []) or [])
+                        if isinstance(log_type, str)
+                    }),
+                    "encryption_config": encryption_config,
+                    "encryption_configured": bool(encryption_config),
+                    "authentication_mode": endpoint_config.get("authenticationMode"),
+                },
+                source="aws",
+                region=self.region,
+            ))
+        return resources
 
     def discover_cloudfront_distributions(self) -> list[Resource]:
         """Discover CloudFront distribution security metadata without contacting origins."""
