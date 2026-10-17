@@ -79,32 +79,35 @@ def build_dependency_graph(resources: list[Resource]) -> DependencyGraph:
             edges.append(DependencyEdge(source=source, target=target, attribute=str(attribute)))
             adjacency[source].append(target)
 
-    # Deterministic depth-first traversal; nodes in a back-edge cycle are
-    # recorded once. The bounded recursion is safe because each node is visited
-    # at most once on the active stack.
-    state: dict[str, int] = {}
-    stack: list[str] = []
-    cycle_nodes: set[str] = set()
-
-    def visit(node: str) -> None:
-        state[node] = 1
-        stack.append(node)
-        for target in sorted(set(adjacency.get(node, []))):
-            target_state = state.get(target, 0)
-            if target_state == 0:
-                visit(target)
-            elif target_state == 1:
-                try:
-                    start = stack.index(target)
-                except ValueError:
-                    start = 0
-                cycle_nodes.update(stack[start:])
-        stack.pop()
-        state[node] = 2
-
-    for address in sorted(addresses):
-        if state.get(address, 0) == 0:
-            visit(address)
+    # Iteratively prune acyclic sources/sinks. Nodes remaining after pruning
+    # belong to directed cycles. This avoids recursion-depth failures on large
+    # Terraform modules with thousands of resources.
+    active = set(addresses)
+    incoming = {node: 0 for node in addresses}
+    outgoing = {node: 0 for node in addresses}
+    for source, targets in adjacency.items():
+        for target in targets:
+            if target in active:
+                outgoing[source] += 1
+                incoming[target] += 1
+    while True:
+        removable = {
+            node for node in active
+            if incoming[node] == 0 or outgoing[node] == 0
+        }
+        if not removable:
+            break
+        for node in removable:
+            active.remove(node)
+        for source in active:
+            for target in adjacency.get(source, []):
+                if target in removable:
+                    outgoing[source] -= 1
+        for target in active:
+            for source in removable:
+                if target in adjacency.get(source, []):
+                    incoming[target] -= 1
+    cycle_nodes = active
 
     return DependencyGraph(
         nodes=nodes,
