@@ -787,6 +787,15 @@ def main() -> None:
         parser.error("--snapshot-output is not yet supported with --accounts-file")
     if args.source == "snapshot" and args.snapshot_output and args.file and args.file.resolve() == args.snapshot_output.resolve():
         parser.error("--snapshot-output must not overwrite the input snapshot")
+    if args.snapshot_output:
+        for label, other_path in (
+            ("graph output", args.graph_output),
+            ("summary output", args.summary_output),
+            ("diff output", args.diff_output),
+            ("baseline output", args.baseline_output),
+        ):
+            if other_path is not None and other_path.resolve() == args.snapshot_output.resolve():
+                parser.error(f"--snapshot-output must not overwrite the {label}")
     if not 1 <= args.native_findings_limit <= 1000:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
