@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0.0",
+  "purpose": "Track evidence-based capability comparisons without implying equivalence between cloud posture and IaC scanners.",
+  "updated_on": "2026-10-17",
+  "scanner_scope": {
+    "aws_security_scanner": {
+      "modes": ["aws_read_only_posture", "terraform_json", "terraform_hcl_static"],
+      "live_account_validation": "not_performed",
+      "rule_inventory_command": "python scripts/export_rule_inventory.py --output reports/rule-inventory.json"
+    }
+  },
+  "upstream_tools": [
+    {
+      "name": "Prowler",
+      "repository": "https://github.com/prowler-cloud/prowler",
+      "primary_comparison": "AWS cloud security posture checks and native finding ingestion",
+      "not_directly_comparable": ["Terraform HCL expression analysis", "Terraform plan change analysis"],
+      "mapping_status": "not_yet_mapped_check_by_check"
+    },
+    {
+      "name": "Checkov",
+      "repository": "https://github.com/bridgecrewio/checkov",
+      "primary_comparison": "Terraform/IaC policy checks, variable handling and module analysis",
+      "not_directly_comparable": ["Live AWS discovery breadth"],
+      "mapping_status": "not_yet_mapped_check_by_check"
+    },
+    {
+      "name": "Trivy",
+      "repository": "https://github.com/aquasecurity/trivy",
+      "primary_comparison": "IaC misconfiguration and broader security scanning workflows",
+      "not_directly_comparable": ["AWS API discovery parity"],
+      "mapping_status": "not_yet_mapped_check_by_check"
+    },
+    {
+      "name": "ScoutSuite",
+      "repository": "https://github.com/nccgroup/ScoutSuite",
+      "primary_comparison": "Multi-service cloud posture inventory and findings",
+      "not_directly_comparable": ["Terraform static expression resolution"],
+      "mapping_status": "not_yet_mapped_check_by_check"
+    },
+    {
+      "name": "Cloudsplaining",
+      "repository": "https://github.com/salesforce/cloudsplaining",
+      "primary_comparison": "IAM policy risk analysis and privilege exposure",
+      "not_directly_comparable": ["Full cloud resource posture coverage"],
+      "mapping_status": "not_yet_mapped_check_by_check"
+    },
+    {
+      "name": "Parliament",
+      "repository": "https://github.com/duo-labs/parliament",
+      "primary_comparison": "IAM policy syntax and security linting",
+      "not_directly_comparable": ["Resource configuration checks"],
+      "mapping_status": "not_yet_mapped_check_by_check"
+    }
+  ],
+  "priority_gaps": [
+    {
+      "id": "terraform-variable-and-local-resolution",
+      "priority": "P0",
+      "status": "in_progress",
+      "evidence_required": ["secure fixture", "insecure fixture", "unknown-expression fixture"],
+      "acceptance": "Values resolve only when statically provable; unresolved values are explicit."
+    },
+    {
+      "id": "terraform-module-input-output-and-resource-graph",
+      "priority": "P0",
+      "status": "planned",
+      "evidence_required": ["cross-file fixture", "nested-module fixture", "cycle fixture"],
+      "acceptance": "Deterministic edges, canonical addresses and no false safe conclusions for unknowns."
+    },
+    {
+      "id": "terraform-plan-and-data-source-completeness",
+      "priority": "P0",
+      "status": "planned",
+      "evidence_required": ["unknown plan attributes", "unevaluated data source", "unexpanded module"],
+      "acceptance": "Summary and exit status distinguish incomplete analysis from a clean result."
+    },
+    {
+      "id": "iam-policy-analysis-depth",
+      "priority": "P1",
+      "status": "planned",
+      "evidence_required": ["wildcard action/resource", "condition-constrained policy", "unknown policy structure"],
+      "acceptance": "Policy semantics are tested against upstream references; conditions are not treated as proof of safety."
+    },
+    {
+      "id": "network-exposure-and-attack-paths",
+      "priority": "P1",
+      "status": "planned",
+      "evidence_required": ["public ingress", "route and subnet relationships", "unresolved relationship"],
+      "acceptance": "Reachability claims require a documented graph path and confidence; simple co-occurrence is not an attack path."
+    },
+    {
+      "id": "aws-service-rule-breadth",
+      "priority": "P1",
+      "status": "planned",
+      "evidence_required": ["per-check upstream reference", "secure/insecure/unknown tests", "scope and permissions"],
+      "acceptance": "Prioritise identity, network exposure, data protection, audit logging, backup/recovery, containers and serverless."
+    }
+  ],
+  "mapping_entries": [],
+  "mapping_policy": {
+    "equivalence_values": ["equivalent", "partial", "not_equivalent", "not_applicable", "not_reviewed"],
+    "required_fields": ["local_check_id", "upstream_tool", "upstream_check_id_or_url", "equivalence", "rationale", "reviewed_on"],
+    "rule": "Do not mark a check equivalent based only on similar names; compare semantics, evidence requirements, defaults, exceptions and unknown-state handling."
+  }
+}
