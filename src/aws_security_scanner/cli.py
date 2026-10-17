@@ -514,6 +514,8 @@ def run_scan(
                     "bounded_limit": native_findings_limit,
                 })
         except (ClientError, BotoCoreError, RuntimeError) as exc:
+            if not return_coverage:
+                raise
             error_code = (
                 exc.response.get("Error", {}).get("Code", "ClientError")
                 if isinstance(exc, ClientError) else type(exc).__name__
