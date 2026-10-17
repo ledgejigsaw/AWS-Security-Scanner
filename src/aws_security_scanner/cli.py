@@ -324,8 +324,6 @@ def discover_resources(
         raise ValueError("--module-root can only be used with --source hcl.")
     if var_files and source != "hcl":
         raise ValueError("--var-file can only be used with --source hcl.")
-    if var_files and source != "hcl":
-        raise ValueError("--var-file can only be used with --source hcl.")
 
 
     if source == "fixture":
@@ -472,6 +470,8 @@ def run_scan(
         raise ValueError("--include-native-findings can only be used with --source aws.")
     if module_roots and source != "hcl":
         raise ValueError("--module-root can only be used with --source hcl.")
+    if var_files and source != "hcl":
+        raise ValueError("--var-file can only be used with --source hcl.")
     if (profile or services) and source != "aws":
         raise ValueError("--profile and --service can only be used with --source aws.")
     if profile and aws_session is not None:
