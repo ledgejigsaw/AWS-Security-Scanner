@@ -76,12 +76,14 @@ def check_eks_audit_logging_disabled(resource: Resource) -> list[Finding]:
     service="EKS",
     severity=Severity.INFO,
     category="Network Exposure",
-    title="EKS cluster has public endpoint access enabled",
-    description="The Kubernetes API endpoint is configured for public access. Public access is not proof of exposure when CIDRs are restricted, but it is a useful review signal.",
-    remediation="Confirm that public endpoint access is required, restrict the allow-list, and evaluate private endpoint access for administrative workflows.",
+    title="EKS cluster has no private API endpoint",
+    description="The Kubernetes API endpoint is public and private endpoint access is explicitly disabled. This is a review signal rather than proof of reachability.",
+    remediation="Consider enabling private endpoint access for approved administrative workflows and restrict public endpoint CIDRs where public access remains necessary.",
 )
 def check_eks_public_endpoint_review(resource: Resource) -> list[Finding]:
     if resource.attributes.get("endpoint_public_access") is not True:
+        return []
+    if resource.attributes.get("endpoint_private_access") is not False:
         return []
     cidrs = resource.attributes.get("public_access_cidrs")
     if not isinstance(cidrs, list):
@@ -90,5 +92,5 @@ def check_eks_public_endpoint_review(resource: Resource) -> list[Finding]:
         check_eks_public_endpoint_review,
         resource=resource.resource_id,
         region=resource.region,
-        evidence="endpoint_public_access=true; public_access_cidrs=" + ",".join(sorted(str(item) for item in cidrs)),
+        evidence="endpoint_public_access=true; endpoint_private_access=false; public_access_cidrs=" + ",".join(sorted(str(item) for item in cidrs)),
     )]
