@@ -535,14 +535,17 @@ def run_scan(
                     )
                 )
     if source == "hcl" or any(
-        resource.attributes.get("hcl_unresolved_expressions")
-        or resource.attributes.get("hcl_diagnostic")
+        (isinstance(resource.attributes.get("hcl_unresolved_expressions"), list)
+         and bool(resource.attributes.get("hcl_unresolved_expressions")))
+        or isinstance(resource.attributes.get("hcl_diagnostic"), str)
         for resource in resources
     ):
         for resource in resources:
-            unresolved = resource.attributes.get("hcl_unresolved_expressions")
+            unresolved = resource.attributes.get("hcl_unresolved_expressions", [])
+            if not isinstance(unresolved, list):
+                unresolved = []
             diagnostic = resource.attributes.get("hcl_diagnostic")
-            if not unresolved and diagnostic != "module_not_expanded":
+            if not unresolved and diagnostic not in {"module_not_expanded", "data_source_not_evaluated"}:
                 continue
             is_module = diagnostic == "module_not_expanded"
             findings.append(
@@ -567,7 +570,7 @@ def run_scan(
                         else "Resolve the expression from a trusted, reviewed plan or inspect the referenced values before relying on this assessment."
                     ),
                     region=resource.region,
-                    evidence="; ".join(str(item) for item in (unresolved or [])[:5]) or "Module contents were not loaded.",
+                    evidence="; ".join(str(item) for item in unresolved[:5]) or "Module or data-source contents were not evaluated.",
                 )
             )
 
