@@ -567,21 +567,30 @@ def run_scan(
                         else "Terraform HCL contains unresolved expressions"
                     ),
                     description=(
-                        "The scanner does not load or evaluate Terraform modules; resources inside this module are outside this scan."
+                        "This module call could not be expanded; the evidence identifies the source and reason. Resources inside it were not assessed."
                         if is_module
                         else "The scanner does not query Terraform data sources. Values derived from this data source and dependent checks may be incomplete."
                         if is_data_source
                         else "One or more HCL expressions could not be resolved statically. Related checks may be incomplete."
                     ),
                     remediation=(
-                        "Review the module source separately or provide Terraform JSON generated from a reviewed plan that includes expanded module resources."
+                        "Review the module source and the reported reason, or provide Terraform JSON generated from a reviewed plan that includes the expanded resources."
                         if is_module
                         else "Review the data source and its dependent values using a trusted Terraform plan; the scanner does not query providers."
                         if is_data_source
                         else "Review the expression and its dependencies, or use a trusted, reviewed Terraform plan where the required values are known."
                     ),
                     region=resource.region,
-                    evidence="; ".join(str(item) for item in unresolved[:5]) or "Module or data-source contents were not evaluated.",
+                    evidence=(
+                        "; ".join(str(item) for item in unresolved[:5])
+                        or (
+                            f"{resource.attributes.get('hcl_diagnostic_reason')}; "
+                            f"source_file={resource.source_file or 'unknown'}; "
+                            f"address={resource.source_address or resource.resource_id}"
+                        )
+                    ),
+                    source_file=resource.source_file,
+                    source_address=resource.source_address,
                 )
             )
 
