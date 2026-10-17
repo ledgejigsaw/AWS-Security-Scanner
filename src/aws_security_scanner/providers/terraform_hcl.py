@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import hcl2
+from lark.exceptions import LarkError
 
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.providers.terraform import TerraformProvider
@@ -32,7 +33,7 @@ class TerraformHCLProvider:
         try:
             with self.hcl_file.open(encoding="utf-8") as file:
                 data = hcl2.load(file)
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, LarkError) as error:
             raise ValueError(f"Unable to parse Terraform HCL file '{self.hcl_file}': {error}") from error
 
         if not isinstance(data, dict):
@@ -56,6 +57,32 @@ class TerraformHCLProvider:
                         continue
                     for name, attributes in instances.items():
                         resources.append(self._make_resource(_unquote_label(resource_type), _unquote_label(name), attributes))
+
+        # Data sources are not resolved. Emit diagnostics rather than treating
+        # their configuration as discovered resources or evaluating provider calls.
+        data_blocks = data.get("data", [])
+        if isinstance(data_blocks, list):
+            for data_block in data_blocks:
+                if not isinstance(data_block, dict):
+                    continue
+                for data_type, instances in data_block.items():
+                    if not isinstance(instances, dict):
+                        continue
+                    for data_name in instances:
+                        address = f"data.{_unquote_label(data_type)}.{_unquote_label(data_name)}"
+                        resources.append(Resource(
+                            resource_type="terraform_hcl_unsupported",
+                            resource_id=address,
+                            attributes={
+                                "hcl_diagnostic": "data_source_not_evaluated",
+                                "hcl_unresolved_expressions": [
+                                    "Terraform data source values were not evaluated; dependent values may be unknown."
+                                ],
+                            },
+                            source="terraform",
+                            source_file=str(self.hcl_file),
+                            source_address=address,
+                        ))
 
         # Module code is deliberately not loaded or evaluated. Emit a diagnostic
         # placeholder so reports make this analysis limitation visible.

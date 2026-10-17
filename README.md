@@ -44,7 +44,7 @@ Generate a plan JSON file with:
 terraform show -json > terraform.json
 ```
 
-The Terraform JSON provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging, lifecycle and bucket-policy configuration. The direct HCL provider uses `python-hcl2` for offline static analysis; it does not evaluate variables/locals, expand modules, or execute Terraform. Unresolved expressions and unexpanded modules produce informational diagnostics. See [rule coverage](docs/rule-coverage.md) for the supported subset.
+The Terraform JSON provider normalises resource data and resolves/aggregates related S3 resources, including bucket encryption, versioning, public-access-block, logging, lifecycle and bucket-policy configuration. The direct HCL provider uses `python-hcl2` for offline static analysis; it does not evaluate variables/locals, expand modules, or execute Terraform. Unresolved expressions, count/for_each and dynamic blocks, unexpanded modules, and unevaluated data sources produce informational diagnostics. The scanner never executes arbitrary HCL expressions. See [rule coverage](docs/rule-coverage.md) for the supported subset.
 
 **AWS APIs** are accessed through boto3 in read-only mode. Use `--profile` to select a profile from the standard AWS shared configuration/credentials files, and repeat `--service` to limit discovery to specific supported service domains. Without `--service`, the scanner runs its full supported discovery scope. For example:
 
