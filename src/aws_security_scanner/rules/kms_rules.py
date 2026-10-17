@@ -222,3 +222,34 @@ def check_kms_cross_account_access(resource: Resource) -> list[Finding]:
         region=resource.region,
         evidence="Unconditional cross-account Allow: " + "; ".join(risky[:5]),
     )]
+
+
+@rule_for(
+    "aws_kms_key", check_id="KMS-005", service="KMS",
+    severity=Severity.MEDIUM, category="Access Control",
+    title="KMS key grant permits grant delegation",
+    description="A discovered KMS grant includes CreateGrant or a wildcard operation. These operations can delegate or broaden key use and should be reviewed.",
+    remediation="Confirm the grantee and required operations with the key owner. Remove unnecessary CreateGrant permissions. This is a review signal; grants may be legitimate.",
+)
+def check_kms_broad_grants(resource: Resource) -> list[Finding]:
+    if resource.attributes.get("grant_discovery") != "success":
+        return []
+    grants = resource.attributes.get("grants")
+    if not isinstance(grants, list):
+        return []
+    risky = []
+    for grant in grants:
+        if not isinstance(grant, dict):
+            continue
+        operations = grant.get("Operations")
+        if isinstance(operations, str):
+            operations = [operations]
+        if isinstance(operations, list):
+            selected = sorted(item for item in operations if isinstance(item, str) and item.lower() in {"creategrant", "*"})
+            if selected:
+                grantee = grant.get("GranteePrincipal")
+                risky.append("grantee=" + (grantee if isinstance(grantee, str) else "unknown") + " operations=" + ",".join(selected))
+    if not risky:
+        return []
+    return [Finding.from_rule(check_kms_broad_grants, resource=resource.resource_id, region=resource.region,
+        evidence="grant_discovery=success; high-impact grants: " + "; ".join(risky[:5]))]
