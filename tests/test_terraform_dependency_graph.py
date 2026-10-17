@@ -77,7 +77,7 @@ def test_hcl_dependency_graph_is_empty_for_resources_without_references(tmp_path
 def test_hcl_cycle_detection_excludes_path_between_two_cycles(tmp_path):
     (tmp_path / "main.tf").write_text(
         'resource "aws_s3_bucket" "a" { bucket = aws_s3_bucket.b.bucket }\n'
-        'resource "aws_s3_bucket" "b" { bucket = aws_s3_bucket.a.bucket }\n'
+        'resource "aws_s3_bucket" "b" { bucket = aws_s3_bucket.a.bucket force_destroy = aws_s3_bucket.bridge.id }\n'
         'resource "aws_s3_bucket" "bridge" { bucket = aws_s3_bucket.c.bucket }\n'
         'resource "aws_s3_bucket" "c" { bucket = aws_s3_bucket.d.bucket }\n'
         'resource "aws_s3_bucket" "d" { bucket = aws_s3_bucket.c.bucket }\n',
