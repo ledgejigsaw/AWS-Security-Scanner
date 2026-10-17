@@ -27,8 +27,12 @@ def _unquote_label(value: str) -> str:
 class TerraformHCLProvider:
     """Parse Terraform HCL and expand bounded local modules without running Terraform."""
 
-    def __init__(self, hcl_file: str | Path):
+    def __init__(self, hcl_file: str | Path, module_roots: list[str | Path] | None = None):
         self.hcl_file = Path(hcl_file)
+        self.module_roots = tuple(Path(root).resolve() for root in (module_roots or []))
+        for root in self.module_roots:
+            if not root.is_dir():
+                raise ValueError(f"Trusted Terraform module root is not an existing directory: '{root}'.")
 
     def discover(self) -> list[Resource]:
         """Discover HCL resources and expand safe local child modules."""
@@ -68,6 +72,15 @@ class TerraformHCLProvider:
                 seen.add(identity)
                 unique.append(resource)
         return unique
+
+    @staticmethod
+    def _is_within(path: Path, root: Path) -> bool:
+        """Return whether a canonical path is inside an allowed root."""
+        try:
+            path.resolve().relative_to(root.resolve())
+        except ValueError:
+            return False
+        return True
 
     @staticmethod
     def _module_files(module_dir: Path) -> list[Path]:
@@ -129,11 +142,10 @@ class TerraformHCLProvider:
                 continue
 
             child_dir = (declaring_file.parent / source).resolve()
-            try:
-                child_dir.relative_to(scan_root.resolve())
-            except ValueError:
+            allowed_roots = (scan_root.resolve(), *self.module_roots)
+            if not any(self._is_within(child_dir, allowed_root) for allowed_root in allowed_roots):
                 self._set_module_diagnostic(resources, address, declaring_file,
-                    "The local module source resolves outside the selected scan root and was not followed.", source=source)
+                    "The local module source resolves outside the selected scan root and all explicitly trusted module roots; it was not followed.", source=source)
                 continue
             if child_dir in (*active_stack, module_dir):
                 self._set_module_diagnostic(resources, address, declaring_file,

@@ -1,6 +1,6 @@
 # Terraform HCL static-analysis scope
 
-The HCL provider is deliberately non-executing: it parses local HCL with `python-hcl2`, does not execute Terraform, query providers, or download remote modules. It can expand relative local module sources contained within the selected scan root, recursively with cycle and depth protection. `--file` accepts either one `.tf` file or a module-root directory. Directory mode parses only the direct `*.tf` children together; nested directories are treated as separate module/example boundaries.
+The HCL provider is deliberately non-executing: it parses local HCL with `python-hcl2`, does not execute Terraform, query providers, or download remote modules. By default, it expands relative local module sources contained within the selected scan root, recursively with cycle and depth protection. For repository layouts where an example references sibling modules, `--module-root PATH` explicitly trusts an additional directory; the option is repeatable and canonical paths must remain within the selected scan root or one of the trusted roots. `--file` accepts either one `.tf` file or a module-root directory. Directory mode parses only the direct `*.tf` children together; nested directories are treated as separate module/example boundaries.
 
 ## Supported and explicitly limited constructs
 
@@ -20,6 +20,9 @@ aws-security-scan --source hcl --file main.tf --format sarif --output reports/ia
 
 # Scan all .tf files directly in one module root
 aws-security-scan --source hcl --file ./terraform/network --format html --output reports/network.html
+
+# Scan an example while explicitly trusting local modules elsewhere in the checked-out repository
+aws-security-scan --source hcl --file ./terraform-aws-vpc/examples/complete --module-root ./terraform-aws-vpc --format html --output reports/vpc.html
 ```
 
-Malformed HCL fails with a contextual input error. Local module expansion is bounded to eight levels and checks for cycles and path escapes. A module that cannot be expanded remains visible as an informational diagnostic with the reason and source address. The scanner does not silently skip parse errors or substitute an empty configuration.
+Malformed HCL fails with a contextual input error. Local module expansion is bounded to eight levels and checks for cycles and path escapes. A trusted module root is an explicit filesystem trust decision: use only directories from source repositories you have reviewed. Trusting a repository root permits expansion of local modules within that repository, but not outside it. A module that cannot be expanded remains visible as an informational diagnostic with the reason and source address. The scanner does not silently skip parse errors or substitute an empty configuration.

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from aws_security_scanner.cli import build_parser, run_scan
 from aws_security_scanner.normalization.terraform import aggregate_s3_resources
 from aws_security_scanner.providers.terraform_hcl import TerraformHCLProvider
@@ -344,3 +346,62 @@ def test_hcl_module_count_is_not_expanded_as_single_instance(tmp_path):
     assert module.attributes["hcl_diagnostic"] == "module_not_expanded"
     assert "cardinality" in module.attributes["hcl_diagnostic_reason"]
     assert not any(item.source_address == "module.network.aws_vpc.main" for item in resources)
+
+
+def test_hcl_module_outside_scan_root_expands_when_explicitly_trusted(tmp_path):
+    repository = tmp_path / "terraform-repo"
+    example = repository / "examples" / "complete"
+    module = repository / "modules" / "storage"
+    example.mkdir(parents=True)
+    module.mkdir(parents=True)
+    (example / "main.tf").write_text(
+        'module "storage" { source = "../../modules/storage" }\\n',
+        encoding="utf-8",
+    )
+    (module / "main.tf").write_text(
+        'resource "aws_s3_bucket" "data" { bucket = "sensitive-data" }\\n',
+        encoding="utf-8",
+    )
+
+    default_resources = TerraformHCLProvider(example).discover()
+    diagnostic = next(item for item in default_resources if item.source_address == "module.storage")
+    assert diagnostic.attributes["hcl_diagnostic"] == "module_not_expanded"
+    assert "trusted module roots" in diagnostic.attributes["hcl_diagnostic_reason"]
+
+    trusted_resources = TerraformHCLProvider(example, module_roots=[repository]).discover()
+    assert any(item.source_address == "module.storage.aws_s3_bucket.data" for item in trusted_resources)
+    assert not any(item.attributes.get("hcl_diagnostic") == "module_not_expanded" for item in trusted_resources)
+
+
+def test_hcl_trusted_module_root_does_not_allow_escape_outside_trusted_root(tmp_path):
+    repository = tmp_path / "terraform-repo"
+    example = repository / "examples" / "complete"
+    module = repository / "modules" / "storage"
+    outside = tmp_path / "outside"
+    example.mkdir(parents=True)
+    module.mkdir(parents=True)
+    outside.mkdir()
+    (example / "main.tf").write_text(
+        'module "storage" { source = "../../modules/storage" }\\n',
+        encoding="utf-8",
+    )
+    (module / "main.tf").write_text(
+        'module "escape" { source = "../../../outside" }\\n',
+        encoding="utf-8",
+    )
+    (outside / "main.tf").write_text(
+        'resource "aws_s3_bucket" "outside" { bucket = "outside-data" }\\n',
+        encoding="utf-8",
+    )
+
+    resources = TerraformHCLProvider(example, module_roots=[repository]).discover()
+    escape = next(item for item in resources if item.source_address == "module.storage.module.escape")
+    assert escape.attributes["hcl_diagnostic"] == "module_not_expanded"
+    assert "outside the selected scan root and all explicitly trusted module roots" in escape.attributes["hcl_diagnostic_reason"]
+
+
+def test_hcl_trusted_module_root_must_be_an_existing_directory(tmp_path):
+    source = tmp_path / "main.tf"
+    source.write_text('resource "aws_s3_bucket" "data" { bucket = "data" }\\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="Trusted Terraform module root"):
+        TerraformHCLProvider(source, module_roots=[tmp_path / "missing"])

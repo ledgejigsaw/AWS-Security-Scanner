@@ -615,3 +615,13 @@ def test_cli_accepts_ocsf_report_format():
     ])
     assert args.format == "ocsf"
     assert args.output is None
+
+
+def test_cli_accepts_repeatable_trusted_terraform_module_roots():
+    args = build_parser().parse_args([
+        "--source", "hcl",
+        "--file", "examples/complete",
+        "--module-root", "terraform-repo",
+        "--module-root", "shared-modules",
+    ])
+    assert args.module_root == [Path("terraform-repo"), Path("shared-modules")]
