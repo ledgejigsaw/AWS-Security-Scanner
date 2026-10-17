@@ -27,12 +27,16 @@ def _unquote_label(value: str) -> str:
 class TerraformHCLProvider:
     """Parse Terraform HCL and expand bounded local modules without running Terraform."""
 
-    def __init__(self, hcl_file: str | Path, module_roots: list[str | Path] | None = None):
+    def __init__(self, hcl_file: str | Path, module_roots: list[str | Path] | None = None, var_files: list[str | Path] | None = None):
         self.hcl_file = Path(hcl_file)
         self.module_roots = tuple(Path(root).resolve() for root in (module_roots or []))
+        self.var_files = tuple(Path(path).resolve() for path in (var_files or []))
         for root in self.module_roots:
             if not root.is_dir():
                 raise ValueError(f"Trusted Terraform module root is not an existing directory: '{root}'.")
+        for path in self.var_files:
+            if not path.is_file():
+                raise ValueError(f"Terraform variable file does not exist or is not a file: '{path}'.")
 
     def discover(self) -> list[Resource]:
         """Discover HCL resources and expand safe local child modules."""
@@ -110,7 +114,11 @@ class TerraformHCLProvider:
             raise ValueError(f"Terraform local module depth exceeds {max_depth} at '{module_dir}'.")
 
         variables = self._collect_variable_defaults(files)
+        # Root input files override defaults; child module arguments are applied last.
+        if depth == 0:
+            variables.update(self._load_root_variable_values(module_dir))
         variables.update(input_values)
+        variables.update(self._collect_local_values(files, variables))
         resources: list[Resource] = []
         module_calls: list[tuple[str, dict[str, Any], Path]] = []
         for path in files:
@@ -170,8 +178,10 @@ class TerraformHCLProvider:
                 key = _unquote_label(str(raw_key))
                 if key in {"source", "version", "providers", "depends_on", "count", "for_each", "__is_block__"}:
                     continue
-                value = self._literal_value(raw_value)
-                if value is not _NON_LITERAL:
+                normalized = self._normalise_nested_blocks({"value": raw_value}).get("value")
+                substituted = self._substitute_variables(normalized, variables)
+                value = self._literal_value(substituted)
+                if value is not _NON_LITERAL and not self._unresolved_expressions(substituted):
                     child_inputs[key] = value
                 else:
                     # Preserve unknown caller expressions so they override child defaults
@@ -211,6 +221,68 @@ class TerraformHCLProvider:
                         if value is not _NON_LITERAL:
                             defaults[_unquote_label(raw_name)] = value
         return defaults
+
+    def _load_root_variable_values(self, root: Path) -> dict[str, Any]:
+        """Load supported root variable files in deterministic precedence order."""
+        paths: list[Path] = []
+        standard = root / "terraform.tfvars"
+        if standard.is_file():
+            paths.append(standard)
+        paths.extend(sorted(path for path in root.glob("*.auto.tfvars") if path.is_file()))
+        paths.extend(self.var_files)
+        resolved: dict[str, Any] = {}
+        for path in paths:
+            try:
+                if path.suffix.lower() == ".json":
+                    with path.open(encoding="utf-8") as handle:
+                        values = json.load(handle)
+                else:
+                    with path.open(encoding="utf-8") as handle:
+                        values = hcl2.load(handle)
+            except (OSError, ValueError, LarkError, json.JSONDecodeError) as error:
+                raise ValueError(f"Unable to parse Terraform variable file '{path}': {error}") from error
+            if not isinstance(values, dict):
+                raise ValueError(f"Terraform variable file '{path}' must contain an object.")
+            for raw_name, raw_value in values.items():
+                name = _unquote_label(str(raw_name))
+                normalized = self._normalise_nested_blocks({"value": raw_value}).get("value")
+                literal = self._literal_value(normalized)
+                if literal is not _NON_LITERAL:
+                    resolved[name] = literal
+        return resolved
+
+    def _collect_local_values(self, files: list[Path], variables: dict[str, Any]) -> dict[str, Any]:
+        """Resolve a bounded subset of local values without evaluating arbitrary HCL."""
+        definitions: dict[str, Any] = {}
+        for path in files:
+            data = self._load_hcl(path)
+            blocks = data.get("locals", [])
+            if isinstance(blocks, dict):
+                blocks = [blocks]
+            if isinstance(blocks, list):
+                for block in blocks:
+                    if isinstance(block, dict):
+                        for raw_name, raw_value in block.items():
+                            definitions[_unquote_label(str(raw_name))] = raw_value
+        resolved: dict[str, Any] = {}
+        for _ in range(min(len(definitions) + 1, 32)):
+            changed = False
+            scope = dict(variables)
+            scope.update({f"local.{name}": value for name, value in resolved.items()})
+            for name, raw_value in definitions.items():
+                if name in resolved:
+                    continue
+                normalized = self._normalise_nested_blocks({"value": raw_value}).get("value")
+                candidate = self._substitute_variables(normalized, scope)
+                if self._unresolved_expressions(candidate):
+                    continue
+                literal = self._literal_value(candidate)
+                if literal is not _NON_LITERAL:
+                    resolved[name] = literal
+                    changed = True
+            if not changed:
+                break
+        return {f"local.{name}": value for name, value in resolved.items()}
 
     def _literal_value(self, value: Any) -> Any:
         if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
@@ -344,7 +416,7 @@ class TerraformHCLProvider:
 
     def _substitute_variables(self, value: Any, variables: dict[str, Any]) -> Any:
         """Substitute only statically known variable references."""
-        pattern = re.compile(r"\x24\{var\.([A-Za-z0-9_-]+)\}|(?<![A-Za-z0-9_])var\.([A-Za-z0-9_-]+)(?![A-Za-z0-9_])")
+        pattern = re.compile(r"\x24\{(var|local)\.([A-Za-z0-9_-]+)\}|(?<![A-Za-z0-9_])(var|local)\.([A-Za-z0-9_-]+)(?![A-Za-z0-9_])")
         if isinstance(value, dict):
             return {key: self._substitute_variables(item, variables) for key, item in value.items()}
         if isinstance(value, list):
@@ -353,10 +425,15 @@ class TerraformHCLProvider:
             return value
         full = pattern.fullmatch(value)
         if full:
-            name = full.group(1) or full.group(2)
-            return variables.get(name, value)
+            scope = full.group(1) or full.group(3)
+            name = full.group(2) or full.group(4)
+            key = f"local.{name}" if scope == "local" else name
+            return variables.get(key, value)
         def replace(match):
-            replacement = variables.get(match.group(1) or match.group(2))
+            scope = match.group(1) or match.group(3)
+            name = match.group(2) or match.group(4)
+            key = f"local.{name}" if scope == "local" else name
+            replacement = variables.get(key)
             if replacement is None or isinstance(replacement, (dict, list)):
                 return match.group(0)
             return str(replacement)
