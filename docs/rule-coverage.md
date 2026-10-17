@@ -50,3 +50,8 @@ When a rule is added or removed:
 3. Update the matrix and README counts in the same pull request.
 4. Run the complete test suite and verify CI.
 5. Review the matrix against the actual registry; do not rely on a hand-maintained count without checking it.
+
+
+## Terraform source attribution
+
+For direct HCL input, findings include the source file and logical resource address where available. The current parser integration does not expose reliable line/column spans, so the scanner deliberately does not invent line numbers. JSON, HTML and SARIF reports carry the file/address metadata when present. Module diagnostics identify the module address but do not claim to cover resources inside unexpanded modules.
