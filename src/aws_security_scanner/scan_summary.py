@@ -70,7 +70,20 @@ def build_scan_summary(
                 "failed": failed_accounts,
             }
 
-    complete = coverage_gaps == 0 and failed_accounts == 0
+    hcl_diagnostics = [
+        finding for finding in findings
+        if finding.check_id in {"IAC-HCL-001", "IAC-HCL-002", "IAC-HCL-003"}
+    ] if source == "hcl" else []
+    hcl_codes = Counter(finding.check_id for finding in hcl_diagnostics)
+    hcl_analysis = {
+        "status": "incomplete" if hcl_diagnostics else "complete",
+        "diagnostics_total": len(hcl_diagnostics),
+        "diagnostics_by_code": dict(sorted(hcl_codes.items())),
+        "unresolved_expressions": hcl_codes.get("IAC-HCL-001", 0),
+        "unexpanded_modules": hcl_codes.get("IAC-HCL-002", 0),
+        "unevaluated_data_sources": hcl_codes.get("IAC-HCL-003", 0),
+    }
+    complete = coverage_gaps == 0 and failed_accounts == 0 and not hcl_diagnostics
     return {
         "schema_version": "1.0.0",
         "status": "complete" if complete else "incomplete",
@@ -93,6 +106,7 @@ def build_scan_summary(
             "domains_with_gaps": coverage_gaps,
             "statuses": dict(sorted(coverage_statuses.items())),
         },
+        "analysis": hcl_analysis,
         "accounts": account_summary,
         "failure_threshold": {
             "severity": fail_on,
