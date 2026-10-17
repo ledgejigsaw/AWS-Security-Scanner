@@ -232,6 +232,24 @@ aws-security-scan --source terraform --file terraform.json --graph-output report
 
 The graph contains safe resource identity metadata, explicit resolved relationships with provenance/confidence, unresolved references marked as unknown, and finding check IDs linked only when the resource match is unambiguous. It deliberately excludes raw resource attributes, policies, secret values and object contents. It does not infer network reachability: an absent edge is not evidence of isolation. Multi-account graph output is not supported in this increment.
 
+## Live AWS authentication and identity check
+
+For `--source aws`, the CLI resolves credentials through boto3's standard AWS credential chain and verifies the active identity with STS before starting discovery. The account ID and principal ARN are printed so the operator can confirm the target. If credentials are missing, the scan stops with setup guidance; the scanner never prompts for, accepts, or stores access keys or secret keys.
+
+Configure a named profile with the AWS CLI, or use IAM Identity Center:
+
+```bash
+aws configure --profile audit
+# Or, for IAM Identity Center:
+aws configure sso --profile audit
+aws sso login --profile audit
+
+aws-security-scan --source aws --profile audit --region eu-west-2
+```
+
+The profile or default credential chain may also use environment, web-identity, container, or instance-role credentials. Use a dedicated least-privilege read-only identity. STS identity verification is not proof that every service permission is available; service-level access-denied and incomplete-discovery handling remains important. The identity preflight applies to single-account AWS scans; the explicit multi-account workflow validates each assumed-role identity separately. Fixture and IaC scans do not require AWS credentials.
+
+
 ## Container usage
 
 Build the image locally:
@@ -282,6 +300,11 @@ Fixtures / Terraform JSON / Terraform HCL / AWS APIs
 ```
 
 The `Resource` model separates source-specific discovery from security rules. This design is already useful, but large architectural changes are intentionally deferred while functional coverage is expanded.
+
+## AWS discovery pagination limits
+
+AWS API discovery follows continuation tokens and rejects repeated tokens or truncated responses without a continuation token. Pagination now has a hard safety bound of 1,000 pages per collection by default. If the bound is reached while more results remain, discovery raises an explicit incomplete-discovery error instead of returning a partial resource list as though it were complete. This is a safety bound, not a claim that every service has returned all resources; service APIs and permissions still determine actual coverage.
+
 
 ## Development and tests
 
