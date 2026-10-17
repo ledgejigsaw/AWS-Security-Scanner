@@ -52,6 +52,7 @@ class AWSProvider:
         logs_client: Any | None = None,
         cloudwatch_client: Any | None = None,
         efs_client: Any | None = None,
+        codebuild_client: Any | None = None,
     ):
         self.region = region
         # Preserve the existing boto3.client path for single-account scans;
@@ -139,6 +140,7 @@ class AWSProvider:
         self.logs_client = logs_client or self._client("logs", region_name=region)
         self.cloudwatch_client = cloudwatch_client or self._client("cloudwatch", region_name=region)
         self.efs_client = efs_client or self._client("efs", region_name=region)
+        self.codebuild_client = codebuild_client or self._client("codebuild", region_name=region)
 
     def _collect_pages(
         self,
@@ -2397,6 +2399,79 @@ class AWSProvider:
                         "posix_user": access_point.get("PosixUser"),
                         "root_directory": access_point.get("RootDirectory"),
                         "lifecycle_state": access_point.get("LifeCycleState"),
+                    },
+                    source="aws",
+                    region=self.region,
+                ))
+        return resources
+
+    def discover_codebuild_projects(self) -> list[Resource]:
+        """Discover CodeBuild project security metadata without reading build logs or env values."""
+        project_names = self._collect_pages(
+            self.codebuild_client.list_projects,
+            "projects",
+            request_token="nextToken",
+            response_token="nextToken",
+        )
+        resources: list[Resource] = []
+        for offset in range(0, len(project_names), 100):
+            batch = project_names[offset:offset + 100]
+            response = self.codebuild_client.batch_get_projects(names=batch)
+            for project in response.get("projects", []) if isinstance(response, dict) else []:
+                if not isinstance(project, dict):
+                    continue
+                name = project.get("name")
+                if not isinstance(name, str) or not name:
+                    continue
+                environment = project.get("environment", {})
+                if not isinstance(environment, dict):
+                    environment = {}
+                environment_variables = []
+                raw_variables = environment.get("environmentVariables", [])
+                if isinstance(raw_variables, list):
+                    for variable in raw_variables:
+                        if not isinstance(variable, dict):
+                            continue
+                        variable_name = variable.get("name")
+                        if not isinstance(variable_name, str) or not variable_name:
+                            continue
+                        # Intentionally never retain environment-variable values.
+                        environment_variables.append({
+                            "name": variable_name,
+                            "type": variable.get("type"),
+                        })
+                source = project.get("source", {})
+                if not isinstance(source, dict):
+                    source = {}
+                vpc_config = project.get("vpcConfig", {})
+                if not isinstance(vpc_config, dict):
+                    vpc_config = {}
+                logs_config = project.get("logsConfig", {})
+                if not isinstance(logs_config, dict):
+                    logs_config = {}
+                cloudwatch_logs = logs_config.get("cloudWatchLogs", {})
+                if not isinstance(cloudwatch_logs, dict):
+                    cloudwatch_logs = {}
+                resources.append(Resource(
+                    resource_type="aws_codebuild_project",
+                    resource_id=name,
+                    attributes={
+                        "name": name,
+                        "arn": project.get("arn"),
+                        "service_role": project.get("serviceRole"),
+                        "environment_type": environment.get("type"),
+                        "environment_image": environment.get("image"),
+                        "compute_type": environment.get("computeType"),
+                        "privileged_mode": environment.get("privilegedMode"),
+                        "environment_variables": environment_variables,
+                        "source_type": source.get("type"),
+                        "source_location": source.get("location"),
+                        "build_timeout_minutes": project.get("timeoutInMinutes"),
+                        "vpc_id": vpc_config.get("vpcId"),
+                        "subnet_ids": vpc_config.get("subnets", []),
+                        "security_group_ids": vpc_config.get("securityGroups", []),
+                        "cloudwatch_logs_status": cloudwatch_logs.get("status"),
+                        "cloudwatch_log_group_name": cloudwatch_logs.get("groupName"),
                     },
                     source="aws",
                     region=self.region,

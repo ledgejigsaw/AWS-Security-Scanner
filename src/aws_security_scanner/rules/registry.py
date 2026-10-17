@@ -128,6 +128,11 @@ from aws_security_scanner.rules.efs_rules import (
     check_efs_access_point_root_identity,
 )
 
+from aws_security_scanner.rules.codebuild_rules import (
+    check_codebuild_privileged_mode,
+    check_codebuild_plaintext_sensitive_environment_variables,
+)
+
 from aws_security_scanner.rules.cloudwatch_rules import (
     check_cloudwatch_log_group_retention,
     check_cloudwatch_alarm_actions,
@@ -284,6 +289,8 @@ def get_all_rules():
         check_eks_public_endpoint_review,
         check_cloudwatch_log_group_retention,
         check_cloudwatch_alarm_actions,
+        check_codebuild_privileged_mode,
+        check_codebuild_plaintext_sensitive_environment_variables,
         check_efs_encryption_disabled,
         check_efs_access_point_root_identity,
         check_cloudfront_http_viewer_access,
