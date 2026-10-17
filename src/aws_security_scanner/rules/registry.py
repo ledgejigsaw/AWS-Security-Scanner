@@ -123,6 +123,11 @@ from aws_security_scanner.rules.ecs_rules import (
     check_ecs_image_not_pinned_by_digest,
 )
 
+from aws_security_scanner.rules.efs_rules import (
+    check_efs_encryption_disabled,
+    check_efs_access_point_root_identity,
+)
+
 from aws_security_scanner.rules.codebuild_rules import (
     check_codebuild_privileged_mode,
     check_codebuild_plaintext_sensitive_environment_variables,
@@ -286,6 +291,8 @@ def get_all_rules():
         check_cloudwatch_alarm_actions,
         check_codebuild_privileged_mode,
         check_codebuild_plaintext_sensitive_environment_variables,
+        check_efs_encryption_disabled,
+        check_efs_access_point_root_identity,
         check_cloudfront_http_viewer_access,
         check_cloudfront_weak_tls_policy,
         check_cloudfront_logging_disabled,
