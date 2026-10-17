@@ -216,6 +216,12 @@ Native finding import is disabled by default. It queries Security Hub and GuardD
 
 Do not commit credentials, account exports containing sensitive data, or generated reports. Use a least-privilege read-only identity and validate required IAM permissions before scanning a production account.
 
+## AWS discovery coverage and partial assessments
+
+For live AWS scans, the CLI reports a status for each selected service domain: `success` (resources discovered), `empty` (discovery completed with no resources), `partial` (some discovery operations succeeded and others failed), or `failed` (all operations for that domain failed). The JSON report includes per-domain counts and bounded diagnostic codes; raw AWS error messages and request payloads are not copied into coverage diagnostics.
+
+A scan with any `partial` or `failed` service domain emits a warning and exits with status 1 after writing the report. This prevents incomplete visibility from being presented as a clean assessment. An `empty` status means discovery succeeded but returned no resources; it does not prove that an unsupported service or unobservable resource is secure. Service selection with `--service` limits the intended scope and is reflected in the coverage entries.
+
 ## Resource graph export
 
 Add `--graph-output` to a single-account scan to write a separate machine-readable resource graph:
