@@ -158,6 +158,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--guardduty-region",
+        action="append",
+        help="Region to query for native GuardDuty findings; repeat to scan multiple regions. Defaults to --region or the configured AWS region.",
+    )
+    parser.add_argument(
+        "--guardduty-record-state",
+        choices=["ACTIVE", "ARCHIVED", "ALL"],
+        default="ALL",
+        help="Filter native GuardDuty findings by archived state (default: ALL, preserving existing behaviour).",
+    )
+    parser.add_argument(
+        "--guardduty-updated-after",
+        help="Optional ISO-8601 date-time lower bound for GuardDuty finding updates, e.g. 2026-10-01T00:00:00Z.",
+    )
+
+    parser.add_argument(
         "--format",
         choices=["json", "html", "sarif"],
         default="json",
@@ -365,6 +381,9 @@ def run_scan(
     services: list[str] | None = None,
     return_resources: bool = False,
     return_coverage: bool = False,
+    guardduty_regions: list[str] | None = None,
+    guardduty_record_state: str = "ALL",
+    guardduty_updated_after: str | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -473,12 +492,72 @@ def run_scan(
                     converted.account_id = expected_account_id
                 findings.append(converted)
 
-        guardduty_items = native_provider.get_guardduty_findings(limit=native_findings_limit)
-        for item in guardduty_items:
-            converted = guardduty_to_finding(item, fallback_region=region)
-            if converted is not None:
+        configured_region = (
+            region
+            or getattr(aws_session, "region_name", None)
+            or boto3.Session().region_name
+            or "us-east-1"
+        )
+        selected_guardduty_regions = list(dict.fromkeys(guardduty_regions or [configured_region]))
+        if any(not isinstance(item, str) or not item.strip() for item in selected_guardduty_regions):
+            raise ValueError("GuardDuty regions must be non-empty region names.")
+        seen_guardduty_findings: set[tuple[str, str | None, str]] = set()
+        for guardduty_region in selected_guardduty_regions:
+            regional_provider = (
+                AWSProvider(region=guardduty_region, session=aws_session)
+                if aws_session is not None
+                else AWSProvider(region=guardduty_region)
+            )
+            archived_filter = (
+                None if guardduty_record_state == "ALL"
+                else guardduty_record_state == "ARCHIVED"
+            )
+            try:
+                guardduty_items = regional_provider.get_guardduty_findings(
+                    limit=native_findings_limit,
+                    archived=archived_filter,
+                    updated_after=guardduty_updated_after,
+                    require_detector=True,
+                )
+                if return_coverage:
+                    discovery_coverage.append({
+                        "service": f"guardduty-findings:{guardduty_region}",
+                        "status": "success" if guardduty_items else "empty",
+                        "resources_discovered": len(guardduty_items),
+                        "successful_operations": 1,
+                        "failed_operations": [],
+                        "bounded_limit": native_findings_limit,
+                    })
+            except (ClientError, BotoCoreError, RuntimeError) as exc:
+                error_code = (
+                    exc.response.get("Error", {}).get("Code", "ClientError")
+                    if isinstance(exc, ClientError) else
+                    "GuardDutyNotEnabled" if "not enabled" in str(exc).lower() or "no detector" in str(exc).lower()
+                    else type(exc).__name__
+                )
+                if return_coverage:
+                    discovery_coverage.append({
+                        "service": f"guardduty-findings:{guardduty_region}",
+                        "status": "failed",
+                        "resources_discovered": 0,
+                        "successful_operations": 0,
+                        "failed_operations": [{"operation": "get_findings", "error_code": str(error_code)[:80]}],
+                    })
+                continue
+            for item in guardduty_items:
+                converted = guardduty_to_finding(item, fallback_region=guardduty_region)
+                if converted is None:
+                    continue
                 if converted.account_id is None:
                     converted.account_id = expected_account_id
+                identity = (
+                    converted.region or guardduty_region,
+                    converted.account_id,
+                    converted.source_id or "",
+                )
+                if identity in seen_guardduty_findings:
+                    continue
+                seen_guardduty_findings.add(identity)
                 findings.append(converted)
 
         access_analyzer_items = native_provider.get_access_analyzer_findings(
@@ -558,6 +637,12 @@ def main() -> None:
         parser.error("--native-findings-limit must be between 1 and 1000")
     if args.native_findings_limit != 100 and not args.include_native_findings:
         parser.error("--native-findings-limit requires --include-native-findings")
+    if (
+        (args.guardduty_region or args.guardduty_record_state != "ALL"
+         or args.guardduty_updated_after is not None)
+        and not args.include_native_findings
+    ):
+        parser.error("GuardDuty filters require --include-native-findings")
 
     compliance_mapping = None
     if args.compliance_mapping:
@@ -609,6 +694,9 @@ def main() -> None:
             services=args.service,
             return_resources=bool(args.graph_output),
             return_coverage=(args.source == "aws"),
+            guardduty_regions=args.guardduty_region,
+            guardduty_record_state=args.guardduty_record_state,
+            guardduty_updated_after=args.guardduty_updated_after,
         )
         if args.graph_output and args.source == "aws":
             findings, graph_resources, discovery_coverage = scan_result
