@@ -2252,9 +2252,24 @@ class AWSProvider:
             arn = load_balancer.get("LoadBalancerArn")
             if not isinstance(arn, str) or not arn:
                 continue
-            association = self.wafv2_client.get_web_acl_for_resource(ResourceArn=arn)
-            web_acl = association.get("WebACL") if isinstance(association, dict) else None
-            web_acl_id = web_acl.get("Id") if isinstance(web_acl, dict) else None
+            try:
+                association = self.wafv2_client.get_web_acl_for_resource(ResourceArn=arn)
+            except ClientError as error:
+                code = error.response.get("Error", {}).get("Code", "")
+                if code in {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"}:
+                    web_acl = None
+                    web_acl_id = None
+                    association_state = "unknown"
+                else:
+                    raise
+            else:
+                web_acl = association.get("WebACL") if isinstance(association, dict) else None
+                web_acl_id = web_acl.get("Id") if isinstance(web_acl, dict) else None
+                association_state = "associated" if web_acl_id else "not_associated"
+            listeners = self._collect_pages(self.elbv2_client.describe_listeners, "Listeners", LoadBalancerArn=arn)
+            listener_data = [{"protocol": x.get("Protocol"), "port": x.get("Port"), "ssl_policy": x.get("SslPolicy")} for x in listeners if isinstance(x, dict)]
+            lb_attrs = self.elbv2_client.describe_load_balancer_attributes(LoadBalancerArn=arn).get("Attributes", [])
+            access_logs = next((x.get("Value") for x in lb_attrs if isinstance(x, dict) and x.get("Key") == "access_logs.s3.enabled"), None)
             resources.append(Resource(
                 resource_type="aws_lb",
                 resource_id=arn,
@@ -2266,7 +2281,9 @@ class AWSProvider:
                     "vpc_id": load_balancer.get("VpcId"),
                     "security_group_ids": load_balancer.get("SecurityGroups", []),
                     "web_acl_id": web_acl_id,
-                    "waf_association_state": "associated" if web_acl_id else "not_associated",
+                    "waf_association_state": association_state,
+                    "listeners": listener_data,
+                    "access_logs_enabled": access_logs == "true" if access_logs is not None else None,
                 },
                 source="aws",
                 region=self.region,
