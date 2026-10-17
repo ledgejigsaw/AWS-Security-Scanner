@@ -42,7 +42,7 @@ def find_attack_path_candidates(
         if not isinstance(edge, dict):
             continue
         source, target = edge.get("source"), edge.get("target")
-        if source in nodes and target in nodes and isinstance(source, str) and isinstance(target, str):
+        if isinstance(source, str) and isinstance(target, str) and source in nodes and target in nodes:
             adjacency[source].append((target, str(edge.get("relationship", "relationship"))))
     for source in adjacency:
         adjacency[source] = sorted(set(adjacency[source]))
