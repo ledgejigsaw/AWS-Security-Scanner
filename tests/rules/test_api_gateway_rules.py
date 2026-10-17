@@ -57,3 +57,23 @@ def test_access_logging_rule_flags_explicit_missing_settings():
 def test_access_logging_rule_does_not_flag_enabled_or_unknown_state():
     assert check_api_gateway_access_logging_disabled(stage(access_logging_enabled=True)) == []
     assert check_api_gateway_access_logging_disabled(stage()) == []
+
+
+def http_stage(**attributes):
+    return Resource(resource_type="aws_api_gateway_http_api_stage", resource_id="http123:$default", attributes=attributes, source="fixture", region="eu-west-2")
+
+
+def test_http_api_unauthenticated_route_generates_finding():
+    findings = __import__("aws_security_scanner.rules.api_gateway_rules", fromlist=["check_api_gateway_http_api_unauthenticated_routes"]).check_api_gateway_http_api_unauthenticated_routes(
+        http_stage(routes=[{"route_key": "POST /payments", "authorization_type": "NONE"}])
+    )
+    assert len(findings) == 1
+    assert findings[0].check_id == "APIGW-003"
+    assert findings[0].severity == Severity.HIGH
+
+
+def test_http_api_access_logging_rule():
+    module = __import__("aws_security_scanner.rules.api_gateway_rules", fromlist=["check_api_gateway_http_api_access_logging_disabled"])
+    assert module.check_api_gateway_http_api_access_logging_disabled(http_stage(access_logging_enabled=False)) 
+    assert module.check_api_gateway_http_api_access_logging_disabled(http_stage(access_logging_enabled=True)) == []
+    assert module.check_api_gateway_http_api_access_logging_disabled(http_stage()) == []
