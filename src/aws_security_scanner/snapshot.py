@@ -22,8 +22,8 @@ _RESOURCE_KEYS = {
 }
 _REDACTED = "[REDACTED]"
 _SENSITIVE_KEYS = {
-    "password", "passwd", "secretstring", "secretbinary", "secretvalue",
-    "secretaccesskey", "accesskeysecret", "privatekey", "sessiontoken",
+    "password", "passwd", "secret", "secretstring", "secretbinary", "secretvalue",
+    "secretaccesskey", "accesskeysecret", "accesskey", "secretkey", "apitoken", "token", "credential", "privatekey", "sessiontoken",
     "credentialvalue", "authorization", "clientsecret",
 }
 
