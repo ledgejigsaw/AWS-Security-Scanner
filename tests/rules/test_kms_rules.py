@@ -107,3 +107,18 @@ def test_kms_specific_principal_is_not_flagged():
     )
 
     assert check_kms_key_policy_wildcard_access(resource) == []
+
+
+def test_kms_grant_delegation_generates_review_finding():
+    from aws_security_scanner.rules.kms_rules import check_kms_broad_grants
+    findings = check_kms_broad_grants(make_key(grant_discovery="success", grants=[
+        {"GrantId": "grant-1", "GranteePrincipal": "arn:aws:iam::123456789012:role/app", "Operations": ["Decrypt", "CreateGrant"]}
+    ]))
+    assert len(findings) == 1
+    assert findings[0].check_id == "KMS-005"
+    assert "CreateGrant" in findings[0].evidence
+
+def test_kms_narrow_grant_and_unknown_state_are_not_flagged():
+    from aws_security_scanner.rules.kms_rules import check_kms_broad_grants
+    assert check_kms_broad_grants(make_key(grant_discovery="success", grants=[{"Operations": ["Decrypt"]}])) == []
+    assert check_kms_broad_grants(make_key(grant_discovery="unknown", grants=[])) == []
