@@ -75,6 +75,8 @@ class TerraformHCLProvider:
                                     ],
                                 },
                                 source="terraform",
+                                source_file=str(self.hcl_file),
+                                source_address=f"module.{_unquote_label(module_name)}",
                             )
                         )
 
@@ -93,6 +95,8 @@ class TerraformHCLProvider:
             attributes=attributes,
             source="terraform",
             region=attributes.get("region"),
+            source_file=str(self.hcl_file),
+            source_address=f"{resource_type}.{name}",
         )
 
     def _normalise_nested_blocks(self, attributes: dict[str, Any]) -> dict[str, Any]:
