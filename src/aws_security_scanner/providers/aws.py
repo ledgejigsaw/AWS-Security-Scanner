@@ -51,6 +51,7 @@ class AWSProvider:
         eks_client: Any | None = None,
         logs_client: Any | None = None,
         cloudwatch_client: Any | None = None,
+        efs_client: Any | None = None,
         codebuild_client: Any | None = None,
     ):
         self.region = region
@@ -138,6 +139,7 @@ class AWSProvider:
         self.eks_client = eks_client or self._client("eks", region_name=region)
         self.logs_client = logs_client or self._client("logs", region_name=region)
         self.cloudwatch_client = cloudwatch_client or self._client("cloudwatch", region_name=region)
+        self.efs_client = efs_client or self._client("efs", region_name=region)
         self.codebuild_client = codebuild_client or self._client("codebuild", region_name=region)
 
     def _collect_pages(
@@ -2304,6 +2306,104 @@ class AWSProvider:
             ))
         return resources
 
+
+    def discover_efs_file_systems(self) -> list[Resource]:
+        """Discover EFS file systems, mount-target metadata and access points."""
+        file_systems = self._collect_pages(
+            self.efs_client.describe_file_systems,
+            "FileSystems",
+            request_token="Marker",
+            response_token="NextMarker",
+        )
+        resources: list[Resource] = []
+        for file_system in file_systems:
+            if not isinstance(file_system, dict):
+                continue
+            file_system_id = file_system.get("FileSystemId")
+            if not isinstance(file_system_id, str) or not file_system_id:
+                continue
+            mount_targets = self._collect_pages(
+                self.efs_client.describe_mount_targets,
+                "MountTargets",
+                request_token="Marker",
+                response_token="NextMarker",
+                FileSystemId=file_system_id,
+            )
+            mount_target_details = []
+            for target in mount_targets:
+                if not isinstance(target, dict):
+                    continue
+                target_id = target.get("MountTargetId")
+                security_groups = []
+                if isinstance(target_id, str) and target_id:
+                    response = self.efs_client.describe_mount_target_security_groups(
+                        MountTargetId=target_id
+                    )
+                    security_groups = response.get("SecurityGroups", []) if isinstance(response, dict) else []
+                mount_target_details.append({
+                    "mount_target_id": target_id,
+                    "subnet_id": target.get("SubnetId"),
+                    "network_interface_id": target.get("NetworkInterfaceId"),
+                    "lifecycle_state": target.get("LifeCycleState"),
+                    "security_group_ids": sorted(
+                        item for item in security_groups if isinstance(item, str)
+                    ) if isinstance(security_groups, list) else [],
+                })
+            access_points = self._collect_pages(
+                self.efs_client.describe_access_points,
+                "AccessPoints",
+                request_token="Marker",
+                response_token="NextMarker",
+                FileSystemId=file_system_id,
+            )
+            resources.append(Resource(
+                resource_type="aws_efs_file_system",
+                resource_id=file_system_id,
+                attributes={
+                    "file_system_id": file_system_id,
+                    "name": file_system.get("Name"),
+                    "arn": file_system.get("FileSystemArn"),
+                    "encrypted": file_system.get("Encrypted"),
+                    "kms_key_id": file_system.get("KmsKeyId"),
+                    "performance_mode": file_system.get("PerformanceMode"),
+                    "throughput_mode": file_system.get("ThroughputMode"),
+                    "lifecycle_state": file_system.get("LifeCycleState"),
+                    "mount_targets": mount_target_details,
+                    "access_points": [
+                        {
+                            "access_point_id": item.get("AccessPointId"),
+                            "arn": item.get("AccessPointArn"),
+                            "posix_user": item.get("PosixUser"),
+                            "root_directory": item.get("RootDirectory"),
+                            "lifecycle_state": item.get("LifeCycleState"),
+                        }
+                        for item in access_points if isinstance(item, dict)
+                    ],
+                },
+                source="aws",
+                region=self.region,
+            ))
+            for access_point in access_points:
+                if not isinstance(access_point, dict):
+                    continue
+                access_point_id = access_point.get("AccessPointId")
+                if not isinstance(access_point_id, str) or not access_point_id:
+                    continue
+                resources.append(Resource(
+                    resource_type="aws_efs_access_point",
+                    resource_id=access_point_id,
+                    attributes={
+                        "access_point_id": access_point_id,
+                        "arn": access_point.get("AccessPointArn"),
+                        "file_system_id": file_system_id,
+                        "posix_user": access_point.get("PosixUser"),
+                        "root_directory": access_point.get("RootDirectory"),
+                        "lifecycle_state": access_point.get("LifeCycleState"),
+                    },
+                    source="aws",
+                    region=self.region,
+                ))
+        return resources
 
     def discover_codebuild_projects(self) -> list[Resource]:
         """Discover CodeBuild project security metadata without reading build logs or env values."""
