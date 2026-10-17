@@ -77,6 +77,9 @@ def run_multi_account_scan(
     policy_path: Path | None = None,
     include_native_findings: bool = False,
     native_findings_limit: int = 100,
+    guardduty_regions: list[str] | None = None,
+    guardduty_record_state: str = "ALL",
+    guardduty_updated_after: str | None = None,
 ) -> tuple[list[Finding], dict[str, Any]]:
     """Assume each configured role sequentially and record every account outcome."""
     targets = load_account_targets(accounts_file)
@@ -122,6 +125,9 @@ def run_multi_account_scan(
                 region=region,
                 include_native_findings=include_native_findings,
                 native_findings_limit=native_findings_limit,
+                guardduty_regions=guardduty_regions,
+                guardduty_record_state=guardduty_record_state,
+                guardduty_updated_after=guardduty_updated_after,
                 aws_session=session,
                 expected_account_id=account_id,
             )

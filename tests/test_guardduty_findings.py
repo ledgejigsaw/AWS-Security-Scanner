@@ -1,8 +1,8 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
-from aws_security_scanner.cli import build_parser
+from aws_security_scanner.cli import build_parser, run_scan
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.models.finding import Severity
 from aws_security_scanner.providers.aws import AWSProvider
@@ -118,3 +118,146 @@ def test_native_findings_cli_help_mentions_both_sources():
     ])
     assert args.include_native_findings is True
     assert args.native_findings_limit == 25
+
+
+
+def test_guardduty_provider_applies_archived_and_updated_after_filters():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+    provider.guardduty_client.list_detectors.return_value = {"DetectorIds": ["detector-1"]}
+    provider.guardduty_client.get_detector.return_value = {"Status": "ENABLED"}
+    provider.guardduty_client.list_findings.return_value = {"FindingIds": []}
+
+    assert provider.get_guardduty_findings(
+        limit=10,
+        archived=False,
+        updated_after="2026-10-01T00:00:00Z",
+        require_detector=True,
+    ) == []
+
+    assert provider.guardduty_client.list_findings.call_args.kwargs == {
+        "DetectorId": "detector-1",
+        "MaxResults": 10,
+        "FindingCriteria": {
+            "Criterion": {
+                "service.archived": {"Eq": ["false"]},
+                "updatedAt": {"Gte": ["2026-10-01T00:00:00Z"]},
+            }
+        },
+    }
+
+
+def test_guardduty_provider_marks_missing_detector_as_unavailable():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+    provider.guardduty_client.list_detectors.return_value = {"DetectorIds": []}
+
+    with pytest.raises(RuntimeError, match="GuardDuty is not enabled"):
+        provider.get_guardduty_findings(require_detector=True)
+
+    provider.guardduty_client.list_findings.assert_not_called()
+
+
+def test_guardduty_provider_marks_disabled_detector_as_unavailable():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+    provider.guardduty_client.list_detectors.return_value = {"DetectorIds": ["detector-1"]}
+    provider.guardduty_client.get_detector.return_value = {"Status": "DISABLED"}
+
+    with pytest.raises(RuntimeError, match="detector is not enabled"):
+        provider.get_guardduty_findings(require_detector=True)
+
+    provider.guardduty_client.list_findings.assert_not_called()
+
+
+def test_guardduty_provider_rejects_timezone_missing_update_filter():
+    provider = AWSProvider.__new__(AWSProvider)
+    provider.guardduty_client = Mock()
+
+    with pytest.raises(ValueError, match="include a timezone"):
+        provider.get_guardduty_findings(updated_after="2026-10-01T00:00:00")
+
+    provider.guardduty_client.list_detectors.assert_not_called()
+
+
+def test_cli_accepts_guardduty_multi_region_and_filter_options():
+    args = build_parser().parse_args([
+        "--source", "aws",
+        "--include-native-findings",
+        "--guardduty-region", "eu-west-2",
+        "--guardduty-region", "us-east-1",
+        "--guardduty-record-state", "ACTIVE",
+        "--guardduty-updated-after", "2026-10-01T00:00:00Z",
+    ])
+    assert args.guardduty_region == ["eu-west-2", "us-east-1"]
+    assert args.guardduty_record_state == "ACTIVE"
+    assert args.guardduty_updated_after == "2026-10-01T00:00:00Z"
+
+
+
+def test_run_scan_deduplicates_guardduty_per_account_and_region():
+    first_region_item = guardduty_item(Id="same-id", Region="eu-west-2")
+    second_region_item = guardduty_item(Id="same-id", Region="us-east-1")
+    with patch("aws_security_scanner.cli.AWSProvider") as provider_factory:
+        provider = provider_factory.return_value
+        provider.discover_s3_buckets.return_value = []
+        provider.discover_s3_account_public_access_block.return_value = []
+        provider.get_securityhub_findings.return_value = []
+        provider.get_guardduty_findings.side_effect = [
+            [first_region_item, first_region_item],
+            [second_region_item],
+        ]
+        provider.get_access_analyzer_findings.return_value = []
+        provider.get_inspector_findings.return_value = []
+        provider.get_macie_findings.return_value = []
+
+        findings, coverage = run_scan(
+            "aws",
+            region="eu-west-2",
+            services=["s3"],
+            include_native_findings=True,
+            aws_session=Mock(region_name="eu-west-2"),
+            guardduty_regions=["eu-west-2", "us-east-1"],
+            return_coverage=True,
+        )
+
+    guardduty_findings = [item for item in findings if item.source_type == "guardduty"]
+    assert len(guardduty_findings) == 2
+    assert {item.region for item in guardduty_findings} == {"eu-west-2", "us-east-1"}
+    assert [item["service"] for item in coverage if item["service"].startswith("guardduty-findings:")] == [
+        "guardduty-findings:eu-west-2",
+        "guardduty-findings:us-east-1",
+    ]
+
+
+def test_run_scan_reports_guardduty_region_failure_and_continues_other_regions():
+    with patch("aws_security_scanner.cli.AWSProvider") as provider_factory:
+        provider = provider_factory.return_value
+        provider.discover_s3_buckets.return_value = []
+        provider.discover_s3_account_public_access_block.return_value = []
+        provider.get_securityhub_findings.return_value = []
+        provider.get_guardduty_findings.side_effect = [
+            RuntimeError("GuardDuty is not enabled in this region"),
+            [guardduty_item(Id="healthy-region", Region="us-east-1")],
+        ]
+        provider.get_access_analyzer_findings.return_value = []
+        provider.get_inspector_findings.return_value = []
+        provider.get_macie_findings.return_value = []
+
+        findings, coverage = run_scan(
+            "aws",
+            region="eu-west-2",
+            services=["s3"],
+            include_native_findings=True,
+            aws_session=Mock(region_name="eu-west-2"),
+            guardduty_regions=["eu-west-2", "us-east-1"],
+            return_coverage=True,
+        )
+
+    assert any(item.source_id == "healthy-region" for item in findings)
+    regional_coverage = {
+        item["service"]: item for item in coverage
+        if item["service"].startswith("guardduty-findings:")
+    }
+    assert regional_coverage["guardduty-findings:eu-west-2"]["status"] == "failed"
+    assert regional_coverage["guardduty-findings:us-east-1"]["status"] == "success"
