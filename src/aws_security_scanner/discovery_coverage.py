@@ -102,3 +102,24 @@ def summarise_discovery_operations(
         "resources_discovered": sum(item.resources_discovered for item in ordered),
         "operations": [item.to_dict() for item in ordered],
     }
+
+
+def classify_discovery_error(error: Exception) -> tuple[DiscoveryOutcome, str]:
+    """Map errors to safe categories without serializing request details."""
+    code = ""
+    if hasattr(error, "response"):
+        response = getattr(error, "response", {})
+        if isinstance(response, dict):
+            detail = response.get("Error", {})
+            if isinstance(detail, dict):
+                code = str(detail.get("Code", ""))
+    lowered = (code or type(error).__name__).lower()
+    if any(token in lowered for token in ("accessdenied", "unauthorized", "notauthorized", "forbidden")):
+        return DiscoveryOutcome.ACCESS_DENIED, "authorization"
+    if any(token in lowered for token in ("throttl", "requestlimit", "toomanyrequests")):
+        return DiscoveryOutcome.THROTTLED, "throttling"
+    if any(token in lowered for token in ("notenabled", "disabled", "subscriptionrequired")):
+        return DiscoveryOutcome.DISABLED, "service_disabled"
+    if any(token in lowered for token in ("unknownoperation", "unknownservice", "unsupported")):
+        return DiscoveryOutcome.UNSUPPORTED, "unsupported_operation"
+    return DiscoveryOutcome.FAILED, "discovery_failed"

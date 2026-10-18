@@ -122,3 +122,10 @@ def test_kms_narrow_grant_and_unknown_state_are_not_flagged():
     from aws_security_scanner.rules.kms_rules import check_kms_broad_grants
     assert check_kms_broad_grants(make_key(grant_discovery="success", grants=[{"Operations": ["Decrypt"]}])) == []
     assert check_kms_broad_grants(make_key(grant_discovery="unknown", grants=[])) == []
+
+
+def test_disabled_key_generates_lifecycle_review_finding():
+    finding = check_kms_key_pending_deletion(make_key(key_state="Disabled"))
+    assert len(finding) == 1
+    assert finding[0].check_id == "KMS-002"
+    assert finding[0].evidence == "key_state=Disabled"
