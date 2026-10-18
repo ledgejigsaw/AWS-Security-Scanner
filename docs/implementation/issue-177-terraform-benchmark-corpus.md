@@ -1,17 +1,35 @@
 # Issue #177 — Representative Terraform benchmark corpus
 
-Status: implementation plan / draft PR. This document does not claim a representative differential benchmark has been implemented.
+## Implemented in this PR
 
-## Implementation sequence
-1. Extend the existing offline synthetic corpus before importing public projects.
-2. For every upstream fixture, pin repository URL and commit, record licence, local modifications, expected findings, and expected unresolved diagnostics.
-3. Add secure, insecure, and ambiguous examples across the services named in issue #177, including multi-file roots and module relationships.
-4. Normalise rule IDs, severities, source attribution, resource addresses, and diagnostics for deterministic comparison.
-5. Add optional Checkov/Trivy adapters only when tools are installed; record exact versions/configuration and never claim equivalence without measured results.
-6. Report true positives, false positives, false negatives, and unresolved coverage separately.
+- Added deterministic validation for imported-source metadata: repository URL,
+  full 40-character commit SHA, licence identifier, local fixture path, and
+  SHA-256 digest.
+- Added Checkov and Trivy JSON normalizers retaining tool ID, severity,
+  resource address, source file, and title without pretending their rule IDs
+  are equivalent to this scanner's rule IDs.
+- Added optional command adapters for installed Checkov or Trivy. The adapters
+  never install dependencies, use a timeout, return a safe diagnostic when a
+  tool is missing or fails, and do not include raw stderr in results.
+- Added offline tests for metadata validation, hashing, normalizers, missing
+  tools, and invalid tool output.
 
-## Required tests
-Offline deterministic run; pinned metadata validation; unexpected finding/severity/source changes fail CI; unknown diagnostics are not counted as passes; optional external tools are skipped cleanly.
+## Benchmark interpretation
 
-## Licensing
-Do not copy upstream code or fixtures until their licence and attribution requirements have been reviewed.
+External scanner results are normalized for comparison but are not automatically
+counted as true positives or false positives against this scanner. Cross-tool
+rule mappings need explicit review and must preserve severity and resource
+address. The existing offline expected-finding evaluator remains the scoring
+authority for labelled cases.
+
+## Remaining limitation
+
+This PR adds provenance and adapter infrastructure; it does not import public
+Terraform repositories. Before importing any upstream fixture, review its
+licence, pin the exact commit, record local modifications, and record a digest.
+Synthetic fixtures remain valuable for deterministic offline regression tests.
+
+## Validation
+
+Tests were added but not executed in this editing session. CI and the local
+pytest suite are required before merge.
