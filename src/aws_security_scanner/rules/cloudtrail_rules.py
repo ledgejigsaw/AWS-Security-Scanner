@@ -163,7 +163,6 @@ def check_cloudtrail_management_event_coverage(resource: Resource) -> list[Findi
         evidence="event_selector_discovery=success; no selector explicitly enables management events",
     )]
 
-
 @rule_for(
     "aws_cloudtrail_trail",
     check_id="CT-007",
