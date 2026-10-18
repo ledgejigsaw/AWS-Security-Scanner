@@ -53,6 +53,7 @@ from aws_security_scanner.scan_summary import (
     scan_exit_code,
     write_scan_summary,
 )
+from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
 
 
 
@@ -161,6 +162,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--profile",
         help="AWS shared-config profile to use (AWS source only; no credentials are accepted on the command line).",
+    )
+    parser.add_argument(
+        "--aws-permissions-preflight",
+        action="store_true",
+        help="Run one low-impact, read-only permission probe per selected AWS service before scanning; results are not proof of full API coverage.",
     )
     parser.add_argument(
         "--service",
@@ -511,7 +517,7 @@ def run_scan(
         valid_services = {
             "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
             "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
         }
         unknown = sorted(set(services) - valid_services)
         if unknown:
@@ -879,8 +885,10 @@ def main() -> None:
         parser.error("--accounts-file can only be used with --source aws")
     if args.accounts_file and args.file:
         parser.error("--accounts-file cannot be combined with --file")
-    if (args.profile or args.service) and args.source != "aws":
-        parser.error("--profile and --service can only be used with --source aws")
+    if (args.profile or args.service or args.aws_permissions_preflight) and args.source != "aws":
+        parser.error("--profile, --service, and --aws-permissions-preflight can only be used with --source aws")
+    if args.aws_permissions_preflight and args.accounts_file:
+        parser.error("--aws-permissions-preflight is not supported with --accounts-file; run it for each account explicitly")
     if args.accounts_file and args.profile:
         parser.error("--profile with --accounts-file is not supported; configure the default credential chain for the caller")
     if args.graph_output and args.accounts_file:
@@ -944,6 +952,20 @@ def main() -> None:
             live_aws_session = create_verified_aws_session(args.profile, args.region)
         except RuntimeError as exc:
             parser.error(str(exc))
+    permissions_preflight = None
+    if args.aws_permissions_preflight:
+        permissions_preflight = run_aws_permissions_preflight(
+            live_aws_session,
+            region=args.region,
+            services=args.service,
+        )
+        assessment_metadata = {"permissions_preflight": permissions_preflight}
+        print(f"AWS permissions preflight: {permissions_preflight['status']}")
+        for check in permissions_preflight.get("checks", []):
+            suffix = f" ({check['error_category']})" if check.get("error_category") else ""
+            print(f"Preflight {check['service']}: {check['outcome']}{suffix}")
+        if permissions_preflight["status"] != "complete":
+            print("Warning: preflight found permission or service-availability gaps; scanning will continue and discovery coverage remains authoritative.")
     if args.accounts_file:
         findings, assessment_metadata = run_multi_account_scan(
             args.accounts_file,
@@ -991,10 +1013,14 @@ def main() -> None:
     baseline_action_requested = bool(
         args.write_baseline or args.compare_baseline or args.baseline
     )
+    failed_account_count = (
+        assessment_metadata.get("summary", {}).get("failed_accounts", 0)
+        if isinstance(assessment_metadata, dict)
+        and isinstance(assessment_metadata.get("summary", {}), dict)
+        else 0
+    )
     baseline_actions_skipped = bool(
-        assessment_metadata
-        and assessment_metadata["summary"]["failed_accounts"] > 0
-        and baseline_action_requested
+        failed_account_count > 0 and baseline_action_requested
     )
     if baseline_actions_skipped:
         print(
@@ -1077,7 +1103,17 @@ def main() -> None:
                     "operations_with_gaps": operations_with_gaps,
                 },
             }
-        write_json_report(findings, output_path, compliance_mapping, report_assessment)
+        json_assessment = (
+            dict(report_assessment) if isinstance(report_assessment, dict) else {}
+        )
+        if permissions_preflight is not None:
+            json_assessment["permissions_preflight"] = permissions_preflight
+        write_json_report(
+            findings,
+            output_path,
+            compliance_mapping,
+            json_assessment or report_assessment,
+        )
     elif args.format == "html":
         write_html_report(findings, output_path, compliance_mapping, assessment_metadata)
     elif args.format == "sarif":
@@ -1136,7 +1172,7 @@ def main() -> None:
 
     assessment_incomplete = bool(
         baseline_actions_skipped
-        or (assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0)
+        or failed_account_count > 0
         or discovery_has_gaps
         or hcl_analysis_incomplete
     )

@@ -625,3 +625,13 @@ def test_cli_accepts_repeatable_trusted_terraform_module_roots():
         "--module-root", "shared-modules",
     ])
     assert args.module_root == [Path("terraform-repo"), Path("shared-modules")]
+
+
+def test_cli_accepts_aws_permissions_preflight():
+    args = build_parser().parse_args([
+        "--source", "aws",
+        "--aws-permissions-preflight",
+        "--service", "s3",
+    ])
+    assert args.aws_permissions_preflight is True
+    assert args.service == ["s3"]
