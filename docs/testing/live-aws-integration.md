@@ -29,3 +29,8 @@ is a placeholder, not a real account.
 Without the opt-in variable, the test is skipped. When opted in, a missing or
 malformed expected account ID is a test failure rather than an implicit
 fallback. Live tests must be reported separately from mocked unit tests.
+
+
+## CI policy
+
+The live test is opt-in by environment variable and performs no provisioning or cleanup. Standard CI should run pytest without the opt-in variable, so the live test is skipped and does not require repository secrets. Do not configure the opt-in variable on public pull requests or forked builds. Run live validation manually from a trusted environment using the dedicated test account.
