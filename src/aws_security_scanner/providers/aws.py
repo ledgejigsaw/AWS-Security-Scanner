@@ -1878,6 +1878,47 @@ class AWSProvider:
 
         return resources
 
+
+
+def _advanced_selector_is_data_event(selector: dict[str, Any]) -> bool:
+    """Return true only when an advanced selector explicitly includes Data events."""
+    fields = selector.get("FieldSelectors", [])
+    if not isinstance(fields, list):
+        return False
+    for field in fields:
+        if not isinstance(field, dict) or field.get("Field") != "eventCategory":
+            continue
+        values = field.get("Equals", [])
+        if isinstance(values, list) and "Data" in values:
+            return True
+    return False
+
+
+def _count_cloudtrail_data_selectors(
+    basic_selectors: list[dict[str, Any]],
+    advanced_selectors: list[dict[str, Any]],
+) -> int:
+    """Count observable data-resource entries and advanced Data selectors."""
+    basic_count = 0
+    for selector in basic_selectors:
+        resources = selector.get("DataResources", [])
+        if isinstance(resources, list):
+            basic_count += len(resources)
+    return basic_count + sum(_advanced_selector_is_data_event(item) for item in advanced_selectors)
+
+
+def _cloudtrail_data_event_coverage(
+    basic_selectors: list[dict[str, Any]],
+    advanced_selectors: list[dict[str, Any]],
+    discovery_state: str,
+) -> str:
+    """Avoid inferring data-event coverage from inaccessible selector metadata."""
+    if discovery_state != "success":
+        return "unknown"
+    if _count_cloudtrail_data_selectors(basic_selectors, advanced_selectors) > 0:
+        return "configured"
+    return "not_observed"
+
     def discover_cloudtrail_trails(self) -> list[Resource]:
         """Discover CloudTrail trails and their logging status."""
         trails = self._collect_pages(
@@ -1919,15 +1960,9 @@ class AWSProvider:
                     attributes={
                         "name": trail_name,
                         "trail_arn": trail_arn,
-                        "is_multi_region_trail": trail.get(
-                            "IsMultiRegionTrail", False
-                        ),
-                        "is_organization_trail": trail.get(
-                            "IsOrganizationTrail", False
-                        ),
-                        "log_file_validation_enabled": trail.get(
-                            "LogFileValidationEnabled", False
-                        ),
+                        "is_multi_region_trail": trail.get("IsMultiRegionTrail"),
+                        "is_organization_trail": trail.get("IsOrganizationTrail"),
+                        "log_file_validation_enabled": trail.get("LogFileValidationEnabled"),
                         "kms_key_id": trail.get("KmsKeyId"),
                         "s3_bucket_name": trail.get("S3BucketName"),
                         "home_region": trail.get("HomeRegion"),
@@ -1942,9 +1977,12 @@ class AWSProvider:
                             any(item.get("IncludeManagementEvents") is True for item in event_selectors)
                             if selector_state == "success" and event_selectors else None
                         ),
-                        "data_event_selector_count": (
-                            sum(len(item.get("DataResources", [])) for item in event_selectors if isinstance(item.get("DataResources", []), list)) + len(advanced_selectors)
-                            if selector_state == "success" else None
+                        "data_event_selector_count": _count_cloudtrail_data_selectors(event_selectors, advanced_selectors) if selector_state == "success" else None,
+                        "data_event_coverage": _cloudtrail_data_event_coverage(event_selectors, advanced_selectors, selector_state),
+                        "organization_trail_scope": (
+                            "organization" if trail.get("IsOrganizationTrail") is True
+                            else "account" if trail.get("IsOrganizationTrail") is False
+                            else "unknown"
                         ),
                     },
                     source="aws",
