@@ -45,7 +45,6 @@ class DiscoveryOperation:
     pagination_complete: bool | None = None
     error_category: str | None = None
     iam_action: str | None = None
-    detail: str | None = None
 
     def __post_init__(self) -> None:
         if not self.service.strip() or not self.operation.strip() or not self.scope.strip():
