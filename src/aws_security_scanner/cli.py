@@ -13,7 +13,6 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.terraform_hcl import TerraformHCLProvider
 from aws_security_scanner.providers.aws import AWSProvider
-from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.integrations.access_analyzer import access_analyzer_to_finding
@@ -53,6 +52,7 @@ from aws_security_scanner.scan_summary import (
     scan_exit_code,
     write_scan_summary,
 )
+from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
 
 
 
@@ -1056,14 +1056,23 @@ def main() -> None:
                 for item in discovery_coverage
             )
             report_assessment = {
-                **(assessment_metadata if isinstance(assessment_metadata, dict) else {}),
                 "discovery_coverage": discovery_coverage,
                 "discovery_summary": {
                     "services_assessed": len(discovery_coverage),
                     "services_with_gaps": failed_services,
                 },
             }
-        write_json_report(findings, output_path, compliance_mapping, report_assessment)
+        json_assessment = (
+            dict(report_assessment) if isinstance(report_assessment, dict) else {}
+        )
+        if permissions_preflight is not None:
+            json_assessment["permissions_preflight"] = permissions_preflight
+        write_json_report(
+            findings,
+            output_path,
+            compliance_mapping,
+            json_assessment or report_assessment,
+        )
     elif args.format == "html":
         write_html_report(findings, output_path, compliance_mapping, assessment_metadata)
     elif args.format == "sarif":
