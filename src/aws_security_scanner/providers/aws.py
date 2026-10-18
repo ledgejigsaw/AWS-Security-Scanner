@@ -14,6 +14,46 @@ class CredentialReportUnavailableError(RuntimeError):
     """Raised when IAM credential-report data is not ready or incomplete."""
 
 
+def _advanced_selector_is_data_event(selector: dict[str, Any]) -> bool:
+    """Return true only when an advanced selector explicitly includes Data events."""
+    fields = selector.get("FieldSelectors", [])
+    if not isinstance(fields, list):
+        return False
+    for field in fields:
+        if not isinstance(field, dict) or field.get("Field") != "eventCategory":
+            continue
+        values = field.get("Equals", [])
+        if isinstance(values, list) and "Data" in values:
+            return True
+    return False
+
+
+def _count_cloudtrail_data_selectors(
+    basic_selectors: list[dict[str, Any]],
+    advanced_selectors: list[dict[str, Any]],
+) -> int:
+    """Count observable data-resource entries and advanced Data selectors."""
+    basic_count = 0
+    for selector in basic_selectors:
+        resources = selector.get("DataResources", [])
+        if isinstance(resources, list):
+            basic_count += len(resources)
+    return basic_count + sum(_advanced_selector_is_data_event(item) for item in advanced_selectors)
+
+
+def _cloudtrail_data_event_coverage(
+    basic_selectors: list[dict[str, Any]],
+    advanced_selectors: list[dict[str, Any]],
+    discovery_state: str,
+) -> str:
+    """Avoid inferring data-event coverage from inaccessible selector metadata."""
+    if discovery_state != "success":
+        return "unknown"
+    if _count_cloudtrail_data_selectors(basic_selectors, advanced_selectors) > 0:
+        return "configured"
+    return "not_observed"
+
+
 class AWSProvider:
     """Discover AWS resources using read-only boto3 clients."""
 
@@ -1880,44 +1920,6 @@ class AWSProvider:
 
 
 
-def _advanced_selector_is_data_event(selector: dict[str, Any]) -> bool:
-    """Return true only when an advanced selector explicitly includes Data events."""
-    fields = selector.get("FieldSelectors", [])
-    if not isinstance(fields, list):
-        return False
-    for field in fields:
-        if not isinstance(field, dict) or field.get("Field") != "eventCategory":
-            continue
-        values = field.get("Equals", [])
-        if isinstance(values, list) and "Data" in values:
-            return True
-    return False
-
-
-def _count_cloudtrail_data_selectors(
-    basic_selectors: list[dict[str, Any]],
-    advanced_selectors: list[dict[str, Any]],
-) -> int:
-    """Count observable data-resource entries and advanced Data selectors."""
-    basic_count = 0
-    for selector in basic_selectors:
-        resources = selector.get("DataResources", [])
-        if isinstance(resources, list):
-            basic_count += len(resources)
-    return basic_count + sum(_advanced_selector_is_data_event(item) for item in advanced_selectors)
-
-
-def _cloudtrail_data_event_coverage(
-    basic_selectors: list[dict[str, Any]],
-    advanced_selectors: list[dict[str, Any]],
-    discovery_state: str,
-) -> str:
-    """Avoid inferring data-event coverage from inaccessible selector metadata."""
-    if discovery_state != "success":
-        return "unknown"
-    if _count_cloudtrail_data_selectors(basic_selectors, advanced_selectors) > 0:
-        return "configured"
-    return "not_observed"
 
     def discover_cloudtrail_trails(self) -> list[Resource]:
         """Discover CloudTrail trails and their logging status."""
