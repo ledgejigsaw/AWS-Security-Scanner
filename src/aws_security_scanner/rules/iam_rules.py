@@ -1,6 +1,24 @@
 from aws_security_scanner.models.finding import Finding, Severity
 from aws_security_scanner.models.resource import Resource
 from aws_security_scanner.rules.decorators import rule_for
+
+
+def _policy_statement_condition_context(statement: dict) -> str:
+    """Describe IAM condition keys without assuming they make a grant safe."""
+    condition = statement.get("Condition")
+    if not isinstance(condition, dict) or not condition:
+        return "Condition=absent"
+    keys = sorted({
+        str(key)
+        for operator_values in condition.values()
+        if isinstance(operator_values, dict)
+        for key in operator_values
+    })
+    operators = sorted(str(operator) for operator in condition)
+    return (
+        f"Condition=present; operators={operators}; keys={keys}; "
+        "condition semantics require contextual review"
+    )
 from datetime import datetime, timezone
 
 
@@ -81,7 +99,8 @@ def check_overly_permissive_policy(
                     evidence=(
                         "Effect=Allow, "
                         f"Action={action}, "
-                        f"Resource={resource_scope}"
+                        f"Resource={resource_scope}; "
+                        f"{_policy_statement_condition_context(statement)}"
                     ),
                 )
             )
@@ -192,7 +211,8 @@ def check_wildcard_permissions(
                         f"Effect=Allow, "
                         f"Action={action}, "
                         f"NotAction={not_action}, "
-                        f"Resource={resource_scope}"
+                        f"Resource={resource_scope}; "
+                        f"{_policy_statement_condition_context(statement)}"
                     ),
                 )
             )
