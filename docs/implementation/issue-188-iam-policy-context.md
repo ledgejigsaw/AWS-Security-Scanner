@@ -14,10 +14,7 @@ to statement-level observations by the existing analyzer.
 
 ## Limits
 
-This does not calculate effective permissions and does not yet inventory AWS
-Organizations SCP attachments or arbitrary resource policies. Those contexts
-must be collected and evaluated before an effective-access conclusion could
-be justified. The API reports these limits explicitly.
+Optional helpers now analyse supplied resource-policy documents and collect SCPs attached to explicitly supplied Organizations target IDs. SCP collection remains partial when access is denied or a policy document is unavailable. This does not recursively discover every applicable root/OU/account attachment and does not calculate effective permissions. The API reports these limits explicitly.
 
 ## Validation
 
