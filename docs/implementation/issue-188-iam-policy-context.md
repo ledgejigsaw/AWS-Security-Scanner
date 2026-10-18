@@ -1,16 +1,34 @@
 # Issue #188 — IAM policy-context analysis
 
-Status: implementation plan / draft PR. This document does not claim effective permissions are calculated.
+## Implemented in this PR
 
-## Implementation sequence
-1. Extend inventory for attached and inline policies on users, groups, and roles, with policy-version handling.
-2. Capture permissions-boundary presence and policy, trust-policy principals and conditions, and explicit denies.
-3. Add Organizations SCP context only when available and authorised; represent unavailable context as unknown.
-4. Collect supported resource-policy context without storing unnecessary raw policy payloads in reports.
-5. Keep direct statement analysis separate from effective-authorization conclusions; do not claim effective access without complete documented evaluation semantics.
+The new collect_iam_policy_context API inventories IAM users, groups, and roles;
+records attached and inline policies; reads managed policies at their default
+version; captures permissions-boundary presence and role trust-policy context;
+and applies the existing conservative statement analyzer to policy documents.
+Pagination is checked, and access denied or malformed/missing documents remain
+unknown/partial rather than being interpreted as no policy.
 
-## Required tests
-Attached/inline policies, default and non-default versions, boundaries, trust conditions, wildcard principals, explicit deny, AccessDenied, missing Organizations permissions, unavailable resource policies.
+Raw API responses are not copied into the report. Policy documents are reduced
+to statement-level observations by the existing analyzer.
 
-## Safety
-Document least-privilege read-only actions, minimise sensitive evidence, and use fixtures/mocks in CI.
+## Limits
+
+This does not calculate effective permissions and does not yet inventory AWS
+Organizations SCP attachments or arbitrary resource policies. Those contexts
+must be collected and evaluated before an effective-access conclusion could
+be justified. The API reports these limits explicitly.
+
+## Validation
+
+Offline mock tests cover attached policies, default policy versions, boundaries,
+trust principals, and AccessDenied handling. Tests were added but not executed
+in this editing session; CI is the merge gate.
+
+## Permissions
+
+The caller needs read-only IAM inventory permissions, including ListUsers,
+ListGroups, ListRoles, ListAttachedUserPolicies, ListAttachedGroupPolicies,
+ListAttachedRolePolicies, ListUserPolicies, ListGroupPolicies, ListRolePolicies,
+GetUserPolicy, GetGroupPolicy, GetRolePolicy, GetPolicy, and GetPolicyVersion.
+Grant only the calls required by the inventory scope.
