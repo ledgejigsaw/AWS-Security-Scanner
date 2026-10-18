@@ -13,6 +13,7 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.terraform_hcl import TerraformHCLProvider
 from aws_security_scanner.providers.aws import AWSProvider
+from aws_security_scanner.discovery_coverage import DiscoveryOperation, DiscoveryOutcome, classify_discovery_error, summarise_discovery_operations
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.integrations.access_analyzer import access_analyzer_to_finding
@@ -398,7 +399,15 @@ def discover_resources(
             service_resources = []
             successful_operations = 0
             failed_operations = []
+            operation_records = []
             for discover in discovery_by_service[service]:
+                operation_name = (
+                    getattr(discover, "_mock_name", None)
+                    or getattr(discover, "__name__", None)
+                    or "discovery"
+                )
+                operation_name = str(operation_name)[:120]
+                scope = region or "configured-region"
                 try:
                     discovered = discover()
                 except (ClientError, BotoCoreError, RuntimeError) as exc:
@@ -406,18 +415,23 @@ def discover_resources(
                         error_code = exc.response.get("Error", {}).get("Code", "ClientError")
                     else:
                         error_code = type(exc).__name__
-                    operation_name = (
-                        getattr(discover, "_mock_name", None)
-                        or getattr(discover, "__name__", None)
-                        or "discovery"
-                    )
+                    outcome, error_category = classify_discovery_error(exc)
                     failed_operations.append({
-                        "operation": str(operation_name)[:120],
+                        "operation": operation_name,
                         "error_code": str(error_code)[:80],
+                        "error_category": error_category,
                     })
+                    operation_records.append(DiscoveryOperation.for_operation(
+                        service, operation_name, scope, outcome,
+                        error_category=error_category,
+                    ).to_dict())
                     continue
                 successful_operations += 1
                 service_resources.extend(discovered)
+                operation_records.append(DiscoveryOperation.for_operation(
+                    service, operation_name, scope, DiscoveryOutcome.SUCCESS,
+                    resources_discovered=len(discovered),
+                ).to_dict())
 
             resources.extend(service_resources)
             if discovery_coverage is not None:
@@ -430,11 +444,28 @@ def discover_resources(
                 else:
                     status = "success"
                 discovery_coverage.append({
+                    "schema_version": "1.0.0",
                     "service": service,
+                    "scope": region or "configured-region",
                     "status": status,
                     "resources_discovered": len(service_resources),
                     "successful_operations": successful_operations,
                     "failed_operations": failed_operations,
+                    "operations": operation_records,
+                    "operation_summary": summarise_discovery_operations([
+                        DiscoveryOperation(
+                            service=item["service"],
+                            operation=item["operation"],
+                            scope=item["scope"],
+                            outcome=DiscoveryOutcome(item["outcome"]),
+                            resources_discovered=item["resources_discovered"],
+                            pages=item["pages"],
+                            pagination_complete=item["pagination_complete"],
+                            error_category=item["error_category"],
+                            iam_action=item["iam_action"],
+                        )
+                        for item in operation_records
+                    ]),
                 })
 
         if account_id is not None:
@@ -1029,11 +1060,21 @@ def main() -> None:
                 item["status"] in {"partial", "failed"}
                 for item in discovery_coverage
             )
+            operation_count = sum(len(item.get("operations", [])) for item in discovery_coverage)
+            operations_with_gaps = sum(
+                operation.get("outcome") not in {"success", "skipped"}
+                for item in discovery_coverage
+                for operation in item.get("operations", [])
+            )
             report_assessment = {
+                "schema_version": "1.0.0",
+                "status": "incomplete" if failed_services or operations_with_gaps else "complete",
                 "discovery_coverage": discovery_coverage,
                 "discovery_summary": {
                     "services_assessed": len(discovery_coverage),
                     "services_with_gaps": failed_services,
+                    "operations_assessed": operation_count,
+                    "operations_with_gaps": operations_with_gaps,
                 },
             }
         write_json_report(findings, output_path, compliance_mapping, report_assessment)
