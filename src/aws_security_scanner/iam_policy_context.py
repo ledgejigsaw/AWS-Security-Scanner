@@ -12,7 +12,7 @@ def _pages(client: Any, method_name: str, result_key: str, **kwargs: Any) -> lis
     """Collect marker-paginated IAM API results and fail on repeated markers."""
     method = getattr(client, method_name)
     marker = None
-    results: list[dict[str, Any]] = []
+    results: list[Any] = []
     while True:
         request = dict(kwargs)
         if marker:
@@ -20,7 +20,7 @@ def _pages(client: Any, method_name: str, result_key: str, **kwargs: Any) -> lis
         response = method(**request)
         values = response.get(result_key, [])
         if isinstance(values, list):
-            results.extend(item for item in values if isinstance(item, dict))
+            results.extend(values)
         if not response.get("IsTruncated"):
             break
         next_marker = response.get("Marker")
@@ -83,6 +83,8 @@ def collect_iam_policy_context(iam_client: Any) -> dict[str, Any]:
                 continue
 
             for entity in discovered:
+                if not isinstance(entity, dict):
+                    continue
                 name = entity.get(name_key)
                 if not isinstance(name, str) or not name:
                     continue
@@ -121,7 +123,7 @@ def collect_iam_policy_context(iam_client: Any) -> dict[str, Any]:
                         record: dict[str, Any] = {"name": policy_name, "arn": policy_arn}
                         if inline:
                             try:
-                                response = iam_client.get_{entity_type}_policy(**{entity_arg: name, "PolicyName": policy_name})
+                                response = getattr(iam_client, f"get_{entity_type}_policy")(**{entity_arg: name, "PolicyName": policy_name})
                                 document = response.get("PolicyDocument")
                                 if isinstance(document, (dict, str)):
                                     record["analysis"] = analyze_iam_policy(document, policy_source="inline_identity_policy")
