@@ -220,12 +220,31 @@ def check_wildcard_bucket_policy(resource: Resource) -> list[Finding]:
         )
 
         if wildcard_principal:
+            actions = statement.get("Action")
+            resources = statement.get("Resource")
+            condition = statement.get("Condition")
+            if isinstance(condition, dict) and condition:
+                condition_keys = sorted({
+                    str(key)
+                    for values in condition.values()
+                    if isinstance(values, dict)
+                    for key in values
+                })
+                condition_context = (
+                    f"Condition=present; operators={sorted(map(str, condition))}; "
+                    f"keys={condition_keys}; constraints require contextual review"
+                )
+            else:
+                condition_context = "Condition=absent"
             findings.append(
                 Finding.from_rule(
                     check_wildcard_bucket_policy,
                     resource=resource.resource_id,
                     region=resource.region,
-                    evidence=f"Principal={principal}",
+                    evidence=(
+                        f"Principal={principal}; Action={actions}; Resource={resources}; "
+                        f"{condition_context}"
+                    ),
                 )
             )
             break
