@@ -1060,11 +1060,21 @@ def main() -> None:
                 item["status"] in {"partial", "failed"}
                 for item in discovery_coverage
             )
+            operation_count = sum(len(item.get("operations", [])) for item in discovery_coverage)
+            operations_with_gaps = sum(
+                operation.get("outcome") not in {"success", "skipped"}
+                for item in discovery_coverage
+                for operation in item.get("operations", [])
+            )
             report_assessment = {
+                "schema_version": "1.0.0",
+                "status": "incomplete" if failed_services or operations_with_gaps else "complete",
                 "discovery_coverage": discovery_coverage,
                 "discovery_summary": {
                     "services_assessed": len(discovery_coverage),
                     "services_with_gaps": failed_services,
+                    "operations_assessed": operation_count,
+                    "operations_with_gaps": operations_with_gaps,
                 },
             }
         write_json_report(findings, output_path, compliance_mapping, report_assessment)
