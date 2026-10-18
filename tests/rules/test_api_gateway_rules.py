@@ -77,3 +77,32 @@ def test_http_api_access_logging_rule():
     assert module.check_api_gateway_http_api_access_logging_disabled(http_stage(access_logging_enabled=False)) 
     assert module.check_api_gateway_http_api_access_logging_disabled(http_stage(access_logging_enabled=True)) == []
     assert module.check_api_gateway_http_api_access_logging_disabled(http_stage()) == []
+
+
+def test_http_api_authorized_routes_are_not_reported():
+    from aws_security_scanner.rules.api_gateway_rules import check_api_gateway_http_api_unauthenticated_routes
+
+    findings = check_api_gateway_http_api_unauthenticated_routes(http_stage(routes=[
+        {"route_key": "GET /private", "authorization_type": "AWS_IAM"},
+        {"route_key": "GET /jwt", "authorization_type": "JWT", "authorizer_id": "auth-1"},
+        {"route_key": "GET /lambda", "authorization_type": "CUSTOM", "authorizer_id": "auth-2"},
+    ]))
+
+    assert findings == []
+
+
+def test_http_api_unknown_authorization_is_not_assumed_unauthenticated():
+    from aws_security_scanner.rules.api_gateway_rules import check_api_gateway_http_api_unauthenticated_routes
+
+    assert check_api_gateway_http_api_unauthenticated_routes(http_stage(routes=[
+        {"route_key": "GET /unknown", "authorization_type": None},
+        {"route_key": "GET /missing"},
+    ])) == []
+
+
+def test_http_api_logging_requires_explicit_disabled_state_to_flag():
+    from aws_security_scanner.rules.api_gateway_rules import check_api_gateway_http_api_access_logging_disabled
+
+    assert check_api_gateway_http_api_access_logging_disabled(http_stage(access_logging_enabled=False))
+    assert check_api_gateway_http_api_access_logging_disabled(http_stage(access_logging_enabled=True)) == []
+    assert check_api_gateway_http_api_access_logging_disabled(http_stage()) == []

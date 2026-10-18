@@ -26,7 +26,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | DynamoDB | 3 | Point-in-time recovery, explicit server-side encryption state and deletion protection. |
 | SQS | 2 | Sensitive wildcard access and explicit encryption state. Queue messages are never read. |
 | SNS | 2 | Sensitive wildcard access and explicit encryption state. Messages are never published or consumed. |
-| API Gateway REST APIs | 2 | Method authorization and stage access logging. HTTP APIs v2 are not yet covered. |
+| API Gateway REST and HTTP APIs v2 | 4 | REST API method authorization and stage access logging; HTTP API route authorization and stage access logging. Only explicitly observed `NONE` authorization is flagged; unknown route/stage metadata is not treated as safe or insecure. |
 | WAFv2 | 2 | Managed rule group and rate-based rule coverage review signals; does not evaluate rule efficacy or managed-rule versions. |
 | Application Load Balancers | 4 | Missing WAF association, internet-facing HTTP listeners, explicitly known legacy TLS policies that permit TLS 1.0/1.1, and disabled access logging as review signals. Unknown policy names are not classified; Network Load Balancers are not included. | 
 | ECS/Fargate | 7 | Privileged mode, host networking, explicit root user, writable root filesystem, public-IP assignment, shared task/execution role review signal and mutable container image references without digest pins. Public IP assignment does not prove internet reachability; role sharing and digest pinning are review signals. |
@@ -35,7 +35,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | CloudWatch | 2 | Missing explicit log-group retention (LOW, policy-dependent) and metric alarms without enabled alarm actions (INFO review signal). The scanner does not read log events or claim that generic alarms cover every security control. |
 | EFS | 2 | Explicitly unencrypted file systems and an informational review signal for access points configured with POSIX UID 0. Network reachability is not inferred from security-group IDs alone. |
 | CodeBuild | 2 | Privileged build mode and sensitive-looking environment variable names explicitly stored as PLAINTEXT. Values are never collected; the checks are not a full build-supply-chain analysis. |
-| **Total** | **127** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **129** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
