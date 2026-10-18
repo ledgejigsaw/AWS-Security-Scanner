@@ -18,7 +18,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | GuardDuty | 1 | Regional detector enablement; optional bounded native-finding import preserves source IDs and timestamps. |
 | AWS Config | 3 | Regional recorder configuration, recording state and delivery-channel presence. Missing status remains unknown; API errors fail discovery. |
 | Amazon Macie | 1 | Regional session enablement/paused status. This does not assess discovery-job coverage or delegated-administrator configuration; optional bounded native Macie finding import is available with `--include-native-findings`. |
-| KMS | 5 | Rotation, pending deletion, wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals. This is not a full IAM/KMS policy simulator. |
+| KMS | 5 | Rotation, disabled/pending-deletion key lifecycle, wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals. Grant count and pagination completeness are recorded; denied grant inventory remains unknown. This is not a full IAM/KMS policy simulator. |
 | RDS | 5 | Encryption, public accessibility, backup retention, deletion protection and reported server-certificate expiry within 30 days. Unknown certificate metadata is not flagged. |
 | Lambda | 3 | Function URL authentication, wildcard invocation policies and a reviewed snapshot of known deprecated runtimes. Lifecycle data must be refreshed against AWS before release. |
 | Secrets Manager | 2 | Explicitly disabled rotation and unconditional wildcard-principal resource policies. Secret values must never be retrieved. |
