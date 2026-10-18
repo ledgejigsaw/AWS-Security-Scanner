@@ -1598,3 +1598,57 @@ def test_aws_provider_keeps_malformed_object_lock_response_unknown():
         "enabled": None,
         "default_retention": None,
     }
+
+
+def test_cloudtrail_advanced_selectors_count_only_explicit_data_events():
+    cloudtrail = Mock()
+    cloudtrail.describe_trails.return_value = {"trailList": [{
+        "Name": "account-trail", "TrailARN": "arn:aws:cloudtrail:eu-west-2:123456789012:trail/account-trail",
+        "IsOrganizationTrail": False, "IsMultiRegionTrail": True,
+    }]}
+    cloudtrail.get_trail_status.return_value = {"IsLogging": True}
+    cloudtrail.get_event_selectors.return_value = {
+        "EventSelectors": [{"IncludeManagementEvents": True, "DataResources": [
+            {"Type": "AWS::S3::Object", "Values": ["arn:aws:s3:::example/*"]}
+        ]}],
+        "AdvancedEventSelectors": [
+            {"Name": "data-events", "FieldSelectors": [
+                {"Field": "eventCategory", "Equals": ["Data"]},
+                {"Field": "resources.type", "Equals": ["AWS::Lambda::Function"]},
+            ]},
+            {"Name": "management-only", "FieldSelectors": [
+                {"Field": "eventCategory", "Equals": ["Management"]}
+            ]},
+        ],
+    }
+    resource = AWSProvider(cloudtrail_client=cloudtrail, region="eu-west-2").discover_cloudtrail_trails()[0]
+    assert resource.attributes["organization_trail_scope"] == "account"
+    assert resource.attributes["data_event_selector_count"] == 2
+    assert resource.attributes["data_event_coverage"] == "configured"
+
+
+def test_cloudtrail_missing_org_metadata_remains_unknown():
+    cloudtrail = Mock()
+    cloudtrail.describe_trails.return_value = {"trailList": [{
+        "Name": "legacy", "TrailARN": "arn:aws:cloudtrail:eu-west-2:123456789012:trail/legacy",
+    }]}
+    cloudtrail.get_trail_status.return_value = {"IsLogging": True}
+    cloudtrail.get_event_selectors.return_value = {"EventSelectors": [], "AdvancedEventSelectors": []}
+    resource = AWSProvider(cloudtrail_client=cloudtrail).discover_cloudtrail_trails()[0]
+    assert resource.attributes["is_organization_trail"] is None
+    assert resource.attributes["organization_trail_scope"] == "unknown"
+    assert resource.attributes["data_event_coverage"] == "not_observed"
+
+
+def test_cloudtrail_denied_selector_access_does_not_claim_no_data_events():
+    cloudtrail = Mock()
+    cloudtrail.describe_trails.return_value = {"trailList": [{
+        "Name": "restricted", "TrailARN": "arn:aws:cloudtrail:eu-west-2:123456789012:trail/restricted",
+    }]}
+    cloudtrail.get_trail_status.return_value = {"IsLogging": True}
+    cloudtrail.get_event_selectors.side_effect = ClientError(
+        {"Error": {"Code": "AccessDenied", "Message": "sensitive"}}, "GetEventSelectors"
+    )
+    resource = AWSProvider(cloudtrail_client=cloudtrail).discover_cloudtrail_trails()[0]
+    assert resource.attributes["event_selector_discovery"] == "unknown"
+    assert resource.attributes["data_event_coverage"] == "unknown"
