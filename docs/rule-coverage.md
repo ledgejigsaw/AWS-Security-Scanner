@@ -35,7 +35,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | CloudWatch | 2 | Missing explicit log-group retention (LOW, policy-dependent) and metric alarms without enabled alarm actions (INFO review signal). The scanner does not read log events or claim that generic alarms cover every security control. |
 | EFS | 2 | Explicitly unencrypted file systems and an informational review signal for access points configured with POSIX UID 0. Network reachability is not inferred from security-group IDs alone. |
 | CodeBuild | 2 | Privileged build mode and sensitive-looking environment variable names explicitly stored as PLAINTEXT. Values are never collected; the checks are not a full build-supply-chain analysis. |
-| **Total** | **129** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **127** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 
