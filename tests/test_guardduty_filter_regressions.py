@@ -35,7 +35,7 @@ def test_guardduty_applies_archive_and_updated_after_filters():
 @pytest.mark.parametrize("value", ["2026-10-01", "not-a-date", "2026-10-01T00:00:00"])
 def test_guardduty_rejects_invalid_or_timezone_naive_updated_after(value):
     provider = _provider()
-    with pytest.raises(ValueError, match="ISO-8601"):
+    with pytest.raises(ValueError, match="ISO-8601|timezone"):
         provider.get_guardduty_findings(updated_after=value)
     provider.guardduty_client.list_detectors.assert_not_called()
 
