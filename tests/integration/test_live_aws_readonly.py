@@ -11,20 +11,24 @@ import boto3
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError
 
+from aws_security_scanner.live_aws import (
+    live_aws_opted_in,
+    validate_expected_account_id,
+    verify_caller_account,
+)
+
 
 pytestmark = pytest.mark.live_aws
 
 
 def _live_session() -> boto3.Session:
-    if os.getenv("AWS_SECURITY_SCANNER_LIVE_AWS") != "1":
+    if not live_aws_opted_in():
         pytest.skip("set AWS_SECURITY_SCANNER_LIVE_AWS=1 to opt in to live AWS tests")
 
-    expected = os.getenv("AWS_SECURITY_SCANNER_EXPECTED_ACCOUNT_ID", "")
-    if len(expected) != 12 or not expected.isdigit():
-        pytest.fail(
-            "live AWS tests require AWS_SECURITY_SCANNER_EXPECTED_ACCOUNT_ID "
-            "to be a 12-digit account ID"
-        )
+    try:
+        validate_expected_account_id(os.getenv("AWS_SECURITY_SCANNER_EXPECTED_ACCOUNT_ID"))
+    except ValueError as exc:
+        pytest.fail(f"live AWS tests require AWS_SECURITY_SCANNER_EXPECTED_ACCOUNT_ID: {exc}")
     profile = os.getenv("AWS_SECURITY_SCANNER_AWS_PROFILE")
     return boto3.Session(profile_name=profile) if profile else boto3.Session()
 
@@ -39,10 +43,10 @@ def test_live_identity_matches_explicit_test_account_and_s3_is_read_only() -> No
     except (BotoCoreError, ClientError) as exc:
         pytest.fail(f"unable to verify live AWS caller identity ({type(exc).__name__})")
 
-    assert identity.get("Account") == expected, (
-        "refusing live test: caller account does not match "
-        "AWS_SECURITY_SCANNER_EXPECTED_ACCOUNT_ID"
-    )
+    try:
+        verify_caller_account(identity, expected)
+    except ValueError as exc:
+        pytest.fail(f"refusing live test: {exc}")
 
     # This is deliberately a read-only smoke test. No create/update/delete APIs
     # are called and no account resources are provisioned or cleaned up.
