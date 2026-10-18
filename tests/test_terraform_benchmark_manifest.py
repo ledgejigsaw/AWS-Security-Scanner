@@ -5,7 +5,7 @@ from scripts.benchmark_terraform_corpus import _validate_manifest
 
 
 def valid_manifest(tmp_path):
-    (tmp_path / "case").mkdir()
+    (tmp_path / "case").mkdir(exist_ok=True)
     return {
         "schema_version": "1.0.0",
         "cases": [{
