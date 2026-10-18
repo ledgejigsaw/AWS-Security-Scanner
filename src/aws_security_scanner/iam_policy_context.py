@@ -156,3 +156,120 @@ def collect_iam_policy_context(iam_client: Any) -> dict[str, Any]:
             "A missing policy document caused by access denial is unknown, not an empty policy.",
         ],
     }
+
+
+def analyze_resource_policy_context(
+    policies: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Analyse supplied resource-policy documents without returning raw JSON."""
+    results = []
+    for index, policy in enumerate(policies):
+        if not isinstance(policy, dict):
+            results.append({"index": index, "status": "unknown", "diagnostic": "policy_record_invalid"})
+            continue
+        resource_id = policy.get("resource_id")
+        document = policy.get("policy_document")
+        if not isinstance(document, (dict, str)):
+            results.append({
+                "resource_id": resource_id if isinstance(resource_id, str) else None,
+                "status": "unknown",
+                "diagnostic": "policy_document_unavailable",
+            })
+            continue
+        analysis = analyze_iam_policy(document, policy_source="resource_policy")
+        results.append({
+            "resource_id": resource_id if isinstance(resource_id, str) else None,
+            "status": analysis["status"],
+            "analysis": analysis,
+        })
+    return {
+        "schema_version": "1.0.0",
+        "status": "partial" if any(item["status"] == "unknown" for item in results) else "complete",
+        "policies": sorted(results, key=lambda item: (item.get("resource_id") or "", item["status"])),
+        "limitations": [
+            "Resource policy statements are analysed independently from identity policies and permissions boundaries.",
+            "The resource identifier is a correlation label only; no effective-access decision is inferred.",
+        ],
+    }
+
+
+def collect_scp_context(
+    organizations_client: Any,
+    target_ids: list[str],
+) -> dict[str, Any]:
+    """Collect SCPs attached to caller-supplied account, OU, or root targets.
+
+    Organizations is optional and may be unavailable to member accounts. A
+    denied call is reported as unknown context, never as an empty SCP set.
+    """
+    policies: list[dict[str, Any]] = []
+    failures: list[dict[str, str]] = []
+    for target_id in sorted(set(target_ids)):
+        if not isinstance(target_id, str) or not target_id:
+            continue
+        try:
+            attached = _next_token_pages(
+                organizations_client, "list_policies_for_target", "Policies",
+                TargetId=target_id, Filter="SERVICE_CONTROL_POLICY",
+            )
+        except Exception as exc:
+            failures.append({"target_id": target_id, "operation": "list_policies_for_target", "outcome": _error_category(exc)})
+            continue
+        for policy in attached:
+            policy_id = policy.get("Id")
+            if not isinstance(policy_id, str) or not policy_id:
+                continue
+            try:
+                response = organizations_client.describe_policy(PolicyId=policy_id)
+                policy_data = response.get("Policy", {}).get("Content")
+                if not isinstance(policy_data, (str, dict)):
+                    raise ValueError("SCP content unavailable")
+                policies.append({
+                    "target_id": target_id,
+                    "policy_id": policy_id,
+                    "name": policy.get("Name"),
+                    "analysis": analyze_iam_policy(policy_data, policy_source="service_control_policy"),
+                    "status": "complete",
+                })
+            except Exception as exc:
+                failures.append({"target_id": target_id, "operation": "describe_policy", "outcome": _error_category(exc)})
+                policies.append({
+                    "target_id": target_id, "policy_id": policy_id,
+                    "name": policy.get("Name"), "analysis": None, "status": "unknown",
+                })
+    return {
+        "schema_version": "1.0.0",
+        "status": "partial" if failures else "complete",
+        "policies": sorted(policies, key=lambda item: (item["target_id"], item["policy_id"])),
+        "failures": sorted(failures, key=lambda item: (item["target_id"], item["operation"])),
+        "limitations": [
+            "Only the target IDs explicitly supplied by the caller are inspected.",
+            "SCP analysis is static statement context and does not calculate effective permissions.",
+        ],
+    }
+
+
+def _next_token_pages(
+    client: Any,
+    method_name: str,
+    result_key: str,
+    **kwargs: Any,
+) -> list[dict[str, Any]]:
+    """Collect Organizations NextToken pages with loop and shape checks."""
+    method = getattr(client, method_name)
+    token = None
+    results: list[dict[str, Any]] = []
+    while True:
+        request = dict(kwargs)
+        if token:
+            request["NextToken"] = token
+        response = method(**request)
+        values = response.get(result_key, [])
+        if isinstance(values, list):
+            results.extend(item for item in values if isinstance(item, dict))
+        next_token = response.get("NextToken")
+        if not next_token:
+            return results
+        if next_token == token:
+            raise RuntimeError(f"{method_name} returned a repeated continuation token")
+        token = next_token
