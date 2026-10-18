@@ -1250,3 +1250,48 @@ def test_object_lock_unknown_or_unversioned_bucket_does_not_generate_finding():
 
     assert check_object_lock_review(unknown) == []
     assert check_object_lock_review(unversioned) == []
+
+
+def test_wildcard_bucket_policy_preserves_condition_and_scope_context():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="conditional-public-bucket",
+        attributes={"bucket_policy": {"Statement": [{
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": ["s3:GetObject"],
+            "Resource": "arn:aws:s3:::example-bucket/*",
+            "Condition": {"StringEquals": {"aws:PrincipalOrgID": "o-example"}},
+        }]}},
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_bucket_policy(resource)
+
+    assert len(findings) == 1
+    evidence = findings[0].evidence
+    assert "Principal=*" in evidence
+    assert "s3:GetObject" in evidence
+    assert "example-bucket/*" in evidence
+    assert "Condition=present" in evidence
+    assert "aws:PrincipalOrgID" in evidence
+    assert "constraints require contextual review" in evidence
+
+
+def test_unconditional_wildcard_bucket_policy_records_missing_condition():
+    resource = Resource(
+        resource_type="aws_s3_bucket",
+        resource_id="unconditional-public-bucket",
+        attributes={"bucket_policy": {"Statement": [{
+            "Effect": "Allow", "Principal": "*", "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::example-bucket/*",
+        }]}},
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_bucket_policy(resource)
+
+    assert len(findings) == 1
+    assert "Condition=absent" in findings[0].evidence
