@@ -982,10 +982,14 @@ def main() -> None:
     baseline_action_requested = bool(
         args.write_baseline or args.compare_baseline or args.baseline
     )
+    failed_account_count = (
+        assessment_metadata.get("summary", {}).get("failed_accounts", 0)
+        if isinstance(assessment_metadata, dict)
+        and isinstance(assessment_metadata.get("summary", {}), dict)
+        else 0
+    )
     baseline_actions_skipped = bool(
-        assessment_metadata
-        and assessment_metadata["summary"]["failed_accounts"] > 0
-        and baseline_action_requested
+        failed_account_count > 0 and baseline_action_requested
     )
     if baseline_actions_skipped:
         print(
@@ -1118,7 +1122,7 @@ def main() -> None:
 
     assessment_incomplete = bool(
         baseline_actions_skipped
-        or (assessment_metadata and assessment_metadata["summary"]["failed_accounts"] > 0)
+        or failed_account_count > 0
         or discovery_has_gaps
         or hcl_analysis_incomplete
     )
