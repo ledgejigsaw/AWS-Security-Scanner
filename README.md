@@ -113,7 +113,7 @@ The scanner checks that each selected region has an enabled GuardDuty detector. 
 | GuardDuty | Regional detector enablement posture and optional bounded native-finding import, preserving source IDs and timestamps |
 | AWS Config | Regional recorder status, recording state and delivery-channel presence; API permission failures are not treated as disabled state |
 | Amazon Macie | Regional session enablement/paused status; does not assess discovery-job coverage or delegated-administrator configuration |
-| KMS | Automatic rotation, pending deletion, broad wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals |
+| KMS | Automatic rotation, disabled/pending-deletion lifecycle, broad wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals; grant pagination completeness is tracked |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
 | Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies and runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot |
 | Secrets Manager | Explicitly disabled automatic rotation and unconditional wildcard-principal access in resource policies |
@@ -126,7 +126,7 @@ The scanner checks that each selected region has an enabled GuardDuty detector. 
 | Application Load Balancers | WAF association, internet-facing HTTP listeners, explicitly known legacy TLS policies and access logging; unknown discovery state is not treated as absence | 
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 127 rules (18 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 7 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 4 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 127 rules (18 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 4 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -263,7 +263,7 @@ Do not commit credentials, account exports containing sensitive data, or generat
 
 ## AWS discovery coverage and partial assessments
 
-For live AWS scans, the CLI reports a status for each selected service domain: `success` (resources discovered), `empty` (discovery completed with no resources), `partial` (some discovery operations succeeded and others failed), or `failed` (all operations for that domain failed). The JSON report includes per-domain counts and bounded diagnostic codes; raw AWS error messages and request payloads are not copied into coverage diagnostics.
+For live AWS scans, the CLI reports a status for each selected service domain: `success` (resources discovered), `empty` (discovery completed with no resources), `partial` (some discovery operations succeeded and others failed), or `failed` (all operations for that domain failed). Version 1.0.0 coverage entries include scope, per-discovery-function outcomes, operation counts, safe error categories and an operation summary in the JSON assessment. These operation records identify scanner discovery functions, not every nested AWS API call. Raw AWS error messages and request payloads are not copied into coverage diagnostics.
 
 A scan with any `partial` or `failed` service domain emits a warning and exits with status 1 after writing the report. This prevents incomplete visibility from being presented as a clean assessment. An `empty` status means discovery succeeded but returned no resources; it does not prove that an unsupported service or unobservable resource is secure. Service selection with `--service` limits the intended scope and is reflected in the coverage entries.
 
