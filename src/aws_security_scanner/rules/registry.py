@@ -61,6 +61,7 @@ from aws_security_scanner.rules.cloudtrail_rules import (
     check_cloudtrail_cloudwatch_logs_integration,
     check_cloudtrail_delivery_error,
     check_cloudtrail_management_event_coverage,
+    check_cloudtrail_organization_trail_review,
 )
 
 from aws_security_scanner.rules.kms_rules import (
@@ -252,6 +253,7 @@ def get_all_rules():
         check_cloudtrail_cloudwatch_logs_integration,
         check_cloudtrail_delivery_error,
         check_cloudtrail_management_event_coverage,
+        check_cloudtrail_organization_trail_review,
         check_kms_key_rotation,
         check_kms_key_pending_deletion,
         check_kms_key_policy_wildcard_access,
