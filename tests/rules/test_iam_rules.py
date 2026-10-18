@@ -1294,3 +1294,42 @@ def test_unused_iam_role_detected():
     findings = check_unused_iam_role(resource)
     assert len(findings) == 1
     assert findings[0].check_id == "IAM-017"
+
+
+def test_wildcard_iam_finding_preserves_condition_context_without_treating_it_as_safe():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="condition-constrained-wildcard",
+        attributes={"policy_document": {"Statement": [{
+            "Effect": "Allow",
+            "Action": "s3:*",
+            "Resource": "*",
+            "Condition": {"StringEquals": {"aws:PrincipalOrgID": "o-example"}},
+        }]}},
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert "Condition=present" in findings[0].evidence
+    assert "aws:PrincipalOrgID" in findings[0].evidence
+    assert "require contextual review" in findings[0].evidence
+
+
+def test_unconditional_wildcard_iam_finding_records_condition_absence():
+    resource = Resource(
+        resource_type="aws_iam_policy",
+        resource_id="unconditional-wildcard",
+        attributes={"policy_document": {"Statement": [{
+            "Effect": "Allow", "Action": "s3:*", "Resource": "*"
+        }]}},
+        source="fixture",
+        region="eu-west-2",
+    )
+
+    findings = check_wildcard_permissions(resource)
+
+    assert len(findings) == 1
+    assert "Condition=absent" in findings[0].evidence
