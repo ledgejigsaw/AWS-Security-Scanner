@@ -6,7 +6,7 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 ## At a glance
 
-- **129 registered security rules:** 18 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 7 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF, 4 Application Load Balancer, 3 EKS, 2 CloudWatch and 2 EFS and 2 CodeBuild checks.
+- **129 registered security rules:** 18 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 7 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 4 API Gateway (REST and HTTP APIs), 7 ECS, 4 CloudFront, 2 WAF, 4 Application Load Balancer, 3 EKS, 2 CloudWatch, 2 EFS and 2 CodeBuild checks.
 - **Test status:** CI runs the automated suite on Python 3.11 and 3.13; check the latest Actions run for the current branch status.
 - **Inputs:** local JSON fixtures, Terraform JSON, Terraform HCL, versioned resource snapshots and AWS APIs.
 - **Output:** JSON, self-contained HTML, SARIF 2.1.0 and OCSF 1.7.0 reporting, opt-in versioned resource snapshots, minimum-severity filtering, versioned baseline comparison and expiry-aware suppression.
@@ -115,7 +115,7 @@ The scanner checks that each selected region has an enabled GuardDuty detector. 
 | Amazon Macie | Regional session enablement/paused status; does not assess discovery-job coverage or delegated-administrator configuration |
 | KMS | Automatic rotation, disabled/pending-deletion lifecycle, broad wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals; grant pagination completeness is tracked |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
-| Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies and runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot |
+| Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies, runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot and code-signing enforcement review |
 | Secrets Manager | Explicitly disabled automatic rotation and unconditional wildcard-principal access in resource policies |
 | ECR | Mutable image tags and disabled image scanning on push (where the API explicitly reports the setting) |
 | DynamoDB | Point-in-time recovery, explicit server-side encryption status and deletion protection |
@@ -126,7 +126,7 @@ The scanner checks that each selected region has an enabled GuardDuty detector. 
 | Application Load Balancers | WAF association, internet-facing HTTP listeners, explicitly known legacy TLS policies and access logging; unknown discovery state is not treated as absence | 
 | ECS / Fargate | Privileged containers, host network mode, explicitly configured root users, writable container root filesystems and services assigning public IP addresses |
 
-Rules are registered centrally and receive the normalised `Resource` model. The current registry contains 127 rules (18 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 6 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 2 API Gateway, 7 ECS, 4 CloudFront, 2 WAF and 4 Application Load Balancer). Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
+Rules are registered centrally and receive the normalised `Resource` model. The current registry contains **129 rules** across the service domains listed above. The registry and [rule-coverage matrix](docs/rule-coverage.md) are the authoritative service-by-service inventory; registered rule counts do not establish semantic completeness or parity with another scanner. Check IDs and severities are defined in the rule implementation; informational observations, such as an active IAM access key by itself, are not automatically treated as vulnerabilities.
 
 ### Policy and reporting
 
@@ -372,27 +372,69 @@ AWS API calls are mocked in automated tests. These tests establish expected beha
 
 ## Roadmap
 
-Status reflects repository code and automated tests. All provider tests are mocked or fixture-based; **live AWS end-to-end validation has not been performed**.
+This roadmap is ordered by **assessment trustworthiness first, then analysis depth, then breadth**. A large rule count is not a quality metric by itself. The goal is to produce accurate, explainable findings with explicit evidence and honest coverage status.
 
-### Implemented and tested offline
+**Current validation status:** the latest local test run reported by the maintainer is **864 passed, 2 skipped**. Automated tests use fixtures and mocked AWS APIs; **live AWS end-to-end validation has not yet been completed**. Do not interpret passing tests as proof of production-account correctness or full upstream-tool parity.
+
+### Current foundation
 
 - [x] Fixture, Terraform JSON and partial Terraform HCL sources.
-- [x] Read-only AWS discovery across the services listed above, including AWS Config, Security Hub, GuardDuty and Amazon Macie posture.
-- [x] Native Security Hub and GuardDuty finding import, with source identity and deduplication.
-- [x] Multi-account scans through explicit cross-account audit roles, expected-account validation and partial-failure reporting.
-- [x] JSON, self-contained HTML and SARIF reports; optional compliance mapping.
-- [x] Severity filtering, YAML policy overrides, baseline creation, suppression, diffs and expiry metadata.
-- [x] Deterministic resource graph JSON with conservative relationship provenance.
-- [x] CI on Python 3.11 and 3.13 plus container and offline fixture smoke tests.
+- [x] Read-only discovery across the AWS service domains listed in the capability and coverage sections.
+- [x] Explicit discovery coverage states, bounded pagination/retries and incomplete-assessment reporting.
+- [x] Native Security Hub, GuardDuty, IAM Access Analyzer, Inspector and Macie finding ingestion with bounded results and source identity.
+- [x] Explicit cross-account role scans with account identity validation and partial-failure reporting.
+- [x] JSON, self-contained HTML, SARIF and OCSF output; policy overrides, compliance annotations, baselines, diffs and expiry-aware suppressions.
+- [x] Deterministic resource graph output with conservative relationship provenance.
+- [x] Offline HCL benchmark corpus, rule inventory export, container smoke tests and CI on Python 3.11/3.13.
 
-### Limitations and next work
+### Phase 0 — keep evidence and documentation trustworthy
 
-1. **AWS-native integrations:** extend Issue #32 with IAM Access Analyzer findings; assess Macie and Inspector separately before adding their broader APIs.
-2. **S3 access analysis:** continue Issue #36 with condition-aware cross-account bucket-policy analysis and policy-dependent Object Lock signals; do not fetch object contents.
-3. **Explainable risk:** Issue #47 proposes optional, versioned risk scores distinct from severity; scores must not be represented as breach probabilities.
-4. **Multi-cloud architecture:** Issues #58–#60 cover provider-neutral interfaces and future Azure/GCP providers. Azure and GCP are planned, not supported.
-5. **Repository quality:** keep rule inventory, coverage docs, CLI options and examples synchronized with implementation; refresh lifecycle snapshots before releases.
-6. **Live validation:** perform a least-privilege test against a non-production AWS account before claiming end-to-end validation.
+1. **Prevent inventory drift:** [#234 — generate rule inventory and coverage artefacts in CI](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/234). Ensure README counts, per-service totals, selector documentation and rule-coverage tables cannot silently diverge from the registry.
+2. **Maintain a semantic upstream gap ledger:** [#176 — versioned Prowler/ScoutSuite/Checkov gap analysis](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/176). Compare exact scope, conditions, permissions, severity, unknown-state behaviour and tests; do not claim parity based on similar names.
+3. **Validate against a controlled AWS account:** [#121 — live-AWS verification plan](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/121). Use a dedicated non-production account and least-privilege read-only identity; test identity, discovery, denied permissions, pagination and regional behaviour without changing resources.
+
+### Phase 1 — improve accuracy and completeness
+
+4. **IAM policy semantics:** [#227 — conditions, policy constructs and effective-access boundaries](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/227). Model supported IAM policy constructs explicitly and distinguish observed risks from missing evaluation context.
+5. **Network reachability:** [#228 — resolve routes, security groups, ACLs and endpoint relationships](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/228). Report a reachable path only when evidence supports the complete path; unknown edges must not be treated as isolation.
+6. **Regional coverage:** [#229 — opt-in all-enabled-region discovery](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/229). Preserve explicit scope and report each region's outcome; global services require separate handling.
+
+### Phase 2 — deepen Infrastructure-as-Code analysis
+
+7. **Project-wide dependency resolution:** [#172 — Terraform HCL dependency graph](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/172). Resolve supported cross-file and local-module relationships before rule evaluation.
+8. **Safe external module support:** [#174 — opt-in external module resolution](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/174). Keep remote fetching disabled by default; require pinned sources, explicit trust and bounded cache behaviour.
+9. **Plan-to-source enrichment:** [#232 — link plan findings to HCL source and reliable locations](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/232). Preserve planned unknowns and actions; never invent source line numbers or evaluate unsupported expressions.
+
+### Phase 3 — expand high-value AWS security coverage
+
+10. **Analytics, database and search services:** [#230 — prioritise OpenSearch, Redshift, ElastiCache, MSK and AWS Backup](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/230). Add service discovery and a small, tested set of high-confidence controls in separate increments.
+11. **Backup and recovery posture:** [#231 — AWS Backup, retention, replication and recovery signals](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/231). Distinguish backup configuration from freshness and tested restoreability.
+12. **Native finding enrichment:** [#113 — Security Hub standards/control findings](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/113) and [#114 — GuardDuty filters and multi-region coverage](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/114). Keep imports bounded and clearly distinguish imported findings from scanner-authored checks.
+13. **Broader provider direction:** [#58 — provider-neutral architecture](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/58), [#59 — Azure provider](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/59) and [#60 — GCP provider](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/60). Treat these as later-stage work after AWS evidence quality and shared interfaces are stable.
+
+### Phase 4 — prove quality rather than assume parity
+
+14. **Differential benchmark:** [#233 — versioned comparison against Prowler and Checkov](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/233). Track reviewed mappings, false positives/negatives, unknown outcomes and upstream versions using reproducible offline fixtures, with live comparisons opt-in.
+15. **Attack-path analysis:** only after IAM semantics and network relationships are trustworthy. Paths must contain explicit edges, provenance, assumptions and unresolved relationships; resource proximity alone is not evidence of exploitability.
+
+### Competitor positioning and boundaries
+
+- **Prowler** is the primary reference for live cloud posture checks, AWS service breadth, compliance-oriented controls and native integrations: [repository](https://github.com/prowler-cloud/prowler).
+- **Checkov** is the primary reference for IaC policy breadth, Terraform plan enrichment, graph context and CI output: [repository](https://github.com/bridgecrewio/checkov).
+- **Trivy** is a reference for developer-focused IaC scanning and CI workflows: [repository](https://github.com/aquasecurity/trivy).
+- **ScoutSuite** is a reference for multi-service inventory, offline review and honest visibility boundaries: [repository](https://github.com/nccgroup/ScoutSuite).
+- **Cloudsplaining and Parliament** are references for IAM policy risk analysis and policy linting: [Cloudsplaining](https://github.com/salesforce/cloudsplaining), [Parliament](https://github.com/duo-labs/parliament).
+
+These projects have different purposes, maturity, licensing and coverage. The aim is to learn from documented controls and benchmark behaviour—not to copy code blindly or claim equivalence without per-check evidence.
+
+### Roadmap rules
+
+- Every new rule needs positive, negative and unknown/incomplete tests, stable metadata, evidence, remediation and a documented permission requirement.
+- Provider discovery must distinguish success, empty, partial and failed states; access denied is not equivalent to “no findings.”
+- Do not retrieve secret values, database rows, object contents, queue messages or other customer payloads for posture checks.
+- Update registry inventory, rule coverage, README and relevant examples in the same change.
+- Keep Azure/GCP, account-wide organisation discovery and full effective-permission simulation as explicit future scope until their prerequisites are implemented and tested.
+- Reassess priorities after each phase using the benchmark ledger and live-validation evidence, not rule count alone.
 
 ## Project goals
 
