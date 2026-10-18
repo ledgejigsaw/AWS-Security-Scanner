@@ -283,6 +283,8 @@ def get_all_rules():
         check_sns_encryption_disabled,
         check_api_gateway_unauthenticated_methods,
         check_api_gateway_access_logging_disabled,
+        check_api_gateway_http_api_unauthenticated_routes,
+        check_api_gateway_http_api_access_logging_disabled,
         check_ecs_privileged_container,
         check_ecs_host_network_mode,
         check_ecs_root_user,
