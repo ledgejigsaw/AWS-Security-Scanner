@@ -13,7 +13,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | EC2 | 12 | Public IPv4, metadata options, sensitive ports and broad ingress/egress. Detailed monitoring and missing instance-profile checks are informational review signals, not universal requirements. |
 | EBS | 4 | Explicit unencrypted volume/snapshot states plus observed public snapshot create-volume and public AMI launch permissions. Permission-denied public-access checks remain unknown; approved cross-account sharing is not treated as public. |
 | VPC/network | 10 | Subnets, routes and network ACL baselines. Not a complete reachability or network-path analyser. |
-| CloudTrail | 6 | Trail logging, multi-region, log-file validation, CloudWatch Logs integration review, recent delivery errors and management-event selector coverage review. CloudWatch Logs absence is informational; it does not imply S3 delivery is broken. |
+| CloudTrail | 7 | Trail logging, multi-region, log-file validation, CloudWatch Logs integration review, recent delivery errors and management-event selector coverage review. CloudWatch Logs absence is informational; it does not imply S3 delivery is broken. |
 | Security Hub | 1 | Regional hub enablement; optional bounded native-finding import preserves source IDs and timestamps. Standards/control evaluation is not imported. |
 | GuardDuty | 1 | Regional detector enablement; optional bounded native-finding import preserves source IDs and timestamps. |
 | AWS Config | 3 | Regional recorder configuration, recording state and delivery-channel presence. Missing status remains unknown; API errors fail discovery. |
@@ -35,7 +35,7 @@ Terraform inputs may be supplied as Terraform JSON or direct HCL. Direct HCL acc
 | CloudWatch | 2 | Missing explicit log-group retention (LOW, policy-dependent) and metric alarms without enabled alarm actions (INFO review signal). The scanner does not read log events or claim that generic alarms cover every security control. |
 | EFS | 2 | Explicitly unencrypted file systems and an informational review signal for access points configured with POSIX UID 0. Network reachability is not inferred from security-group IDs alone. |
 | CodeBuild | 2 | Privileged build mode and sensitive-looking environment variable names explicitly stored as PLAINTEXT. Values are never collected; the checks are not a full build-supply-chain analysis. |
-| **Total** | **126** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
+| **Total** | **127** | Includes Security Hub, GuardDuty, AWS Config and Amazon Macie posture checks. The registry contract tests validate unique IDs and metadata; re-run registry and CI checks when rules change. |
 
 ## Registry contract enforced by tests
 

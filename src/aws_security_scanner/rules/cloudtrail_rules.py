@@ -162,3 +162,33 @@ def check_cloudtrail_management_event_coverage(resource: Resource) -> list[Findi
         resource=resource.resource_id, region=resource.region,
         evidence="event_selector_discovery=success; no selector explicitly enables management events",
     )]
+
+@rule_for(
+    "aws_cloudtrail_trail",
+    check_id="CT-007",
+    service="CloudTrail",
+    severity=Severity.INFO,
+    category="Logging & Monitoring",
+    title="CloudTrail trail is account-scoped rather than organisation-scoped",
+    description=(
+        "The trail metadata explicitly identifies this as an account-level "
+        "trail. Account-level trails can be appropriate, but organisations "
+        "should review whether central organisation-wide logging is required. "
+        "This finding does not prove that no other organisation trail exists."
+    ),
+    remediation=(
+        "Review the organisation's central logging design and verify that an "
+        "appropriately managed organisation trail covers the required accounts "
+        "and regions. Retain account-level trails where they serve a documented purpose."
+    ),
+)
+def check_cloudtrail_organization_trail_review(resource: Resource) -> list[Finding]:
+    """Emit an informational review signal for explicitly account-scoped trails."""
+    if resource.attributes.get("is_organization_trail") is not False:
+        return []
+    return [Finding.from_rule(
+        check_cloudtrail_organization_trail_review,
+        resource=resource.resource_id,
+        region=resource.region,
+        evidence="is_organization_trail=false; organization_trail_scope=account",
+    )]
