@@ -87,3 +87,17 @@ def test_cloudtrail_unknown_selector_state_does_not_generate_finding():
     assert check_cloudtrail_management_event_coverage(make_trail(
         event_selector_discovery="unknown", management_events_logged=None,
     )) == []
+
+
+def test_account_scoped_trail_generates_informational_organization_review():
+    from aws_security_scanner.rules.cloudtrail_rules import check_cloudtrail_organization_trail_review
+    findings = check_cloudtrail_organization_trail_review(make_trail(is_organization_trail=False))
+    assert len(findings) == 1
+    assert findings[0].check_id == "CT-007"
+    assert findings[0].severity == Severity.INFO
+    assert "does not prove" not in findings[0].evidence
+
+
+def test_unknown_organization_trail_scope_does_not_generate_finding():
+    from aws_security_scanner.rules.cloudtrail_rules import check_cloudtrail_organization_trail_review
+    assert check_cloudtrail_organization_trail_review(make_trail(is_organization_trail=None)) == []
