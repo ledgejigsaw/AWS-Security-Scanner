@@ -130,15 +130,25 @@ def build_resource_graph(
                     if candidate.resource_type in target_types
                     and candidate.resource_id == reference
                     and candidate.source == resource.source
-                    and (candidate.region is None or resource.region is None or candidate.region == resource.region)
-                    and (candidate.account_id is None or resource.account_id is None or candidate.account_id == resource.account_id)
+                    and candidate.region == resource.region
+                    and candidate.account_id == resource.account_id
                 ]
                 if len(matching_ids) == 1:
                     target = matching_ids[0]
-            if target is None:
+            # A typed attribute reference (for example vpc_id) must not
+            # fall back to a same-named resource in another account/region
+            # after the scope-aware lookup failed.
+            if target is None and target_types is None:
                 matching_ids = by_id.get(reference, [])
                 if len(matching_ids) == 1:
-                    target = matching_ids[0]
+                    candidate_id = matching_ids[0]
+                    candidate = ids[candidate_id]
+                    if (
+                        candidate.source == resource.source
+                        and candidate.region == resource.region
+                        and candidate.account_id == resource.account_id
+                    ):
+                        target = candidate_id
             if target is None:
                 safe_reference = "<unresolved-expression>" if "${" in reference else reference[:256]
                 unresolved.append({
