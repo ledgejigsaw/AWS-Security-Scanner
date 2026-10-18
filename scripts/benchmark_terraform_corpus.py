@@ -49,7 +49,7 @@ def _validate_manifest(manifest: Any, repo_root: Path) -> list[dict[str, Any]]:
             raise ValueError(f"Benchmark case '{case_id}' expected_check_ids must be a list of non-empty strings.")
         if len(expected_ids) != len(set(expected_ids)):
             raise ValueError(f"Benchmark case '{case_id}' contains duplicate expected check IDs.")
-        if expected_status not in {"complete", "incomplete"}:
+        if not isinstance(expected_status, str) or expected_status not in {"complete", "incomplete"}:
             raise ValueError(f"Benchmark case '{case_id}' expected_status must be 'complete' or 'incomplete'.")
         case_path = (root / path_value).resolve()
         if not case_path.is_relative_to(root):
@@ -57,7 +57,7 @@ def _validate_manifest(manifest: Any, repo_root: Path) -> list[dict[str, Any]]:
         if not case_path.exists():
             raise ValueError(f"Benchmark case '{case_id}' path does not exist: {path_value}")
         case_class = case.get("class", "unspecified")
-        if case_class not in {"secure", "insecure", "unknown", "unspecified"}:
+        if not isinstance(case_class, str) or case_class not in {"secure", "insecure", "unknown", "unspecified"}:
             raise ValueError(f"Benchmark case '{case_id}' has unsupported class: {case_class}")
         if "notes" in case and not isinstance(case["notes"], str):
             raise ValueError(f"Benchmark case '{case_id}' notes must be a string.")
