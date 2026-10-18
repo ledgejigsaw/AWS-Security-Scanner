@@ -91,7 +91,6 @@ def test_discovery_coverage_marks_successful_empty_service():
 
 
 from aws_security_scanner.discovery_coverage import (
-    DiscoveryOutcome,
     DiscoveryOperation,
     DiscoveryOutcome,
     summarise_discovery_operations,
