@@ -1,5 +1,5 @@
 import json
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 from botocore.exceptions import ClientError
@@ -203,5 +203,5 @@ def test_aws_provider_uses_injected_session_for_client_creation():
     AWSProvider(session=session, region="eu-west-2")
     called_services = {call.args[0] for call in session.client.call_args_list}
     assert {"s3", "iam", "eks", "logs", "cloudwatch", "efs", "codebuild"} <= called_services
-    session.client.assert_any_call("s3", region_name="eu-west-2")
+    session.client.assert_any_call("s3", region_name="eu-west-2", config=ANY)
     assert not any(call.args[0] == "sts" for call in session.client.call_args_list)
