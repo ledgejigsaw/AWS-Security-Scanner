@@ -113,7 +113,7 @@ The scanner checks that each selected region has an enabled GuardDuty detector. 
 | GuardDuty | Regional detector enablement posture and optional bounded native-finding import, preserving source IDs and timestamps |
 | AWS Config | Regional recorder status, recording state and delivery-channel presence; API permission failures are not treated as disabled state |
 | Amazon Macie | Regional session enablement/paused status; does not assess discovery-job coverage or delegated-administrator configuration |
-| KMS | Automatic rotation, pending deletion, broad wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals |
+| KMS | Automatic rotation, disabled/pending-deletion lifecycle, broad wildcard key-policy access, unconditional cross-account access and high-impact grant operations as review signals; grant pagination completeness is tracked |
 | RDS | Storage encryption, public accessibility, automated-backup retention and deletion protection |
 | Lambda | Function URLs configured with unauthenticated access, unconditional wildcard-principal invocation policies and runtimes explicitly listed as deprecated in the reviewed AWS lifecycle snapshot |
 | Secrets Manager | Explicitly disabled automatic rotation and unconditional wildcard-principal access in resource policies |
