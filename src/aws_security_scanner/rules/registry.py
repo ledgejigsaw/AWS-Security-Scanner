@@ -113,6 +113,8 @@ from aws_security_scanner.rules.messaging_rules import (
 from aws_security_scanner.rules.api_gateway_rules import (
     check_api_gateway_unauthenticated_methods,
     check_api_gateway_access_logging_disabled,
+    check_api_gateway_http_api_unauthenticated_routes,
+    check_api_gateway_http_api_access_logging_disabled,
 )
 
 from aws_security_scanner.rules.ecs_rules import (
