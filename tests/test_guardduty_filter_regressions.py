@@ -9,6 +9,7 @@ def _provider():
     provider = AWSProvider.__new__(AWSProvider)
     provider.guardduty_client = Mock()
     provider.guardduty_client.list_detectors.return_value = {"DetectorIds": ["detector-1"]}
+    provider.guardduty_client.get_detector.return_value = {"Status": "ENABLED"}
     provider.guardduty_client.list_findings.return_value = {"FindingIds": ["finding-1"]}
     provider.guardduty_client.get_findings.return_value = {"Findings": [{"Id": "finding-1"}]}
     return provider
