@@ -69,3 +69,44 @@ def test_inline_policy_access_denied_is_not_reported_as_no_policy():
     assert result["status"] == "partial"
     assert user["inline_policies"][0]["status"] == "access_denied"
     assert "private" not in str(result)
+
+
+from aws_security_scanner.iam_policy_context import (
+    analyze_resource_policy_context,
+    collect_scp_context,
+)
+
+
+def test_resource_policy_context_is_reduced_to_static_analysis():
+    result = analyze_resource_policy_context([{
+        "resource_id": "bucket-policy",
+        "policy_document": {
+            "Statement": [{
+                "Effect": "Allow", "Principal": "*", "Action": "s3:GetObject", "Resource": "*"
+            }]
+        },
+    }])
+    assert result["status"] == "complete"
+    assert result["policies"][0]["analysis"]["statements"][0]["status"] == "broad_or_high_risk_allow_review"
+
+
+def test_unavailable_resource_policy_is_unknown_not_empty():
+    result = analyze_resource_policy_context([{"resource_id": "bucket-1"}])
+    assert result["status"] == "partial"
+    assert result["policies"][0]["status"] == "unknown"
+
+
+def test_scp_context_reads_attached_policies_and_marks_denied_targets_partial():
+    organizations = Mock()
+    organizations.list_policies_for_target.side_effect = [
+        {"Policies": [{"Id": "p-abc", "Name": "baseline"}]},
+        ClientError({"Error": {"Code": "AccessDenied", "Message": "private"}}, "ListPoliciesForTarget"),
+    ]
+    organizations.describe_policy.return_value = {
+        "Policy": {"Content": {"Statement": [{"Effect": "Deny", "Action": "iam:*", "Resource": "*"}]}}
+    }
+    result = collect_scp_context(organizations, ["ou-123", "123456789012"])
+    assert result["status"] == "partial"
+    assert result["policies"][0]["analysis"]["statements"][0]["status"] == "explicit_deny_statement"
+    assert result["failures"][0]["outcome"] == "access_denied"
+    assert "private" not in str(result)
