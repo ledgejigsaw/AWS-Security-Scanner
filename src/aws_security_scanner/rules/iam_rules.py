@@ -191,9 +191,14 @@ def check_wildcard_permissions(
             )
         )
 
-        # IAM-001 already handles unrestricted
-        # Action + Resource permissions.
-        if action_is_wildcard and resource_is_wildcard:
+        # IAM-001 handles only global Action="*" plus Resource="*".
+        # A service wildcard such as "s3:*" is not unrestricted across all
+        # AWS services and must remain eligible for IAM-002.
+        action_is_global_wildcard = (
+            action == "*"
+            or (isinstance(action, list) and "*" in action)
+        )
+        if action_is_global_wildcard and resource_is_wildcard:
             continue
 
         if (
