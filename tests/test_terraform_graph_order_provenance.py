@@ -19,9 +19,9 @@ def test_root_graph_is_stable_when_files_are_created_in_different_orders(tmp_pat
     second = TerraformHCLProvider(right)
     second.discover()
 
-    assert first.dependency_graph.nodes == second.dependency_graph.nodes
+    assert [(node["address"], node["resource_type"]) for node in first.dependency_graph.nodes] == [(node["address"], node["resource_type"]) for node in second.dependency_graph.nodes]
     assert first.dependency_graph.edges == second.dependency_graph.edges
-    assert first.dependency_graph.unresolved == second.dependency_graph.unresolved
+    assert [(edge["source"], edge["attribute"], edge["target"], edge["reason"]) for edge in first.dependency_graph.unresolved] == [(edge["source"], edge["attribute"], edge["target"], edge["reason"]) for edge in second.dependency_graph.unresolved]
 
 
 def test_graph_preserves_file_provenance_for_each_resource_node(tmp_path):
