@@ -13,6 +13,7 @@ from aws_security_scanner.providers.fixture import FixtureProvider
 from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.providers.terraform_hcl import TerraformHCLProvider
 from aws_security_scanner.providers.aws import AWSProvider
+from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
 from aws_security_scanner.integrations.securityhub import securityhub_to_finding
 from aws_security_scanner.integrations.guardduty import guardduty_to_finding
 from aws_security_scanner.integrations.access_analyzer import access_analyzer_to_finding
@@ -160,6 +161,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--profile",
         help="AWS shared-config profile to use (AWS source only; no credentials are accepted on the command line).",
+    )
+    parser.add_argument(
+        "--aws-permissions-preflight",
+        action="store_true",
+        help="Run one low-impact, read-only permission probe per selected AWS service before scanning; results are not proof of full API coverage.",
     )
     parser.add_argument(
         "--service",
@@ -480,7 +486,7 @@ def run_scan(
         valid_services = {
             "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
             "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
         }
         unknown = sorted(set(services) - valid_services)
         if unknown:
@@ -848,8 +854,10 @@ def main() -> None:
         parser.error("--accounts-file can only be used with --source aws")
     if args.accounts_file and args.file:
         parser.error("--accounts-file cannot be combined with --file")
-    if (args.profile or args.service) and args.source != "aws":
-        parser.error("--profile and --service can only be used with --source aws")
+    if (args.profile or args.service or args.aws_permissions_preflight) and args.source != "aws":
+        parser.error("--profile, --service, and --aws-permissions-preflight can only be used with --source aws")
+    if args.aws_permissions_preflight and args.accounts_file:
+        parser.error("--aws-permissions-preflight is not supported with --accounts-file; run it for each account explicitly")
     if args.accounts_file and args.profile:
         parser.error("--profile with --accounts-file is not supported; configure the default credential chain for the caller")
     if args.graph_output and args.accounts_file:
@@ -913,6 +921,20 @@ def main() -> None:
             live_aws_session = create_verified_aws_session(args.profile, args.region)
         except RuntimeError as exc:
             parser.error(str(exc))
+    permissions_preflight = None
+    if args.aws_permissions_preflight:
+        permissions_preflight = run_aws_permissions_preflight(
+            live_aws_session,
+            region=args.region,
+            services=args.service,
+        )
+        assessment_metadata = {"permissions_preflight": permissions_preflight}
+        print(f"AWS permissions preflight: {permissions_preflight['status']}")
+        for check in permissions_preflight.get("checks", []):
+            suffix = f" ({check['error_category']})" if check.get("error_category") else ""
+            print(f"Preflight {check['service']}: {check['outcome']}{suffix}")
+        if permissions_preflight["status"] != "complete":
+            print("Warning: preflight found permission or service-availability gaps; scanning will continue and discovery coverage remains authoritative.")
     if args.accounts_file:
         findings, assessment_metadata = run_multi_account_scan(
             args.accounts_file,
@@ -1030,6 +1052,7 @@ def main() -> None:
                 for item in discovery_coverage
             )
             report_assessment = {
+                **(assessment_metadata if isinstance(assessment_metadata, dict) else {}),
                 "discovery_coverage": discovery_coverage,
                 "discovery_summary": {
                     "services_assessed": len(discovery_coverage),
