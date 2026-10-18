@@ -49,3 +49,39 @@ def test_collect_pages_rejects_truncated_response_without_token():
 
     with pytest.raises(RuntimeError, match="truncated results without a continuation token"):
         _provider()._collect_pages(method, "Items")
+
+
+def test_aws_provider_applies_bounded_standard_retry_and_timeout_config():
+    from unittest.mock import Mock
+    from botocore.config import Config
+    from aws_security_scanner.providers.aws import AWSProvider
+
+    session = Mock()
+    provider = AWSProvider(session=session)
+    assert session.client.call_count > 1
+    config = session.client.call_args.kwargs["config"]
+    assert isinstance(config, Config)
+    assert config.retries["mode"] == "standard"
+    assert config.retries["total_max_attempts"] == 4
+    assert config.connect_timeout == 5
+    assert config.read_timeout == 30
+
+
+def test_aws_provider_uses_configured_default_pagination_page_limit():
+    from unittest.mock import Mock
+    from aws_security_scanner.providers.aws import AWSProvider
+
+    provider = AWSProvider(ec2_client=Mock(), max_pages=1)
+    provider.ec2_client.describe_vpcs.return_value = {
+        "Vpcs": [{"VpcId": "vpc-first"}],
+        "NextToken": "page-2",
+    }
+    with pytest.raises(RuntimeError, match="pagination limit of 1 pages"):
+        provider._collect_pages(provider.ec2_client.describe_vpcs, "Vpcs")
+
+
+def test_aws_provider_rejects_invalid_default_page_limit():
+    from aws_security_scanner.providers.aws import AWSProvider
+
+    with pytest.raises(ValueError, match="max_pages"):
+        AWSProvider(max_pages=0)
