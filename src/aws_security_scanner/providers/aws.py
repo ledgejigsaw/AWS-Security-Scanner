@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from aws_security_scanner.models.resource import Resource
@@ -57,6 +58,18 @@ def _cloudtrail_data_event_coverage(
 class AWSProvider:
     """Discover AWS resources using read-only boto3 clients."""
 
+    def _client(self, service: str, **kwargs: Any) -> Any:
+        """Create an AWS client with bounded standard-mode retries and timeouts."""
+        kwargs.setdefault(
+            "config",
+            Config(
+                retries={"mode": "standard", "total_max_attempts": 4},
+                connect_timeout=5,
+                read_timeout=30,
+            ),
+        )
+        return self._client_factory(service, **kwargs)
+
     def __init__(
         self,
         s3_client: Any | None = None,
@@ -93,11 +106,15 @@ class AWSProvider:
         cloudwatch_client: Any | None = None,
         efs_client: Any | None = None,
         codebuild_client: Any | None = None,
+        max_pages: int = 1000,
     ):
         self.region = region
+        if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
+            raise ValueError("max_pages must be a positive integer.")
+        self.max_pages = max_pages
         # Preserve the existing boto3.client path for single-account scans;
         # cross-account scans supply an in-memory session with assumed-role credentials.
-        self._client = session.client if session is not None else boto3.client
+        self._client_factory = session.client if session is not None else boto3.client
 
         self.s3_client = s3_client or self._client(
             "s3",
@@ -189,10 +206,12 @@ class AWSProvider:
         *,
         request_token: str = "NextToken",
         response_token: str = "NextToken",
-        max_pages: int = 1000,
+        max_pages: int | None = None,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
         """Collect pages with a hard bound and reject incomplete pagination."""
+        if max_pages is None:
+            max_pages = getattr(self, "max_pages", 1000)
         if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
             raise ValueError("max_pages must be a positive integer.")
 
@@ -1918,9 +1937,6 @@ class AWSProvider:
 
         return resources
 
-
-
-
     def discover_cloudtrail_trails(self) -> list[Resource]:
         """Discover CloudTrail trails and their logging status."""
         trails = self._collect_pages(
@@ -2044,6 +2060,8 @@ class AWSProvider:
 
             grants: list[dict[str, Any]] = []
             grant_discovery = "success"
+            grant_pages = 0
+            grant_pagination_complete = False
             marker = None
             seen_markers: set[str] = set()
             for _page in range(10):
@@ -2063,6 +2081,7 @@ class AWSProvider:
                     grant_discovery = "unknown"
                     grants = []
                     break
+                grant_pages += 1
                 for grant in page.get("Grants", []):
                     if isinstance(grant, dict):
                         grants.append({key: grant[key] for key in (
@@ -2070,6 +2089,7 @@ class AWSProvider:
                             "RetiringPrincipal", "Constraints",
                         ) if key in grant})
                 if not page.get("Truncated"):
+                    grant_pagination_complete = True
                     break
                 next_marker = page.get("NextMarker")
                 if not isinstance(next_marker, str) or not next_marker or next_marker in seen_markers:
@@ -2099,6 +2119,9 @@ class AWSProvider:
                         "key_policy": policy_document,
                         "grants": grants,
                         "grant_discovery": grant_discovery,
+                        "grant_count": len(grants) if grant_discovery == "success" else None,
+                        "grant_pages": grant_pages,
+                        "grant_pagination_complete": grant_pagination_complete if grant_discovery == "success" else None,
                     },
                     source="aws",
                     region=metadata.get("Arn", "").split(":")[3]
