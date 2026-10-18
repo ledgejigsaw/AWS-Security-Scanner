@@ -88,7 +88,6 @@ def test_cloudtrail_unknown_selector_state_does_not_generate_finding():
         event_selector_discovery="unknown", management_events_logged=None,
     )) == []
 
-
 def test_account_scoped_trail_generates_informational_organization_review():
     from aws_security_scanner.rules.cloudtrail_rules import check_cloudtrail_organization_trail_review
     findings = check_cloudtrail_organization_trail_review(make_trail(is_organization_trail=False))
