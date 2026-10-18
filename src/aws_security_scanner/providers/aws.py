@@ -171,7 +171,7 @@ class AWSProvider:
     ) -> list[dict[str, Any]]:
         """Collect pages with a hard bound and reject incomplete pagination."""
         if max_pages is None:
-            max_pages = self.max_pages
+            max_pages = getattr(self, "max_pages", 1000)
         if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
             raise ValueError("max_pages must be a positive integer.")
 
