@@ -1598,3 +1598,24 @@ def test_aws_provider_keeps_malformed_object_lock_response_unknown():
         "enabled": None,
         "default_retention": None,
     }
+
+
+def test_kms_grant_discovery_exposes_complete_pagination_metadata():
+    kms_client = Mock()
+    kms_client.list_keys.return_value = {"Keys": [{"KeyId": "key-1"}]}
+    kms_client.describe_key.return_value = {"KeyMetadata": {
+        "KeyId": "key-1", "Arn": "arn:aws:kms:eu-west-2:123456789012:key/key-1",
+        "KeyManager": "CUSTOMER", "KeySpec": "SYMMETRIC_DEFAULT",
+        "KeyUsage": "ENCRYPT_DECRYPT", "KeyState": "Enabled",
+    }}
+    kms_client.get_key_rotation_status.return_value = {"KeyRotationEnabled": True}
+    kms_client.get_key_policy.return_value = {"Policy": '{"Statement":[]}'}
+    kms_client.list_grants.side_effect = [
+        {"Grants": [{"GrantId": "g1", "Operations": ["Decrypt"]}], "Truncated": True, "NextMarker": "p2"},
+        {"Grants": [{"GrantId": "g2", "Operations": ["Encrypt"]}], "Truncated": False},
+    ]
+    resource = AWSProvider(kms_client=kms_client).discover_kms_keys()[0]
+    assert resource.attributes["grant_count"] == 2
+    assert resource.attributes["grant_pages"] == 2
+    assert resource.attributes["grant_pagination_complete"] is True
+    assert resource.attributes["grant_discovery"] == "success"

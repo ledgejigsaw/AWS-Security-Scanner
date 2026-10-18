@@ -2004,6 +2004,8 @@ class AWSProvider:
 
             grants: list[dict[str, Any]] = []
             grant_discovery = "success"
+            grant_pages = 0
+            grant_pagination_complete = False
             marker = None
             seen_markers: set[str] = set()
             for _page in range(10):
@@ -2023,6 +2025,7 @@ class AWSProvider:
                     grant_discovery = "unknown"
                     grants = []
                     break
+                grant_pages += 1
                 for grant in page.get("Grants", []):
                     if isinstance(grant, dict):
                         grants.append({key: grant[key] for key in (
@@ -2030,6 +2033,7 @@ class AWSProvider:
                             "RetiringPrincipal", "Constraints",
                         ) if key in grant})
                 if not page.get("Truncated"):
+                    grant_pagination_complete = True
                     break
                 next_marker = page.get("NextMarker")
                 if not isinstance(next_marker, str) or not next_marker or next_marker in seen_markers:
@@ -2059,6 +2063,9 @@ class AWSProvider:
                         "key_policy": policy_document,
                         "grants": grants,
                         "grant_discovery": grant_discovery,
+                        "grant_count": len(grants) if grant_discovery == "success" else None,
+                        "grant_pages": grant_pages,
+                        "grant_pagination_complete": grant_pagination_complete if grant_discovery == "success" else None,
                     },
                     source="aws",
                     region=metadata.get("Arn", "").split(":")[3]

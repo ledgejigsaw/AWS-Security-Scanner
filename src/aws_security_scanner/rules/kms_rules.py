@@ -48,19 +48,20 @@ def check_kms_key_rotation(resource: Resource) -> list[Finding]:
     service="KMS",
     severity=Severity.MEDIUM,
     category="Data Protection",
-    title="KMS key is scheduled for deletion",
+    title="KMS key is disabled or scheduled for deletion",
     description=(
-        "The KMS key is pending deletion. Once deletion completes, data "
-        "that depends on this key may become permanently inaccessible."
+        "The KMS key is disabled or pending deletion. A disabled key cannot "
+        "perform cryptographic operations; a key pending deletion may become " "permanently unavailable when its deletion window completes. Review whether this state is intentional."
     ),
     remediation=(
-        "Confirm the key is no longer required before deletion. If deletion "
-        "was not intended, cancel the scheduled deletion and review key usage."
+        "Review key ownership and dependencies. For a disabled key, confirm "
+        "the disabled state is intentional before enabling it; cancel scheduled " "deletion if the key is still required."
     ),
 )
 def check_kms_key_pending_deletion(resource: Resource) -> list[Finding]:
     """Detect KMS keys whose deletion has been scheduled."""
-    if resource.attributes.get("key_state") != "PendingDeletion":
+    key_state = resource.attributes.get("key_state")
+    if key_state not in {"PendingDeletion", "Disabled"}:
         return []
 
     return [
@@ -68,7 +69,7 @@ def check_kms_key_pending_deletion(resource: Resource) -> list[Finding]:
             check_kms_key_pending_deletion,
             resource=resource.resource_id,
             region=resource.region,
-            evidence="key_state=PendingDeletion",
+            evidence=f"key_state={key_state}",
         )
     ]
 
