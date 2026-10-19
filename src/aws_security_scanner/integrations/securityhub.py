@@ -6,6 +6,7 @@ full source payloads are intentionally excluded from reports.
 from __future__ import annotations
 
 from typing import Any
+from dataclasses import dataclass
 
 from aws_security_scanner.models.finding import Finding, Severity
 
@@ -117,3 +118,61 @@ def securityhub_to_finding(
         first_observed_at=first_observed if isinstance(first_observed, str) else None,
         last_observed_at=last_observed if isinstance(last_observed, str) else None,
     )
+
+
+@dataclass(frozen=True)
+class SecurityHubFetchResult:
+    """Bounded Security Hub query result with explicit truncation metadata."""
+    findings: tuple[Finding, ...]
+    pages_read: int
+    truncated: bool
+
+
+def fetch_securityhub_findings(client: Any, *, region: str | None = None, filters: dict[str, Any] | None = None, max_findings: int = 1000, max_pages: int = 100, page_size: int = 100) -> SecurityHubFetchResult:
+    """Fetch ASFF findings with bounded pagination; API errors propagate."""
+    for name, value in (("max_findings", max_findings), ("max_pages", max_pages), ("page_size", page_size)):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
+    page_size = min(page_size, 100)
+    token = None
+    seen_tokens: set[str] = set()
+    seen_ids: set[str] = set()
+    findings: list[Finding] = []
+    pages_read = 0
+    truncated = False
+    while pages_read < max_pages and len(findings) < max_findings:
+        kwargs: dict[str, Any] = {"MaxResults": page_size}
+        if filters:
+            kwargs["Filters"] = filters
+        if token:
+            kwargs["NextToken"] = token
+        response = client.get_findings(**kwargs)
+        pages_read += 1
+        items = response.get("Findings", [])
+        if not isinstance(items, list):
+            raise ValueError("Security Hub returned malformed Findings")
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            source_id = item.get("Id")
+            if not isinstance(source_id, str) or not source_id or source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+            finding = securityhub_to_finding(item, fallback_region=region)
+            if finding is not None:
+                findings.append(finding)
+                if len(findings) >= max_findings:
+                    break
+        next_token = response.get("NextToken")
+        if not next_token:
+            token = None
+            break
+        if not isinstance(next_token, str) or next_token in seen_tokens:
+            raise RuntimeError("Security Hub pagination returned a repeated or invalid token")
+        seen_tokens.add(next_token)
+        token = next_token
+    else:
+        truncated = bool(token) or len(findings) >= max_findings
+    if token:
+        truncated = True
+    return SecurityHubFetchResult(tuple(findings), pages_read, truncated)
