@@ -474,3 +474,14 @@ python scripts/export_rule_inventory.py --output reports/rule-inventory.json
 ```
 
 The [upstream-tool gap analysis](docs/upstream-tool-gap-analysis.md) distinguishes AWS CSPM from IaC scanning and tracks check-by-check mappings without claiming unverified parity.
+
+
+## Current implementation pull requests
+
+The following reviewable increments are open against `main`. They are not merged and their tests have not been run in the connected environment; run the local test suite and review each scope before merging.
+
+- [#236 — bounded Security Hub control finding ingestion](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/236), addressing [#113](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/113). Additive fetch helper with pagination bounds, deduplication and truncation metadata; CLI integration remains follow-up work.
+- [#237 — bounded GuardDuty regional finding ingestion](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/237), addressing [#114](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/114). Additive regional fetch helpers with filters and completeness metadata; CLI integration remains follow-up work.
+- [#238 — controlled live AWS validation evidence matrix](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/238), addressing [#121](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/121). Documents a manual, read-only validation process and service-domain evidence checklist.
+- [#239 — conservative Terraform static reference resolver](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/239), addressing [#172](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/172). Adds a bounded static-resolution primitive; HCL pipeline integration remains follow-up work.
+- [#240 — opt-in bounded pinned GitHub module fetching](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/240), addressing [#174](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/174). Supports allowlisted pinned GitHub root modules only; Registry downloads and CLI integration remain follow-up work.
