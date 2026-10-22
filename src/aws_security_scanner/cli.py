@@ -366,7 +366,9 @@ def discover_resources(
             if provider.dependency_graph is None:
                 raise RuntimeError('Terraform dependency graph was not built.')
             terraform_graph_output.parent.mkdir(parents=True, exist_ok=True)
-            rendered_graph = json.dumps(dependency_graph_to_dict(provider.dependency_graph), indent=2, sort_keys=True) + chr(10)
+            graph_payload = dependency_graph_to_dict(provider.dependency_graph)
+            graph_payload["static_reference_resolution"] = getattr(provider, "static_reference_resolution", {"resolved": [], "unresolved": []})
+            rendered_graph = json.dumps(graph_payload, indent=2, sort_keys=True) + chr(10)
             terraform_graph_output.write_text(rendered_graph, encoding='utf-8')
         return aggregate_s3_resources(resources)
 
