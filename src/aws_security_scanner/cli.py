@@ -54,6 +54,7 @@ from aws_security_scanner.scan_summary import (
     write_scan_summary,
 )
 from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
+from aws_security_scanner.data_services import discover_backup_inventory
 
 
 
@@ -174,7 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
             "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild", "backup",
         ],
         help="Limit AWS discovery to selected service domains; repeat to select multiple. Default: all supported domains.",
     )
@@ -398,6 +399,7 @@ def discover_resources(
             "cloudwatch": [provider.discover_cloudwatch_log_groups, provider.discover_cloudwatch_alarms],
             "efs": [provider.discover_efs_file_systems],
             "codebuild": [provider.discover_codebuild_projects],
+            "backup": [lambda: discover_backup_inventory(provider._client("backup", region_name=region), region=region or "unknown")],
         }
         selected_services = list(dict.fromkeys(services)) if services else list(discovery_by_service)
         resources = []
