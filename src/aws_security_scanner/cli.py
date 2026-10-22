@@ -1007,6 +1007,7 @@ def main() -> None:
             guardduty_updated_after=args.guardduty_updated_after,
             module_roots=args.module_root,
             var_files=args.var_file,
+            terraform_source_config=args.source_config,
         )
         if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result
