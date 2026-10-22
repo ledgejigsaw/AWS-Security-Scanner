@@ -1015,6 +1015,7 @@ def main() -> None:
             guardduty_updated_after=args.guardduty_updated_after,
             module_roots=args.module_root,
             var_files=args.var_file,
+            terraform_graph_output=args.terraform_graph_output,
         )
         if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result
@@ -1027,7 +1028,6 @@ def main() -> None:
 
     baseline_action_requested = bool(
         args.write_baseline or args.compare_baseline or args.baseline
-        terraform_graph_output=args.terraform_graph_output,
     )
     failed_account_count = (
         assessment_metadata.get("summary", {}).get("failed_accounts", 0)
