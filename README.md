@@ -4,6 +4,18 @@ A Python-based, read-only cloud security posture assessment tool for AWS resourc
 
 > **Current status:** Active development. Fixture, Terraform JSON and partial Terraform HCL scans are available. The AWS provider supports read-only discovery for S3, IAM, EC2, VPC/network, CloudTrail, KMS, RDS, Lambda, Secrets Manager, ECR, DynamoDB, SQS, SNS, API Gateway REST API stages, ECS task definitions and ECS services, and CloudFront distributions, regional and CloudFront-scope WAFv2 Web ACLs, and Application Load Balancers with WAF association metadata, plus regional Security Hub, GuardDuty and AWS Config posture discovery, with optional bounded import of native Security Hub, GuardDuty, IAM Access Analyzer, Amazon Inspector and Macie findings. Live-account validation has not yet been completed.
 
+## Recent implementation batch — 22 October 2026
+
+The following implementation PRs are open for review and have not been merged or locally test-verified:
+
+- [#248 — AWS Backup discovery and recovery checks](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/248) — issue [#231](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/231). Adds read-only Backup vault/plan/protected-resource discovery and a conservative missing-backup-evidence review signal.
+- [#249 — Terraform plan source attribution](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/249) — issue [#232](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/232). Optionally links plan resources to HCL files using exact canonical addresses; it does not fabricate source line numbers.
+- [#250 — Offline differential benchmark](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/250) — issue [#233](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/233). Adds a versioned expected-outcome runner and manifest; the initial upstream mappings remain not reviewed and make no parity claim.
+- [#251 — Rule inventory and upstream mapping ledger](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/251) — issue [#176](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/176). Adds rule source/attribute/test-reference inventory metadata and validation of a versioned mapping ledger.
+- [#252 — Terraform static reference resolution and graph export](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/252) — issue [#172](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/172). Adds conservative exact-reference resolution and optional HCL dependency graph JSON output.
+
+These are integrated into the existing CLI and registry where applicable. Unknown, unobserved, and unsupported states remain explicit. No AWS credentials or live-account validation are required for the offline workflows. Run the local pytest suite and the new scripts before merging; no tests were run as part of this batch.
+
 ## At a glance
 
 - **129 registered security rules:** 18 S3, 17 IAM, 12 EC2, 4 EBS, 10 VPC/network, 7 CloudTrail, 1 Security Hub, 1 GuardDuty, 3 AWS Config, 1 Macie, 5 KMS, 5 RDS, 4 Lambda, 2 Secrets Manager, 2 ECR, 3 DynamoDB, 2 SQS, 2 SNS, 4 API Gateway (REST and HTTP APIs), 7 ECS, 4 CloudFront, 2 WAF, 4 Application Load Balancer, 3 EKS, 2 CloudWatch, 2 EFS and 2 CodeBuild checks.
