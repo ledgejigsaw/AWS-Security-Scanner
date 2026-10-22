@@ -54,6 +54,7 @@ from aws_security_scanner.scan_summary import (
     write_scan_summary,
 )
 from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
+from aws_security_scanner.terraform_dependency_graph import dependency_graph_to_dict
 
 
 
@@ -134,6 +135,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--file",
         type=Path,
         help="Fixture directory, Terraform JSON/HCL file or versioned resource snapshot JSON file.",
+    )
+    parser.add_argument(
+        "--terraform-graph-output", type=Path,
+        help="Write the offline HCL dependency graph as JSON (HCL source only).",
     )
     parser.add_argument(
         "--module-root",
@@ -356,7 +361,14 @@ def discover_resources(
         if source_path is None:
             raise ValueError("--file is required when using the hcl source.")
         provider = TerraformHCLProvider(source_path, module_roots=module_roots, var_files=var_files)
-        return aggregate_s3_resources(provider.discover())
+        resources = provider.discover()
+        if terraform_graph_output is not None:
+            if provider.dependency_graph is None:
+                raise RuntimeError('Terraform dependency graph was not built.')
+            terraform_graph_output.parent.mkdir(parents=True, exist_ok=True)
+            rendered_graph = json.dumps(dependency_graph_to_dict(provider.dependency_graph), indent=2, sort_keys=True) + chr(10)
+            terraform_graph_output.write_text(rendered_graph, encoding='utf-8')
+        return aggregate_s3_resources(resources)
 
     if source == "snapshot":
         if source_path is None:
@@ -502,6 +514,7 @@ def run_scan(
     guardduty_updated_after: str | None = None,
     module_roots: list[Path] | None = None,
     var_files: list[Path] | None = None,
+    terraform_graph_output: Path | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -879,6 +892,8 @@ def main() -> None:
         parser.error("--risk-config requires --risk-score")
     if args.include_native_findings and args.source != "aws":
         parser.error("--include-native-findings can only be used with --source aws")
+    if args.terraform_graph_output and args.source != "hcl":
+        parser.error("--terraform-graph-output can only be used with --source hcl")
     if args.module_root and args.source != "hcl":
         parser.error("--module-root can only be used with --source hcl")
     if args.accounts_file and args.source != "aws":
@@ -1012,6 +1027,7 @@ def main() -> None:
 
     baseline_action_requested = bool(
         args.write_baseline or args.compare_baseline or args.baseline
+        terraform_graph_output=args.terraform_graph_output,
     )
     failed_account_count = (
         assessment_metadata.get("summary", {}).get("failed_accounts", 0)
