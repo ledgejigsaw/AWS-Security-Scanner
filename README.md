@@ -485,3 +485,14 @@ The following reviewable increments are open against `main`. They are not merged
 - [#238 — controlled live AWS validation evidence matrix](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/238), addressing [#121](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/121). Documents a manual, read-only validation process and service-domain evidence checklist.
 - [#239 — conservative Terraform static reference resolver](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/239), addressing [#172](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/172). Adds a bounded static-resolution primitive; HCL pipeline integration remains follow-up work.
 - [#240 — opt-in bounded pinned GitHub module fetching](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/240), addressing [#174](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/174). Supports allowlisted pinned GitHub root modules only; Registry downloads and CLI integration remain follow-up work.
+
+
+## Current implementation batch (22 October 2026)
+
+The following focused pull requests are open for review. They are incremental implementation work, not yet merged or locally test-verified. Several introduce reusable primitives that still need integration into the main scan orchestration; the PR descriptions identify those boundaries.
+
+- [#242 — rule inventory drift check](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/242), for [issue #234](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/234). Checks registry ID uniqueness and the README's total registered-rule count.
+- [#243 — IAM policy structural analysis](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/243), for [issue #227](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/227). Models supported statement fields and explicit unknown/incomplete semantics; existing rules are not yet wired to consume it.
+- [#244 — evidence-bounded network relationship analysis](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/244), for [issue #228](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/228). Builds a provenance-aware relationship graph and avoids claiming reachability from incomplete evidence.
+- [#245 — enabled-region scope planner](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/245), for [issue #229](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/229). Adds deterministic region selection and bounded enabled-region enumeration; CLI integration remains outstanding.
+- [#246 — data and analytics service discovery helpers](https://github.com/ledgejigsaw/AWS-Security-Scanner/pull/246), for [issue #230](https://github.com/ledgejigsaw/AWS-Security-Scanner/issues/230). Adds metadata-only collectors for OpenSearch, Redshift, ElastiCache, MSK and AWS Backup; provider orchestration and service-specific rules remain outstanding.
