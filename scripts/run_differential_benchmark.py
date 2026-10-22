@@ -75,7 +75,7 @@ def main() -> int:
     args = parser.parse_args()
     manifest_path = args.manifest.resolve()
     manifest = load_manifest(manifest_path)
-    results = [run_case(case) for case in manifest["cases"] if case["upstream"]["status"] != "not-reviewed" or case.get("expected_check_ids")]
+    results = [run_case(case) for case in manifest["cases"]]
     report = {
         "schema_version": manifest["schema_version"],
         "benchmark_kind": manifest.get("benchmark_kind"),
