@@ -8,6 +8,16 @@ def _string_list(value: Any) -> tuple[str, ...] | None:
         return (value,)
     if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
         return tuple(sorted(set(value)))
+    # IAM Principal/NotPrincipal may be a mapping such as {"AWS": ["arn:..."]}.
+    # Flatten only known string/list values into deterministic typed tokens.
+    if isinstance(value, dict) and value:
+        tokens: list[str] = []
+        for principal_type, principals in value.items():
+            parsed = _string_list(principals)
+            if not isinstance(principal_type, str) or parsed is None:
+                return None
+            tokens.extend(f"{principal_type}:{principal}" for principal in parsed)
+        return tuple(sorted(set(tokens))) if tokens else None
     return None
 
 @dataclass(frozen=True)
