@@ -1,7 +1,8 @@
 """Deterministic dependency graph for offline Terraform HCL analysis."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+import re
 from typing import Any
 
 from aws_security_scanner.models.resource import Resource
@@ -202,3 +203,77 @@ def dependency_diagnostics(graph: DependencyGraph, resources: list[Resource]) ->
             source_address=f"{source}#dependency-cycle",
         ))
     return diagnostics
+
+
+_REFERENCE = re.compile(r"^(?:\$\{)?(?P<address>(?:module\.[A-Za-z0-9_-]+\.)*(?:aws_[A-Za-z0-9_]+|[A-Za-z0-9_]+)\.[A-Za-z0-9_-]+)\.(?P<attribute>[A-Za-z0-9_-]+)(?:\})?$")
+
+
+def resolve_static_resource_attributes(resources: list[Resource]) -> dict[str, Any]:
+    """Resolve exact references to explicitly present scalar attributes only."""
+    by_address = {
+        resource.source_address: resource for resource in resources
+        if resource.source_address and resource.resource_type != "terraform_hcl_unsupported"
+    }
+    unresolved: list[dict[str, str]] = []
+    resolved: list[dict[str, str]] = []
+
+    def visit(value: Any, resource: Resource, path: str) -> Any:
+        if isinstance(value, dict):
+            return {key: visit(item, resource, f"{path}.{key}" if path else str(key)) for key, item in value.items()}
+        if isinstance(value, list):
+            return [visit(item, resource, f"{path}[{index}]") for index, item in enumerate(value)]
+        if not isinstance(value, str):
+            return value
+        match = _REFERENCE.fullmatch(value.strip())
+        if not match:
+            return value
+        address, attribute = match.group("address"), match.group("attribute")
+        target = by_address.get(address)
+        if target is None:
+            unresolved.append({"source": resource.source_address or resource.resource_id, "attribute": path, "reference": value, "reason": "target_not_discovered"})
+            return value
+        if attribute not in target.attributes:
+            unresolved.append({"source": resource.source_address or resource.resource_id, "attribute": path, "reference": value, "reason": "attribute_not_explicitly_observed"})
+            return value
+        candidate = target.attributes[attribute]
+        if isinstance(candidate, str) and (chr(36) + "{" in candidate or re.search(r"\b(?:var|local|module)\.", candidate)):
+            unresolved.append({"source": resource.source_address or resource.resource_id, "attribute": path, "reference": value, "reason": "target_value_is_expression"})
+            return value
+        if isinstance(candidate, (dict, list)) or candidate is None:
+            unresolved.append({"source": resource.source_address or resource.resource_id, "attribute": path, "reference": value, "reason": "target_value_not_static_scalar"})
+            return value
+        resolved.append({"source": resource.source_address or resource.resource_id, "attribute": path, "reference": value, "target": address + "." + attribute})
+        return candidate
+
+    for resource in resources:
+        if resource.resource_type == "terraform_hcl_unsupported":
+            continue
+        own_unresolved_start = len(unresolved)
+        resource.attributes = visit(resource.attributes, resource, "")
+        own_unresolved = unresolved[own_unresolved_start:]
+        if own_unresolved:
+            prior = resource.attributes.get("hcl_unresolved_expressions", [])
+            if not isinstance(prior, list):
+                prior = [str(prior)]
+            extra = [f"{item['attribute']}: {item['reference']} ({item['reason']})" for item in own_unresolved]
+            resource.attributes["hcl_unresolved_expressions"] = sorted(set(prior + extra))
+    return {
+        "resolved": sorted(resolved, key=lambda item: (item["source"], item["attribute"], item["target"])),
+        "unresolved": sorted(unresolved, key=lambda item: (item["source"], item["attribute"], item["reference"])),
+    }
+
+
+def dependency_graph_to_dict(graph: DependencyGraph) -> dict[str, Any]:
+    """Serialise graph nodes, edges, unresolved references and cycle membership."""
+    return {
+        "schema_version": "1.0.0",
+        "nodes": list(graph.nodes),
+        "edges": [asdict(edge) for edge in graph.edges],
+        "unresolved": list(graph.unresolved),
+        "cycle_nodes": list(graph.cycle_nodes),
+        "limitations": [
+            "Only extracted resource references are represented.",
+            "Static values are propagated only from explicit scalar attributes; provider-computed values remain unresolved.",
+            "This is a dependency graph, not a complete Terraform evaluator.",
+        ],
+    }
