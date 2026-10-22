@@ -14,6 +14,7 @@ from aws_security_scanner.providers.terraform import TerraformProvider
 from aws_security_scanner.terraform_dependency_graph import (
     build_dependency_graph,
     dependency_diagnostics,
+    resolve_static_resource_attributes,
 )
 
 
@@ -82,6 +83,7 @@ class TerraformHCLProvider:
                 unique.append(resource)
         # Construct and validate the graph only after all files and permitted
         # local modules have been discovered, so file order cannot affect edges.
+        self.static_reference_resolution = resolve_static_resource_attributes(unique)
         self.dependency_graph = build_dependency_graph(unique)
         unique.extend(dependency_diagnostics(self.dependency_graph, unique))
         return unique
