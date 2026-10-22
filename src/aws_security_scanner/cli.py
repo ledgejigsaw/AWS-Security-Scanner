@@ -136,6 +136,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fixture directory, Terraform JSON/HCL file or versioned resource snapshot JSON file.",
     )
     parser.add_argument(
+        "--source-config", type=Path,
+        help="Optional Terraform HCL root used to attribute terraform plan JSON resources to source files by exact address (Terraform JSON source only).",
+    )
+    parser.add_argument(
         "--module-root",
         type=Path,
         action="append",
@@ -348,7 +352,7 @@ def discover_resources(
                 "--file is required when using the terraform source."
             )
 
-        provider = TerraformProvider(source_path)
+        provider = TerraformProvider(source_path, source_config=terraform_source_config)
         resources = provider.discover()
         return aggregate_s3_resources(resources)
 
@@ -502,6 +506,7 @@ def run_scan(
     guardduty_updated_after: str | None = None,
     module_roots: list[Path] | None = None,
     var_files: list[Path] | None = None,
+    terraform_source_config: Path | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -879,6 +884,8 @@ def main() -> None:
         parser.error("--risk-config requires --risk-score")
     if args.include_native_findings and args.source != "aws":
         parser.error("--include-native-findings can only be used with --source aws")
+    if args.source_config and args.source != "terraform":
+        parser.error("--source-config can only be used with --source terraform")
     if args.module_root and args.source != "hcl":
         parser.error("--module-root can only be used with --source hcl")
     if args.accounts_file and args.source != "aws":
