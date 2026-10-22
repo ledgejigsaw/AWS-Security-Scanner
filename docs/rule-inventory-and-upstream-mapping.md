@@ -4,6 +4,7 @@ Generate the deterministic inventory and validate the versioned mapping ledger:
 
 ```bash
 python scripts/export_rule_inventory.py --output reports/rule-inventory.json
+python scripts/export_upstream_rule_mapping.py --output reports/upstream-rule-mapping.json
 python scripts/validate_upstream_rule_mapping.py
 ```
 
