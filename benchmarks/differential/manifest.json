@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_kind": "offline_differential_semantics",
+  "generated_at": "2026-10-22",
+  "scope_note": "This is a reviewed sample, not a parity claim. A local expected result can be checked offline; upstream equivalence requires manual semantic review and explicit versioned mapping.",
+  "upstream_tools": [
+    {
+      "name": "Prowler",
+      "repository": "https://github.com/prowler-cloud/prowler",
+      "version": null,
+      "execution_mode": "manual-reference",
+      "limitations": "Live-account checks are not run by this offline harness."
+    },
+    {
+      "name": "Checkov",
+      "repository": "https://github.com/bridgecrewio/checkov",
+      "version": null,
+      "execution_mode": "manual-reference",
+      "limitations": "IaC policy engine is not invoked by this offline harness."
+    }
+  ],
+  "statuses": [
+    "equivalent",
+    "partial",
+    "not-equivalent",
+    "not-applicable",
+    "not-reviewed"
+  ],
+  "cases": [
+    {
+      "id": "s3-public-bucket-fixture-001",
+      "source": "fixture",
+      "input": "tests/fixtures/s3/insecure_bucket.json",
+      "expected_check_ids": [
+        "S3-001"
+      ],
+      "expected_unresolved_diagnostics": [],
+      "upstream": {
+        "tool": "Prowler",
+        "check_id": null,
+        "url": "https://github.com/prowler-cloud/prowler",
+        "version": null,
+        "status": "not-reviewed",
+        "rationale": "No check-level semantic review has been recorded; do not infer equivalence from similar intent."
+      },
+      "provenance": "Repository fixture maintained by this project.",
+      "notes": "Regression smoke case for scanner output only; upstream parity remains not-reviewed."
+    },
+    {
+      "id": "s3-secure-bucket-fixture-001",
+      "source": "fixture",
+      "input": "tests/fixtures/s3/secure_bucket.json",
+      "expected_check_ids": [],
+      "expected_unresolved_diagnostics": [],
+      "upstream": {
+        "tool": "Prowler",
+        "check_id": null,
+        "url": "https://github.com/prowler-cloud/prowler",
+        "version": null,
+        "status": "not-reviewed",
+        "rationale": "The local secure fixture is a scanner regression case; no upstream semantic comparison has been reviewed."
+      },
+      "provenance": "Repository fixture maintained by this project.",
+      "notes": "Expected to produce no findings for this fixture. Passing does not establish upstream parity."
+    }
+  ]
+}
