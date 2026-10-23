@@ -361,7 +361,16 @@ def discover_resources(
         if source_path is None:
             raise ValueError("--file is required when using the hcl source.")
         provider = TerraformHCLProvider(source_path, module_roots=module_roots, var_files=var_files)
-        return aggregate_s3_resources(provider.discover())
+        resources = provider.discover()
+        if terraform_graph_output is not None:
+            if provider.dependency_graph is None:
+                raise RuntimeError('Terraform dependency graph was not built.')
+            terraform_graph_output.parent.mkdir(parents=True, exist_ok=True)
+            graph_payload = dependency_graph_to_dict(provider.dependency_graph)
+            graph_payload["static_reference_resolution"] = getattr(provider, "static_reference_resolution", {"resolved": [], "unresolved": []})
+            rendered_graph = json.dumps(graph_payload, indent=2, sort_keys=True) + chr(10)
+            terraform_graph_output.write_text(rendered_graph, encoding='utf-8')
+        return aggregate_s3_resources(resources)
 
     if source == "snapshot":
         if source_path is None:
