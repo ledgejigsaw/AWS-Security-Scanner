@@ -14,6 +14,10 @@ def _pages(call: Callable[..., dict[str, Any]], result_key: str, *, max_pages: i
     token, seen, items = None, set(), []
     for _ in range(max_pages):
         response = call(**({marker_key: token} if token else {}))
+        # A mocked or unavailable client can return a non-mapping placeholder.
+        # Preserve that as incomplete discovery rather than raising or claiming empty.
+        if not isinstance(response, dict):
+            return items, False
         values = response.get(result_key, [])
         if not isinstance(values, list):
             raise ValueError(f"AWS API returned malformed {result_key}")
