@@ -330,13 +330,18 @@ def discover_resources(
     discovery_coverage: list[dict] | None = None,
     module_roots: list[Path] | None = None,
     var_files: list[Path] | None = None,
+    terraform_source_config: Path | None = None,
+    terraform_graph_output: Path | None = None,
 ):
     """Discover resources from the selected source."""
     if module_roots and source != "hcl":
         raise ValueError("--module-root can only be used with --source hcl.")
     if var_files and source != "hcl":
         raise ValueError("--var-file can only be used with --source hcl.")
-
+    if terraform_source_config is not None and source != "terraform":
+        raise ValueError("--source-config can only be used with --source terraform.")
+    if terraform_graph_output is not None and source != "hcl":
+        raise ValueError("--terraform-graph-output can only be used with --source hcl.")
 
     if source == "fixture":
         if source_path is None:
@@ -549,7 +554,7 @@ def run_scan(
         aws_session = boto3.Session(profile_name=profile, region_name=region)
     discovery_coverage: list[dict] = []
     if aws_session is None and expected_account_id is None and services is None and not return_coverage:
-        resources = discover_resources(source, source_path, region, module_roots=module_roots, var_files=var_files)
+        resources = discover_resources(source, source_path, region, module_roots=module_roots, var_files=var_files, terraform_source_config=terraform_source_config, terraform_graph_output=terraform_graph_output)
     else:
         resources = discover_resources(
             source,
@@ -561,6 +566,8 @@ def run_scan(
             discovery_coverage if return_coverage else None,
             module_roots=module_roots,
             var_files=var_files,
+            terraform_source_config=terraform_source_config,
+            terraform_graph_output=terraform_graph_output,
         )
     if source == "snapshot" and return_coverage and source_path is not None:
         discovery_coverage.extend(load_resource_snapshot_coverage(source_path))
@@ -897,6 +904,8 @@ def main() -> None:
         parser.error("--include-native-findings can only be used with --source aws")
     if args.source_config and args.source != "terraform":
         parser.error("--source-config can only be used with --source terraform")
+    if args.terraform_graph_output and args.source != "hcl":
+        parser.error("--terraform-graph-output can only be used with --source hcl")
     if args.module_root and args.source != "hcl":
         parser.error("--module-root can only be used with --source hcl")
     if args.accounts_file and args.source != "aws":
@@ -1019,6 +1028,7 @@ def main() -> None:
             module_roots=args.module_root,
             var_files=args.var_file,
             terraform_source_config=args.source_config,
+            terraform_graph_output=args.terraform_graph_output,
         )
         if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result
