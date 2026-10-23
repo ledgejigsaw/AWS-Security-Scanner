@@ -523,6 +523,7 @@ def run_scan(
     module_roots: list[Path] | None = None,
     var_files: list[Path] | None = None,
     terraform_source_config: Path | None = None,
+    terraform_graph_output: Path | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
