@@ -9,8 +9,9 @@ from aws_security_scanner.models.resource import Resource
 class TerraformProvider:
     """Load and normalise legacy Terraform JSON and terraform show -json plans."""
 
-    def __init__(self, terraform_file: str | Path):
+    def __init__(self, terraform_file: str | Path, source_config: str | Path | None = None):
         self.terraform_file = Path(terraform_file)
+        self.source_config = Path(source_config) if source_config is not None else None
 
     def discover(self) -> list[Resource]:
         with self.terraform_file.open(encoding="utf-8") as file:
@@ -35,6 +36,9 @@ class TerraformProvider:
                             region=attributes.get("region"),
                         ))
         self._resolve_relationships(resources)
+        if self.source_config is not None and (isinstance(data.get("planned_values"), dict) or isinstance(data.get("resource_changes"), list)):
+            from aws_security_scanner.terraform_source_enrichment import enrich_plan_resources
+            resources = enrich_plan_resources(resources, self.source_config)
         return resources
 
     def _discover_plan(self, data: dict[str, Any]) -> list[Resource]:

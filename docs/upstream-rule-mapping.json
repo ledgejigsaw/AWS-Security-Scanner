@@ -1,0 +1,100 @@
+{
+  "schema_version": "1.0.0",
+  "purpose": "Versioned check-level comparison ledger. Rows remain not-reviewed until semantic evidence is recorded.",
+  "updated_on": "2026-10-22",
+  "status_values": [
+    "equivalent",
+    "partial",
+    "missing",
+    "not-applicable",
+    "not-reviewed"
+  ],
+  "upstream_projects": [
+    {
+      "name": "Prowler",
+      "repository": "https://github.com/prowler-cloud/prowler",
+      "license_review": "required-before-adapting-code"
+    },
+    {
+      "name": "ScoutSuite",
+      "repository": "https://github.com/nccgroup/ScoutSuite",
+      "license_review": "required-before-adapting-code"
+    },
+    {
+      "name": "Checkov",
+      "repository": "https://github.com/bridgecrewio/checkov",
+      "license_review": "required-before-adapting-code"
+    }
+  ],
+  "mappings": [
+    {
+      "scanner_check_id": "S3-001",
+      "upstream_project": "Prowler",
+      "upstream_check_id": null,
+      "upstream_url": "https://github.com/prowler-cloud/prowler",
+      "upstream_version": null,
+      "status": "not-reviewed",
+      "rationale": "Review exact public-bucket condition, ACL/policy semantics, resource scope, exclusions, severity and unknown/error handling before claiming equivalence.",
+      "evidence_required": [
+        "secure fixture",
+        "public exposure fixture",
+        "unknown/permission-failure fixture"
+      ]
+    },
+    {
+      "scanner_check_id": "S3-002",
+      "upstream_project": "Prowler",
+      "upstream_check_id": null,
+      "upstream_url": "https://github.com/prowler-cloud/prowler",
+      "upstream_version": null,
+      "status": "not-reviewed",
+      "rationale": "Review exact encryption evidence and exceptions; similar names do not establish equivalent semantics.",
+      "evidence_required": [
+        "encrypted fixture",
+        "explicitly unencrypted fixture",
+        "unknown encryption state"
+      ]
+    },
+    {
+      "scanner_check_id": null,
+      "upstream_project": "Checkov",
+      "upstream_check_id": null,
+      "upstream_url": "https://github.com/bridgecrewio/checkov",
+      "upstream_version": null,
+      "status": "not-reviewed",
+      "rationale": "Select an exact Terraform policy only after matching supported HCL/plan evidence and exclusions.",
+      "evidence_required": [
+        "HCL fixture",
+        "plan fixture",
+        "unresolved expression case"
+      ]
+    }
+  ],
+  "prioritization": [
+    {
+      "family": "IAM privilege and trust",
+      "priority": "P0",
+      "reason": "High impact if broad or cross-account access is confirmed; condition and boundary context must be explicit."
+    },
+    {
+      "family": "Public network reachability",
+      "priority": "P0",
+      "reason": "Requires joined route, subnet, security group, NACL and load-balancer evidence; missing edges remain unknown."
+    },
+    {
+      "family": "Data protection and recovery",
+      "priority": "P1",
+      "reason": "Assess configured protection separately from freshness and restore-tested evidence."
+    },
+    {
+      "family": "Logging and detection",
+      "priority": "P1",
+      "reason": "Keep regional/global scope and permission-denied states visible."
+    },
+    {
+      "family": "Container and build supply chain",
+      "priority": "P2",
+      "reason": "Prioritise immutable image references, provenance and secret exposure based on observed metadata."
+    }
+  ]
+}

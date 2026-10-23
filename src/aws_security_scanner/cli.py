@@ -54,7 +54,7 @@ from aws_security_scanner.scan_summary import (
     write_scan_summary,
 )
 from aws_security_scanner.permissions_preflight import run_aws_permissions_preflight
-from aws_security_scanner.terraform_dependency_graph import dependency_graph_to_dict
+from aws_security_scanner.data_services import discover_backup_inventory
 
 
 
@@ -137,8 +137,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fixture directory, Terraform JSON/HCL file or versioned resource snapshot JSON file.",
     )
     parser.add_argument(
-        "--terraform-graph-output", type=Path,
-        help="Write the offline HCL dependency graph as JSON (HCL source only).",
+        "--source-config", type=Path,
+        help="Optional Terraform HCL root used to attribute terraform plan JSON resources to source files by exact address (Terraform JSON source only).",
     )
     parser.add_argument(
         "--module-root",
@@ -179,7 +179,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
             "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
+            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild", "backup",
         ],
         help="Limit AWS discovery to selected service domains; repeat to select multiple. Default: all supported domains.",
     )
@@ -353,7 +353,7 @@ def discover_resources(
                 "--file is required when using the terraform source."
             )
 
-        provider = TerraformProvider(source_path)
+        provider = TerraformProvider(source_path, source_config=terraform_source_config)
         resources = provider.discover()
         return aggregate_s3_resources(resources)
 
@@ -412,6 +412,7 @@ def discover_resources(
             "cloudwatch": [provider.discover_cloudwatch_log_groups, provider.discover_cloudwatch_alarms],
             "efs": [provider.discover_efs_file_systems],
             "codebuild": [provider.discover_codebuild_projects],
+            "backup": [lambda: discover_backup_inventory(provider._client("backup", region_name=region), region=region or "unknown")],
         }
         selected_services = list(dict.fromkeys(services)) if services else list(discovery_by_service)
         resources = []
@@ -516,7 +517,7 @@ def run_scan(
     guardduty_updated_after: str | None = None,
     module_roots: list[Path] | None = None,
     var_files: list[Path] | None = None,
-    terraform_graph_output: Path | None = None,
+    terraform_source_config: Path | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -894,8 +895,8 @@ def main() -> None:
         parser.error("--risk-config requires --risk-score")
     if args.include_native_findings and args.source != "aws":
         parser.error("--include-native-findings can only be used with --source aws")
-    if args.terraform_graph_output and args.source != "hcl":
-        parser.error("--terraform-graph-output can only be used with --source hcl")
+    if args.source_config and args.source != "terraform":
+        parser.error("--source-config can only be used with --source terraform")
     if args.module_root and args.source != "hcl":
         parser.error("--module-root can only be used with --source hcl")
     if args.accounts_file and args.source != "aws":
@@ -1017,7 +1018,7 @@ def main() -> None:
             guardduty_updated_after=args.guardduty_updated_after,
             module_roots=args.module_root,
             var_files=args.var_file,
-            terraform_graph_output=args.terraform_graph_output,
+            terraform_source_config=args.source_config,
         )
         if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result
