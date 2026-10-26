@@ -953,7 +953,7 @@ def main() -> None:
         parser.error("Security Hub filters require --include-native-findings")
     if (
         (args.guardduty_region or args.guardduty_record_state != "ALL"
-         or args.guardduty_updated_after is not None)
+         or args.guardduty_updated_after is not None or args.guardduty_type)
         and not args.include_native_findings
     ):
         parser.error("GuardDuty filters require --include-native-findings")
