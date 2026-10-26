@@ -2903,6 +2903,8 @@ class AWSProvider:
         workflow_statuses: list[str] | None = None,
         record_state: str | None = "ACTIVE",
         compliance_status: str | None = None,
+        generator_ids: list[str] | None = None,
+        product_arns: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Return bounded regional Security Hub findings with optional control filters.
 
@@ -2922,6 +2924,11 @@ class AWSProvider:
             raise ValueError("Security Hub record state must be ACTIVE, ARCHIVED or None.")
         if compliance_status not in {None, "PASSED", "WARNING", "FAILED", "NOT_AVAILABLE", "NOT_SUPPORTED"}:
             raise ValueError("Unsupported Security Hub compliance status.")
+        for label, values in (("generator_ids", generator_ids), ("product_arns", product_arns)):
+            if values is not None and (
+                not values or any(not isinstance(value, str) or not value.strip() for value in values)
+            ):
+                raise ValueError(f"{label} must be a non-empty list of non-empty strings when provided.")
 
         findings: list[dict[str, Any]] = []
         token: str | None = None
@@ -2938,6 +2945,16 @@ class AWSProvider:
         if compliance_status is not None:
             filters["ComplianceStatus"] = [
                 {"Comparison": "EQUALS", "Value": compliance_status}
+            ]
+        if generator_ids is not None:
+            filters["GeneratorId"] = [
+                {"Comparison": "EQUALS", "Value": value}
+                for value in dict.fromkeys(generator_ids)
+            ]
+        if product_arns is not None:
+            filters["ProductArn"] = [
+                {"Comparison": "EQUALS", "Value": value}
+                for value in dict.fromkeys(product_arns)
             ]
 
         while len(findings) < limit:

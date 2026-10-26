@@ -216,6 +216,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["PASSED", "WARNING", "FAILED", "NOT_AVAILABLE", "NOT_SUPPORTED"],
         help="Optional Security Hub control compliance-status filter.",
     )
+    parser.add_argument(
+        "--securityhub-generator-id",
+        action="append",
+        help="Filter native Security Hub findings by exact GeneratorId/control ID; repeat to include multiple values.",
+    )
+    parser.add_argument(
+        "--securityhub-product-arn",
+        action="append",
+        help="Filter native Security Hub findings by exact ProductArn; repeat to include multiple products.",
+    )
 
     parser.add_argument(
         "--guardduty-region",
@@ -529,6 +539,8 @@ def run_scan(
     securityhub_workflow_status: list[str] | None = None,
     securityhub_record_state: str = "ACTIVE",
     securityhub_compliance_status: str | None = None,
+    securityhub_generator_ids: list[str] | None = None,
+    securityhub_product_arns: list[str] | None = None,
     guardduty_regions: list[str] | None = None,
     guardduty_record_state: str = "ALL",
     guardduty_updated_after: str | None = None,
@@ -733,6 +745,8 @@ def run_scan(
                 workflow_statuses=securityhub_workflow_status,
                 record_state=None if securityhub_record_state == "ALL" else securityhub_record_state,
                 compliance_status=securityhub_compliance_status,
+                generator_ids=securityhub_generator_ids,
+                product_arns=securityhub_product_arns,
             )
             if return_coverage:
                 discovery_coverage.append({
@@ -964,7 +978,8 @@ def main() -> None:
         parser.error("--native-findings-limit requires --include-native-findings")
     if (
         (args.securityhub_workflow_status or args.securityhub_record_state != "ACTIVE"
-         or args.securityhub_compliance_status is not None)
+         or args.securityhub_compliance_status is not None
+         or args.securityhub_generator_id or args.securityhub_product_arn)
         and not args.include_native_findings
     ):
         parser.error("Security Hub filters require --include-native-findings")
@@ -1047,6 +1062,8 @@ def main() -> None:
             securityhub_workflow_status=args.securityhub_workflow_status,
             securityhub_record_state=args.securityhub_record_state,
             securityhub_compliance_status=args.securityhub_compliance_status,
+            securityhub_generator_ids=args.securityhub_generator_id,
+            securityhub_product_arns=args.securityhub_product_arn,
             guardduty_regions=args.guardduty_region,
             guardduty_record_state=args.guardduty_record_state,
             guardduty_updated_after=args.guardduty_updated_after,
