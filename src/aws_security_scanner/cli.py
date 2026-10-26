@@ -344,12 +344,6 @@ def discover_resources(
         raise ValueError("--module-root can only be used with --source hcl.")
     if var_files and source != "hcl":
         raise ValueError("--var-file can only be used with --source hcl.")
-    if (fetch_external_modules or module_cache or module_source_allowlist) and source != "hcl":
-        raise ValueError("External Terraform module options can only be used with --source hcl.")
-    if (module_cache or module_source_allowlist) and not fetch_external_modules:
-        raise ValueError("--module-cache and --module-source-allowlist require --fetch-external-modules.")
-    if fetch_external_modules and not module_source_allowlist:
-        raise ValueError("--fetch-external-modules requires at least one --module-source-allowlist entry.")
     if terraform_source_config is not None and source != "terraform":
         raise ValueError("--source-config can only be used with --source terraform.")
     if terraform_graph_output is not None and source != "hcl":
