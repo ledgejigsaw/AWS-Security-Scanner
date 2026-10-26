@@ -39,7 +39,7 @@ def _resolve_pinned_github_module(source: str, *, cache_dir: Path, allowlist: li
     from io import BytesIO
     from pathlib import PurePosixPath
     from urllib.parse import parse_qs, urlsplit
-    from urllib.request import Request, urlopen
+    from urllib.request import HTTPRedirectHandler, Request, build_opener
 
     value = source[5:] if source.startswith("git::") else source
     if not value.startswith("https://"):
@@ -86,8 +86,17 @@ def _resolve_pinned_github_module(source: str, *, cache_dir: Path, allowlist: li
     if manifest_path.is_file() and module_dir.is_dir() and any(module_dir.glob("*.tf")):
         return module_dir
     request = Request(f"https://codeload.github.com/{owner}/{repository}/zip/{refs[0].lower()}", headers={"User-Agent": "aws-security-scanner/terraform-module-fetch"})
+
+    class _CodeloadRedirectsOnly(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, message, headers, new_url):
+            redirected = urlsplit(new_url)
+            if redirected.scheme != "https" or redirected.hostname != "codeload.github.com":
+                raise ValueError("Module download redirect left the codeload.github.com HTTPS origin.")
+            return super().redirect_request(request, fp, code, message, headers, new_url)
+
+    opener = build_opener(_CodeloadRedirectsOnly())
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with opener.open(request, timeout=timeout_seconds) as response:
             final = urlsplit(response.geturl())
             if final.scheme != "https" or final.hostname != "codeload.github.com":
                 raise ValueError("Module download redirected outside codeload.github.com HTTPS.")
@@ -148,9 +157,11 @@ def _resolve_pinned_github_module(source: str, *, cache_dir: Path, allowlist: li
         shutil.move(str(roots[0]), str(target))
         manifest = {"schema_version": "1.0.0", "source": identity, "commit": refs[0].lower(), "subdirectory": subdirectory, "archive_sha256": archive_sha256, "network_origin": "https://codeload.github.com"}
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
-    except Exception:
+    except Exception as error:
         shutil.rmtree(staging, ignore_errors=True)
-        raise
+        if isinstance(error, ValueError):
+            raise
+        raise ValueError(f"Unable to safely unpack pinned GitHub module ({type(error).__name__}).") from error
     finally:
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
