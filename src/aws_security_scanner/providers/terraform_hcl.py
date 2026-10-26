@@ -28,12 +28,156 @@ def _unquote_label(value: str) -> str:
         return value[1:-1]
     return value
 
+_EXTERNAL_COMMIT = re.compile(r"^[0-9a-fA-F]{40}$")
+
+
+def _resolve_pinned_github_module(source: str, *, cache_dir: Path, allowlist: list[str] | None, timeout_seconds: int = 15) -> Path:
+    """Fetch an allowlisted immutable GitHub module archive without executing it."""
+    import hashlib
+    import shutil
+    import zipfile
+    from io import BytesIO
+    from pathlib import PurePosixPath
+    from urllib.parse import parse_qs, urlsplit
+    from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+    value = source[5:] if source.startswith("git::") else source
+    if not value.startswith("https://"):
+        raise ValueError("Only HTTPS GitHub module sources are supported.")
+    base, separator, query = value.partition("?")
+    if not separator:
+        raise ValueError("External module source must pin ref to a full 40-character commit SHA.")
+    params = parse_qs(query, keep_blank_values=True, strict_parsing=True)
+    refs = params.get("ref", [])
+    if len(refs) != 1 or not _EXTERNAL_COMMIT.fullmatch(refs[0]) or set(params) != {"ref"}:
+        raise ValueError("External module source must use only ref=<full 40-character commit SHA>.")
+    path = base[len("https://"):]
+    if not path.startswith("github.com/") or "@" in path or "#" in path:
+        raise ValueError("Only credential-free github.com HTTPS sources are supported.")
+    repo_path, marker, subdirectory = path[len("github.com/"):].partition("//")
+    pieces = repo_path.strip("/").split("/")
+    if len(pieces) != 2 or not all(pieces):
+        raise ValueError("GitHub source must identify exactly one owner and repository.")
+    owner, repository = pieces
+    if repository.endswith(".git"):
+        repository = repository[:-4]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", owner) or not re.fullmatch(r"[A-Za-z0-9_.-]+", repository):
+        raise ValueError("GitHub owner/repository contains unsupported characters.")
+    if marker:
+        subparts = PurePosixPath(subdirectory).parts
+        if not subdirectory or subdirectory.startswith("/") or any(part in {"", ".", ".."} for part in subparts):
+            raise ValueError("GitHub module subdirectory must be a safe relative path.")
+        subdirectory = "/".join(subparts)
+    else:
+        subdirectory = ""
+    identity = f"{owner}/{repository}".lower()
+    allowed = {str(item).strip().lower() for item in (allowlist or []) if str(item).strip()}
+    if not allowed:
+        raise ValueError("External module fetching requires at least one --module-source-allowlist OWNER/REPOSITORY entry.")
+    if identity not in allowed:
+        raise ValueError(f"External module source {identity!r} is not in the explicit allowlist.")
+    cache_dir = cache_dir.expanduser().resolve()
+    key = hashlib.sha256(f"{identity}@{refs[0].lower()}".encode()).hexdigest()
+    target = (cache_dir / key).resolve()
+    if not target.is_relative_to(cache_dir):
+        raise ValueError("External module cache path escaped the configured cache directory.")
+    module_dir = target / subdirectory if subdirectory else target
+    manifest_path = target / ".aws-security-scanner-module.json"
+    if manifest_path.is_file() and module_dir.is_dir() and any(module_dir.glob("*.tf")):
+        return module_dir
+    request = Request(f"https://codeload.github.com/{owner}/{repository}/zip/{refs[0].lower()}", headers={"User-Agent": "aws-security-scanner/terraform-module-fetch"})
+
+    class _CodeloadRedirectsOnly(HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, message, headers, new_url):
+            redirected = urlsplit(new_url)
+            if redirected.scheme != "https" or redirected.hostname != "codeload.github.com":
+                raise ValueError("Module download redirect left the codeload.github.com HTTPS origin.")
+            return super().redirect_request(request, fp, code, message, headers, new_url)
+
+    opener = build_opener(_CodeloadRedirectsOnly())
+    try:
+        with opener.open(request, timeout=timeout_seconds) as response:
+            final = urlsplit(response.geturl())
+            if final.scheme != "https" or final.hostname != "codeload.github.com":
+                raise ValueError("Module download redirected outside codeload.github.com HTTPS.")
+            chunks, total = [], 0
+            while True:
+                chunk = response.read(min(1024 * 1024, 25 * 1024 * 1024 + 1 - total))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > 25 * 1024 * 1024:
+                    raise ValueError("External module archive exceeds the 25 MiB download limit.")
+    except ValueError:
+        raise
+    except Exception as error:
+        raise ValueError(f"Unable to fetch pinned GitHub module ({type(error).__name__}).") from error
+    archive = b"".join(chunks)
+    archive_sha256 = hashlib.sha256(archive).hexdigest()
+    staging = target.with_name(target.name + ".staging")
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(BytesIO(archive)) as zipped:
+            members = zipped.infolist()
+            if len(members) > 1000:
+                raise ValueError("External module archive exceeds the 1,000-file limit.")
+            unpacked, roots = 0, set()
+            for member in members:
+                member_path = PurePosixPath(member.filename)
+                if member_path.is_absolute() or any(part in {"", ".", ".."} for part in member_path.parts):
+                    raise ValueError("External module archive contains an unsafe path.")
+                if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError("External module archive contains a symbolic link.")
+                unpacked += member.file_size
+                if unpacked > 100 * 1024 * 1024:
+                    raise ValueError("External module archive exceeds the 100 MiB unpacked limit.")
+                if member_path.parts:
+                    roots.add(member_path.parts[0])
+            if len(roots) != 1:
+                raise ValueError("External module archive must contain exactly one repository root.")
+            for member in members:
+                relative = PurePosixPath(member.filename)
+                destination = (staging / Path(*relative.parts)).resolve()
+                if not destination.is_relative_to(staging.resolve()):
+                    raise ValueError("External module archive path escaped extraction directory.")
+                if member.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                else:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with zipped.open(member) as src, destination.open("wb") as dst:
+                        shutil.copyfileobj(src, dst, length=1024 * 1024)
+        roots = list(staging.iterdir())
+        if len(roots) != 1 or not roots[0].is_dir():
+            raise ValueError("External module archive has an unexpected root layout.")
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.move(str(roots[0]), str(target))
+        manifest = {"schema_version": "1.0.0", "source": identity, "commit": refs[0].lower(), "subdirectory": subdirectory, "archive_sha256": archive_sha256, "network_origin": "https://codeload.github.com"}
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except Exception as error:
+        shutil.rmtree(staging, ignore_errors=True)
+        if isinstance(error, ValueError):
+            raise
+        raise ValueError(f"Unable to safely unpack pinned GitHub module ({type(error).__name__}).") from error
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+    if not module_dir.is_dir() or not any(module_dir.glob("*.tf")):
+        raise ValueError("Pinned archive does not contain Terraform files at the requested module path.")
+    return module_dir
+
 
 class TerraformHCLProvider:
     """Parse Terraform HCL and expand bounded local modules without running Terraform."""
 
-    def __init__(self, hcl_file: str | Path, module_roots: list[str | Path] | None = None, var_files: list[str | Path] | None = None):
+    def __init__(self, hcl_file: str | Path, module_roots: list[str | Path] | None = None, var_files: list[str | Path] | None = None, *, fetch_external_modules: bool = False, module_cache: str | Path | None = None, module_source_allowlist: list[str] | None = None):
         self.hcl_file = Path(hcl_file)
+        self.fetch_external_modules = bool(fetch_external_modules)
+        self.module_cache = Path(module_cache or Path.home() / ".cache" / "aws-security-scanner" / "terraform-modules")
+        self.module_source_allowlist = list(module_source_allowlist or [])
         self.module_roots = tuple(Path(root).resolve() for root in (module_roots or []))
         self.var_files = tuple(Path(path).resolve() for path in (var_files or []))
         self.dependency_graph = None
@@ -152,20 +296,35 @@ class TerraformHCLProvider:
                     source=source if isinstance(source, str) else None,
                 )
                 continue
-            if not isinstance(source, str) or not source.startswith(("./", "../")):
-                self._set_module_diagnostic(
-                    resources, address, declaring_file,
-                    "Only local relative module sources are expanded. Registry, Git and expression-based sources are not downloaded or executed.",
-                    source=source if isinstance(source, str) else None,
-                )
-                continue
-
-            child_dir = (declaring_file.parent / source).resolve()
-            allowed_roots = (scan_root.resolve(), *self.module_roots)
-            if not any(self._is_within(child_dir, allowed_root) for allowed_root in allowed_roots):
-                self._set_module_diagnostic(resources, address, declaring_file,
-                    "The local module source resolves outside the selected scan root and all explicitly trusted module roots; it was not followed.", source=source)
-                continue
+            external_module = not (isinstance(source, str) and source.startswith(("./", "../")))
+            if external_module:
+                if not self.fetch_external_modules:
+                    self._set_module_diagnostic(
+                        resources, address, declaring_file,
+                        "External module source was not fetched. Use --fetch-external-modules with a pinned GitHub commit and an explicit --module-source-allowlist entry to opt in.",
+                        source=source if isinstance(source, str) else None,
+                    )
+                    continue
+                try:
+                    child_dir = _resolve_pinned_github_module(
+                        source if isinstance(source, str) else "",
+                        cache_dir=self.module_cache,
+                        allowlist=self.module_source_allowlist,
+                    )
+                except (ValueError, OSError) as error:
+                    self._set_module_diagnostic(
+                        resources, address, declaring_file,
+                        f"External module was not expanded: {error}",
+                        source=source if isinstance(source, str) else None,
+                    )
+                    continue
+            else:
+                child_dir = (declaring_file.parent / source).resolve()
+                allowed_roots = (scan_root.resolve(), *self.module_roots)
+                if not any(self._is_within(child_dir, allowed_root) for allowed_root in allowed_roots):
+                    self._set_module_diagnostic(resources, address, declaring_file,
+                        "The local module source resolves outside the selected scan root and all explicitly trusted module roots; it was not followed.", source=source)
+                    continue
             if child_dir in (*active_stack, module_dir):
                 self._set_module_diagnostic(resources, address, declaring_file,
                     "A local module cycle was detected; expansion stopped at this call.", source=source)

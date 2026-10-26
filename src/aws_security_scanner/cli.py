@@ -154,6 +154,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Explicit Terraform HCL/JSON variable file; repeat in precedence order (HCL source only).",
     )
+    parser.add_argument("--fetch-external-modules", action="store_true", help="Opt in to fetching immutable GitHub Terraform modules; requires a full commit SHA and explicit --module-source-allowlist.")
+    parser.add_argument("--module-cache", type=Path, help="Cache directory for opt-in pinned external modules.")
+    parser.add_argument("--module-source-allowlist", action="append", default=None, metavar="OWNER/REPOSITORY", help="Explicit GitHub owner/repository allowlist for external module fetching; repeat for each repository.")
     parser.add_argument(
         "--accounts-file",
         type=Path,
@@ -332,6 +335,9 @@ def discover_resources(
     var_files: list[Path] | None = None,
     terraform_source_config: Path | None = None,
     terraform_graph_output: Path | None = None,
+    fetch_external_modules: bool = False,
+    module_cache: Path | None = None,
+    module_source_allowlist: list[str] | None = None,
 ):
     """Discover resources from the selected source."""
     if module_roots and source != "hcl":
@@ -342,6 +348,12 @@ def discover_resources(
         raise ValueError("--source-config can only be used with --source terraform.")
     if terraform_graph_output is not None and source != "hcl":
         raise ValueError("--terraform-graph-output can only be used with --source hcl.")
+    if (fetch_external_modules or module_cache or module_source_allowlist) and source != "hcl":
+        raise ValueError("External Terraform module options can only be used with --source hcl.")
+    if (module_cache or module_source_allowlist) and not fetch_external_modules:
+        raise ValueError("--module-cache and --module-source-allowlist require --fetch-external-modules.")
+    if fetch_external_modules and not module_source_allowlist:
+        raise ValueError("--fetch-external-modules requires at least one --module-source-allowlist entry.")
 
     if source == "fixture":
         if source_path is None:
@@ -365,7 +377,7 @@ def discover_resources(
     if source == "hcl":
         if source_path is None:
             raise ValueError("--file is required when using the hcl source.")
-        provider = TerraformHCLProvider(source_path, module_roots=module_roots, var_files=var_files)
+        provider = TerraformHCLProvider(source_path, module_roots=module_roots, var_files=var_files, fetch_external_modules=fetch_external_modules, module_cache=module_cache, module_source_allowlist=module_source_allowlist)
         resources = provider.discover()
         if terraform_graph_output is not None:
             if provider.dependency_graph is None:
@@ -524,6 +536,9 @@ def run_scan(
     var_files: list[Path] | None = None,
     terraform_source_config: Path | None = None,
     terraform_graph_output: Path | None = None,
+    fetch_external_modules: bool = False,
+    module_cache: Path | None = None,
+    module_source_allowlist: list[str] | None = None,
 ) -> list | tuple[list, list]:
     if include_native_findings and source != "aws":
         raise ValueError("--include-native-findings can only be used with --source aws.")
@@ -555,7 +570,7 @@ def run_scan(
         aws_session = boto3.Session(profile_name=profile, region_name=region)
     discovery_coverage: list[dict] = []
     if aws_session is None and expected_account_id is None and services is None and not return_coverage:
-        resources = discover_resources(source, source_path, region, module_roots=module_roots, var_files=var_files, terraform_source_config=terraform_source_config, terraform_graph_output=terraform_graph_output)
+        resources = discover_resources(source, source_path, region, module_roots=module_roots, var_files=var_files, terraform_source_config=terraform_source_config, terraform_graph_output=terraform_graph_output, fetch_external_modules=fetch_external_modules, module_cache=module_cache, module_source_allowlist=module_source_allowlist)
     else:
         resources = discover_resources(
             source,
@@ -569,6 +584,9 @@ def run_scan(
             var_files=var_files,
             terraform_source_config=terraform_source_config,
             terraform_graph_output=terraform_graph_output,
+            fetch_external_modules=fetch_external_modules,
+            module_cache=module_cache,
+            module_source_allowlist=module_source_allowlist,
         )
     if source == "snapshot" and return_coverage and source_path is not None:
         discovery_coverage.extend(load_resource_snapshot_coverage(source_path))
@@ -909,6 +927,12 @@ def main() -> None:
         parser.error("--terraform-graph-output can only be used with --source hcl")
     if args.module_root and args.source != "hcl":
         parser.error("--module-root can only be used with --source hcl")
+    if (args.fetch_external_modules or args.module_cache or args.module_source_allowlist) and args.source != "hcl":
+        parser.error("External Terraform module options can only be used with --source hcl")
+    if (args.module_cache or args.module_source_allowlist) and not args.fetch_external_modules:
+        parser.error("--module-cache and --module-source-allowlist require --fetch-external-modules")
+    if args.fetch_external_modules and not args.module_source_allowlist:
+        parser.error("--fetch-external-modules requires at least one --module-source-allowlist OWNER/REPOSITORY")
     if args.accounts_file and args.source != "aws":
         parser.error("--accounts-file can only be used with --source aws")
     if args.accounts_file and args.file:
@@ -1030,6 +1054,9 @@ def main() -> None:
             var_files=args.var_file,
             terraform_source_config=args.source_config,
             terraform_graph_output=args.terraform_graph_output,
+            fetch_external_modules=args.fetch_external_modules,
+            module_cache=args.module_cache,
+            module_source_allowlist=args.module_source_allowlist,
         )
         if (args.graph_output or args.snapshot_output) and args.source in {"aws", "snapshot"}:
             findings, graph_resources, discovery_coverage = scan_result

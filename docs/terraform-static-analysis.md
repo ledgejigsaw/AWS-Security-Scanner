@@ -44,6 +44,6 @@ A relationship edge does not imply that the target's provider-computed attribute
 - Child outputs are not a general-purpose expression engine; module output propagation remains a separate incremental capability.
 - Provider-dependent data sources and computed attributes remain unknown.
 - Line/column spans are not currently guaranteed by the parser integration.
-- Remote module retrieval should be a separate explicit opt-in with pinned sources, cache isolation and strict allowlists; it must not be enabled implicitly.
+- External module retrieval is opt-in via `--fetch-external-modules` and currently supports credential-free HTTPS GitHub sources pinned to a full 40-character commit SHA. Every repository must be explicitly allowed with `--module-source-allowlist OWNER/REPOSITORY`; mutable refs, query parameters other than `ref`, registry sources, private authenticated sources and non-GitHub hosts are rejected. Archives are bounded to 25 MiB downloaded, 100 MiB unpacked and 1,000 files, extracted with path/symlink checks, and cached with commit and SHA-256 provenance. The scanner never runs Terraform, Git, providers, provisioners or downloaded scripts. Network access remains disabled by default.
 
 Every supported extension should include positive, negative and unknown-state tests, preserve deterministic output, and run without AWS credentials or Terraform installed.
