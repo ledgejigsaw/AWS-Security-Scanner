@@ -954,7 +954,8 @@ def main() -> None:
         parser.error("--native-findings-limit requires --include-native-findings")
     if (
         (args.securityhub_workflow_status or args.securityhub_record_state != "ACTIVE"
-         or args.securityhub_compliance_status is not None)
+         or args.securityhub_compliance_status is not None
+         or args.securityhub_generator_id or args.securityhub_product_arn)
         and not args.include_native_findings
     ):
         parser.error("Security Hub filters require --include-native-findings")
