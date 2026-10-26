@@ -156,7 +156,7 @@ def _resolve_pinned_github_module(source: str, *, cache_dir: Path, allowlist: li
             shutil.rmtree(target)
         shutil.move(str(roots[0]), str(target))
         manifest = {"schema_version": "1.0.0", "source": identity, "commit": refs[0].lower(), "subdirectory": subdirectory, "archive_sha256": archive_sha256, "network_origin": "https://codeload.github.com"}
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     except Exception as error:
         shutil.rmtree(staging, ignore_errors=True)
         if isinstance(error, ValueError):
