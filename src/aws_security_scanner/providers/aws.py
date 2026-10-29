@@ -3040,6 +3040,7 @@ class AWSProvider:
         *,
         archived: bool | None = None,
         updated_after: str | None = None,
+        finding_types: list[str] | None = None,
         require_detector: bool = False,
     ) -> list[dict[str, Any]]:
         """Return bounded native GuardDuty findings with optional time/status filters.
@@ -3065,6 +3066,11 @@ class AWSProvider:
                 raise ValueError("updated_after must be an ISO-8601 date-time string.") from None
             if parsed_updated_after.tzinfo is None:
                 raise ValueError("updated_after must include a timezone, such as Z or +00:00.")
+        if finding_types is not None and (
+            not finding_types
+            or any(not isinstance(value, str) or not value.strip() for value in finding_types)
+        ):
+            raise ValueError("finding_types must be a non-empty list of non-empty strings when provided.")
 
         detector_ids = self._collect_pages(
             self.guardduty_client.list_detectors,
@@ -3096,6 +3102,8 @@ class AWSProvider:
                     criteria["service.archived"] = {"Eq": ["true" if archived else "false"]}
                 if updated_after is not None:
                     criteria["updatedAt"] = {"Gte": [updated_after]}
+                if finding_types is not None:
+                    criteria["type"] = {"Eq": list(dict.fromkeys(finding_types))}
                 if criteria:
                     request["FindingCriteria"] = {"Criterion": criteria}
                 if token:

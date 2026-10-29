@@ -238,6 +238,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--guardduty-updated-after",
         help="Optional ISO-8601 date-time lower bound for GuardDuty finding updates, e.g. 2026-10-01T00:00:00Z.",
     )
+    parser.add_argument(
+        "--guardduty-type",
+        action="append",
+        help="Filter native GuardDuty findings by exact finding type; repeat to include multiple types.",
+    )
 
     parser.add_argument(
         "--format",
@@ -511,6 +516,7 @@ def run_scan(
     guardduty_regions: list[str] | None = None,
     guardduty_record_state: str = "ALL",
     guardduty_updated_after: str | None = None,
+    guardduty_finding_types: list[str] | None = None,
     module_roots: list[Path] | None = None,
     var_files: list[Path] | None = None,
     terraform_source_config: Path | None = None,
@@ -776,6 +782,7 @@ def run_scan(
                     limit=native_findings_limit,
                     archived=archived_filter,
                     updated_after=guardduty_updated_after,
+                    finding_types=guardduty_finding_types,
                     require_detector=True,
                 )
                 if return_coverage:
@@ -948,7 +955,7 @@ def main() -> None:
         parser.error("Security Hub filters require --include-native-findings")
     if (
         (args.guardduty_region or args.guardduty_record_state != "ALL"
-         or args.guardduty_updated_after is not None)
+         or args.guardduty_updated_after is not None or args.guardduty_type)
         and not args.include_native_findings
     ):
         parser.error("GuardDuty filters require --include-native-findings")
@@ -1007,6 +1014,7 @@ def main() -> None:
             guardduty_regions=args.guardduty_region,
             guardduty_record_state=args.guardduty_record_state,
             guardduty_updated_after=args.guardduty_updated_after,
+            guardduty_finding_types=args.guardduty_type,
             module_roots=args.module_root,
         )
     else:
@@ -1030,6 +1038,7 @@ def main() -> None:
             guardduty_regions=args.guardduty_region,
             guardduty_record_state=args.guardduty_record_state,
             guardduty_updated_after=args.guardduty_updated_after,
+            guardduty_finding_types=args.guardduty_type,
             module_roots=args.module_root,
             var_files=args.var_file,
             terraform_source_config=args.source_config,
