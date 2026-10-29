@@ -58,6 +58,50 @@ def _cloudtrail_data_event_coverage(
 class AWSProvider:
     """Discover AWS resources using read-only boto3 clients."""
 
+    provider_name = "aws"
+    supported_services = (
+        "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
+        "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
+        "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub",
+        "guardduty", "config", "macie", "eks", "cloudwatch", "efs",
+        "codebuild", "backup",
+    )
+
+    def discovery_operations(self):
+        """Expose deterministic AWS discovery operations behind the provider contract."""
+        from aws_security_scanner.data_services import discover_backup_inventory
+
+        return {
+            "s3": [self.discover_s3_buckets, self.discover_s3_account_public_access_block],
+            "iam": [self.discover_iam_policies, self.discover_iam_roles, self.discover_iam_users, self.discover_iam_account],
+            "ec2": [self.discover_ec2_instances],
+            "ebs": [self.discover_ebs_volumes, self.discover_ebs_snapshots, self.discover_amis],
+            "vpc": [self.discover_security_groups, self.discover_vpcs, self.discover_subnets, self.discover_route_tables, self.discover_network_acls, self.discover_flow_logs],
+            "cloudtrail": [self.discover_cloudtrail_trails],
+            "kms": [self.discover_kms_keys],
+            "rds": [self.discover_rds_instances],
+            "lambda": [self.discover_lambda_functions],
+            "secretsmanager": [self.discover_secrets_manager_secrets],
+            "ecr": [self.discover_ecr_repositories],
+            "dynamodb": [self.discover_dynamodb_tables],
+            "sqs": [self.discover_sqs_queues],
+            "sns": [self.discover_sns_topics],
+            "apigateway": [self.discover_api_gateway_rest_apis, self.discover_api_gateway_http_apis],
+            "ecs": [self.discover_ecs_task_definitions, self.discover_ecs_services],
+            "cloudfront": [self.discover_cloudfront_distributions],
+            "waf": [lambda: self.discover_waf_web_acls("CLOUDFRONT"), lambda: self.discover_waf_web_acls("REGIONAL")],
+            "elb": [self.discover_application_load_balancers],
+            "securityhub": [self.discover_security_hub],
+            "guardduty": [self.discover_guardduty],
+            "config": [self.discover_aws_config],
+            "macie": [self.discover_macie_session],
+            "eks": [self.discover_eks_clusters],
+            "cloudwatch": [self.discover_cloudwatch_log_groups, self.discover_cloudwatch_alarms],
+            "efs": [self.discover_efs_file_systems],
+            "codebuild": [self.discover_codebuild_projects],
+            "backup": [lambda: discover_backup_inventory(self._client("backup", region_name=self.region), region=self.region or "unknown")],
+        }
+
     def _client(self, service: str, **kwargs: Any) -> Any:
         """Create an AWS client with bounded standard-mode retries and timeouts."""
         kwargs.setdefault(

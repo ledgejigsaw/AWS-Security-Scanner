@@ -179,11 +179,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--service",
         action="append",
-        choices=[
-            "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
-            "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild", "backup",
-        ],
+        choices=list(AWSProvider.supported_services),
         help="Limit AWS discovery to selected service domains; repeat to select multiple. Default: all supported domains.",
     )
 
@@ -411,36 +407,7 @@ def discover_resources(
             else AWSProvider(region=region)
         )
 
-        discovery_by_service = {
-            "s3": [provider.discover_s3_buckets, provider.discover_s3_account_public_access_block],
-            "iam": [provider.discover_iam_policies, provider.discover_iam_roles, provider.discover_iam_users, provider.discover_iam_account],
-            "ec2": [provider.discover_ec2_instances],
-            "ebs": [provider.discover_ebs_volumes, provider.discover_ebs_snapshots, provider.discover_amis],
-            "vpc": [provider.discover_security_groups, provider.discover_vpcs, provider.discover_subnets, provider.discover_route_tables, provider.discover_network_acls, provider.discover_flow_logs],
-            "cloudtrail": [provider.discover_cloudtrail_trails],
-            "kms": [provider.discover_kms_keys],
-            "rds": [provider.discover_rds_instances],
-            "lambda": [provider.discover_lambda_functions],
-            "secretsmanager": [provider.discover_secrets_manager_secrets],
-            "ecr": [provider.discover_ecr_repositories],
-            "dynamodb": [provider.discover_dynamodb_tables],
-            "sqs": [provider.discover_sqs_queues],
-            "sns": [provider.discover_sns_topics],
-            "apigateway": [provider.discover_api_gateway_rest_apis, provider.discover_api_gateway_http_apis],
-            "ecs": [provider.discover_ecs_task_definitions, provider.discover_ecs_services],
-            "cloudfront": [provider.discover_cloudfront_distributions],
-            "waf": [lambda: provider.discover_waf_web_acls("CLOUDFRONT"), lambda: provider.discover_waf_web_acls("REGIONAL")],
-            "elb": [provider.discover_application_load_balancers],
-            "securityhub": [provider.discover_security_hub],
-            "guardduty": [provider.discover_guardduty],
-            "config": [provider.discover_aws_config],
-            "macie": [provider.discover_macie_session],
-            "eks": [provider.discover_eks_clusters],
-            "cloudwatch": [provider.discover_cloudwatch_log_groups, provider.discover_cloudwatch_alarms],
-            "efs": [provider.discover_efs_file_systems],
-            "codebuild": [provider.discover_codebuild_projects],
-            "backup": [lambda: discover_backup_inventory(provider._client("backup", region_name=region), region=region or "unknown")],
-        }
+        discovery_by_service = provider.discovery_operations()
         selected_services = list(dict.fromkeys(services)) if services else list(discovery_by_service)
         resources = []
         for service in selected_services:
@@ -563,11 +530,7 @@ def run_scan(
     if profile and aws_session is not None:
         raise ValueError("--profile cannot be combined with an injected AWS session.")
     if services:
-        valid_services = {
-            "s3", "iam", "ec2", "ebs", "vpc", "cloudtrail", "kms", "rds",
-            "lambda", "secretsmanager", "ecr", "dynamodb", "sqs", "sns",
-            "apigateway", "ecs", "cloudfront", "waf", "elb", "securityhub", "guardduty", "config", "macie", "eks", "cloudwatch", "efs", "codebuild",
-        }
+        valid_services = set(AWSProvider.supported_services)
         unknown = sorted(set(services) - valid_services)
         if unknown:
             raise ValueError(f"Unsupported AWS service selection: {', '.join(unknown)}")
